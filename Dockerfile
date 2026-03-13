@@ -17,7 +17,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV AUTH_SECRET=build-time-placeholder
 ENV AUTH_TRUST_HOST=true
 ENV NODE_OPTIONS=--max-old-space-size=1536
-RUN npx next build --no-turbopack
+RUN npx next build --webpack --debug
 
 FROM node:20-alpine AS runner
 WORKDIR /app
