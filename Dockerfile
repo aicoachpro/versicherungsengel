@@ -16,7 +16,7 @@ RUN mkdir -p /app/data
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV AUTH_SECRET=build-time-placeholder
 ENV AUTH_TRUST_HOST=true
-RUN npm run build 2>&1
+RUN npm run build > /tmp/build.log 2>&1 || (cat /tmp/build.log && exit 1)
 
 FROM node:20-alpine AS runner
 WORKDIR /app
