@@ -13,7 +13,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+ENV AUTH_SECRET=build-time-placeholder
+ENV AUTH_TRUST_HOST=true
+RUN npm run build 2>&1
 
 FROM node:20-alpine AS runner
 WORKDIR /app
