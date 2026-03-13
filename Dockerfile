@@ -1,11 +1,9 @@
-FROM node:20-alpine AS base
-
-# Install dependencies for better-sqlite3
-RUN apk add --no-cache python3 make g++
+FROM node:20-slim AS base
 
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 RUN npm ci
 
 FROM base AS builder
@@ -17,9 +15,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV AUTH_SECRET=build-time-placeholder
 ENV AUTH_TRUST_HOST=true
 ENV NODE_OPTIONS=--max-old-space-size=1536
-RUN npx next build --webpack --debug
+RUN npm run build; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== BUILD FAILED ==="; cat .next/trace 2>/dev/null || true; exit $EXIT; fi
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
