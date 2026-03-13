@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    restart: always
+    environment:
+      - AUTH_SECRET=voelker-finance-sales-hub-secret-key-2024
+      - AUTH_TRUST_HOST=true
+    volumes:
+      - app_data:/app/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.leads.rule=Host(`leads.voelkergroup.cloud`)
+      - traefik.http.routers.leads.tls=true
+      - traefik.http.routers.leads.entrypoints=web,websecure
+      - traefik.http.routers.leads.tls.certresolver=mytlschallenge
+      - traefik.http.services.leads.loadbalancer.server.port=3000
+    networks:
+      - root_default
+
+volumes:
+  app_data:
+
+networks:
+  root_default:
+    external: true

@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data
+/data/
+*.db
+
+# claude
+.claude/
+cookies.txt
+cookies2.txt
+cookies3.txt
