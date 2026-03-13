@@ -16,7 +16,8 @@ RUN mkdir -p /app/data
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV AUTH_SECRET=build-time-placeholder
 ENV AUTH_TRUST_HOST=true
-RUN npm run build > /tmp/build.log 2>&1 || (cat /tmp/build.log && exit 1)
+ENV NODE_OPTIONS=--max-old-space-size=1536
+RUN npx next build --no-turbopack
 
 FROM node:20-alpine AS runner
 WORKDIR /app
