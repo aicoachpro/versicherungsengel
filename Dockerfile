@@ -15,7 +15,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV AUTH_SECRET=build-time-placeholder
 ENV AUTH_TRUST_HOST=true
 ENV NODE_OPTIONS=--max-old-space-size=1536
-RUN npm run build; EXIT=$?; if [ $EXIT -ne 0 ]; then echo "=== BUILD FAILED ==="; cat .next/trace 2>/dev/null || true; exit $EXIT; fi
+RUN npm run build
 
 FROM node:20-slim AS runner
 WORKDIR /app
