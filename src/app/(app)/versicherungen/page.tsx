@@ -303,7 +303,7 @@ export default function VersicherungenPage() {
             {/* Lead-Auswahl — Pflichtfeld */}
             <div>
               <Label>Lead *</Label>
-              <Select value={form.leadId} onValueChange={(v) => setForm({ ...form, leadId: v })}>
+              <Select value={form.leadId} onValueChange={(v) => setForm({ ...form, leadId: v ?? "" })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Lead zuordnen..." />
                 </SelectTrigger>
