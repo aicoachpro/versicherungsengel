@@ -122,23 +122,34 @@ export function KanbanBoard({
                         }).format(lead.umsatz)}
                       </p>
                     )}
-                    <div className="mt-2 flex gap-1">
+                    <div className="mt-2 flex items-center gap-1">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => onEdit(lead)}
+                        className="h-7 gap-1 text-xs px-2"
+                        onClick={() => router.push(`/pipeline/${lead.id}`)}
                       >
-                        <Edit2 className="h-3.5 w-3.5" />
+                        <ExternalLink className="h-3 w-3" />
+                        Details
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                        onClick={() => onDelete(lead.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="ml-auto flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => onEdit(lead)}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => onDelete(lead.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
