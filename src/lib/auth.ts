@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import * as OTPAuth from "otpauth";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -12,6 +13,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "E-Mail", type: "email" },
         password: { label: "Passwort", type: "password" },
+        totpCode: { label: "2FA Code", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -31,6 +33,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user.passwordHash
         );
         if (!isValid) return null;
+
+        // Check 2FA if enabled
+        if (user.totpEnabled && user.totpSecret) {
+          const totpCode = credentials.totpCode as string;
+          if (!totpCode) {
+            // Signal that 2FA is required
+            throw new Error("2FA_REQUIRED");
+          }
+
+          const totp = new OTPAuth.TOTP({
+            issuer: "VÖLKER Finance",
+            label: user.email,
+            algorithm: "SHA1",
+            digits: 6,
+            period: 30,
+            secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+          });
+
+          const delta = totp.validate({ token: totpCode, window: 1 });
+          if (delta === null) {
+            throw new Error("INVALID_TOTP");
+          }
+        }
 
         return {
           id: String(user.id),

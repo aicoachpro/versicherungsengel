@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function middleware(req: NextRequest) {
-  const isLoginPage = req.nextUrl.pathname === "/login";
-  const isWebhook = req.nextUrl.pathname.startsWith("/api/webhooks");
-  const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth");
+  const pathname = req.nextUrl.pathname;
+  const isPublicPage = pathname === "/login" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/verify-2fa";
+  const isWebhook = pathname.startsWith("/api/webhooks");
+  const isAuthApi = pathname.startsWith("/api/auth");
 
   if (isWebhook || isAuthApi) return NextResponse.next();
 
@@ -18,11 +19,11 @@ export async function middleware(req: NextRequest) {
   });
   const isLoggedIn = !!token;
 
-  if (!isLoggedIn && !isLoginPage) {
+  if (!isLoggedIn && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (isLoggedIn && isLoginPage) {
+  if (isLoggedIn && pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

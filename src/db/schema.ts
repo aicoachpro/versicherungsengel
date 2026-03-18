@@ -7,6 +7,8 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
+  totpSecret: text("totp_secret"),
+  totpEnabled: integer("totp_enabled").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
@@ -70,6 +72,15 @@ export const produkte = sqliteTable("produkte", {
   kategorie: text("kategorie", {
     enum: ["fremdvertrag", "cross_selling"],
   }).notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
