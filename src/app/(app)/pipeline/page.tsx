@@ -16,6 +16,7 @@ export interface Lead {
   email: string | null;
   telefon: string | null;
   website: string | null;
+  gewerbeart: string | null;
   branche: string | null;
   unternehmensgroesse: string | null;
   umsatzklasse: string | null;

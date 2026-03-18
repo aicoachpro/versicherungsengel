@@ -30,6 +30,9 @@ export const leads = sqliteTable("leads", {
   umsatzklasse: text("umsatzklasse", {
     enum: ["<1 Mio", "1–5 Mio", "5–20 Mio", "20–100 Mio", ">100 Mio"],
   }),
+  gewerbeart: text("gewerbeart", {
+    enum: ["hauptberuflich", "nebenberuflich"],
+  }),
   terminKosten: real("termin_kosten").default(320),
   umsatz: real("umsatz"),
   conversion: integer("conversion"),
