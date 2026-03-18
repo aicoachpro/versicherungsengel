@@ -8,10 +8,13 @@ export async function middleware(req: NextRequest) {
 
   if (isWebhook || isAuthApi) return NextResponse.next();
 
+  const secureCookie = req.nextUrl.protocol === "https:";
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET,
-    cookieName: "__Secure-authjs.session-token",
+    cookieName: secureCookie
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token",
   });
   const isLoggedIn = !!token;
 

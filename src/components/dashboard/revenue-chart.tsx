@@ -48,15 +48,15 @@ export function RevenueChart({ data }: RevenueChartProps) {
               />
               <Legend />
               <Bar
-                dataKey="umsatz"
-                name="Umsatz"
-                fill="var(--color-chart-1)"
+                dataKey="kosten"
+                name="Kosten"
+                fill="#c4a035"
                 radius={[4, 4, 0, 0]}
               />
               <Bar
-                dataKey="kosten"
-                name="Kosten"
-                fill="var(--color-chart-2)"
+                dataKey="umsatz"
+                name="Umsatz"
+                fill="#003781"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
