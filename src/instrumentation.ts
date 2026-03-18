@@ -24,9 +24,20 @@ export async function register() {
         email TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         role TEXT DEFAULT 'user' NOT NULL,
+        totp_secret TEXT,
+        totp_enabled INTEGER DEFAULT 0 NOT NULL,
         created_at TEXT DEFAULT (datetime('now')) NOT NULL
       );
       CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (email);
+
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        token TEXT NOT NULL UNIQUE,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')) NOT NULL
+      );
 
       CREATE TABLE IF NOT EXISTS leads (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
