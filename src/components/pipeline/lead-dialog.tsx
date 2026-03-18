@@ -27,6 +27,8 @@ interface LeadDialogProps {
   onSave: (data: Partial<Lead>) => void;
 }
 
+const GEWERBEARTEN = ["hauptberuflich", "nebenberuflich"];
+
 const BRANCHEN = [
   "Bau", "Handwerk", "Dienstleistung", "Produktion", "IT",
   "Gesundheit", "Logistik", "Handel", "Gastronomie", "Immobilien", "Sonstiges",
@@ -41,6 +43,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     ansprechpartner: "",
     email: "",
     telefon: "",
+    gewerbeart: "",
     branche: "",
     unternehmensgroesse: "",
     umsatzklasse: "",
@@ -59,6 +62,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         ansprechpartner: lead.ansprechpartner || "",
         email: lead.email || "",
         telefon: lead.telefon || "",
+        gewerbeart: lead.gewerbeart || "",
         branche: lead.branche || "",
         unternehmensgroesse: lead.unternehmensgroesse || "",
         umsatzklasse: lead.umsatzklasse || "",
@@ -72,7 +76,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     } else {
       setForm({
         name: "", ansprechpartner: "", email: "", telefon: "",
-        branche: "", unternehmensgroesse: "", umsatzklasse: "",
+        gewerbeart: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
         termin: "", eingangsdatum: new Date().toISOString().split("T")[0],
         terminKosten: "320", umsatz: "",
         naechsterSchritt: "", notizen: "",
@@ -87,6 +91,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       ansprechpartner: form.ansprechpartner || null,
       email: form.email || null,
       telefon: form.telefon || null,
+      gewerbeart: form.gewerbeart || null,
       branche: form.branche || null,
       unternehmensgroesse: form.unternehmensgroesse || null,
       umsatzklasse: form.umsatzklasse || null,
@@ -136,6 +141,20 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
                 value={form.telefon}
                 onChange={(e) => setForm({ ...form, telefon: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Gewerbeart</Label>
+              <Select
+                value={form.gewerbeart}
+                onValueChange={(v) => setForm({ ...form, gewerbeart: v ?? "" })}
+              >
+                <SelectTrigger><SelectValue placeholder="Auswählen" /></SelectTrigger>
+                <SelectContent>
+                  {GEWERBEARTEN.map((g) => (
+                    <SelectItem key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Branche</Label>

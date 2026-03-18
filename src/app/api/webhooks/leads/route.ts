@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       ansprechpartner: body.ansprechpartner || null,
       email: body.email || null,
       telefon: body.telefon || null,
+      gewerbeart: body.gewerbeart || null,
       branche: body.branche || null,
       notizen: body.notizen || null,
       terminKosten: body.terminKosten ?? 320,

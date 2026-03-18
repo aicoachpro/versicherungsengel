@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     email: body.email || null,
     telefon: body.telefon || null,
     website: body.website || null,
+    gewerbeart: body.gewerbeart || null,
     branche: body.branche || null,
     unternehmensgroesse: body.unternehmensgroesse || null,
     umsatzklasse: body.umsatzklasse || null,

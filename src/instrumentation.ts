@@ -40,6 +40,7 @@ export async function register() {
         branche TEXT,
         unternehmensgroesse TEXT,
         umsatzklasse TEXT,
+        gewerbeart TEXT,
         termin_kosten REAL DEFAULT 320,
         umsatz REAL,
         conversion INTEGER,

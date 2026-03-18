@@ -9,6 +9,7 @@ import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { PipelineFunnel } from "@/components/dashboard/pipeline-funnel";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { GewerbeartChart } from "@/components/dashboard/gewerbeart-chart";
 
 function getKpis() {
   const openLeads = db
@@ -107,6 +108,31 @@ function getRevenueByMonth() {
     }));
 }
 
+function getGewerbeartData() {
+  const result = db
+    .select({
+      gewerbeart: sql<string>`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`,
+      anzahl: sql<number>`count(*)`,
+      umsatz: sql<number>`coalesce(sum(${leads.umsatz}), 0)`,
+      kosten: sql<number>`coalesce(sum(${leads.terminKosten}), 0)`,
+    })
+    .from(leads)
+    .groupBy(sql`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`)
+    .all();
+
+  return result.map((r) => ({
+    gewerbeart:
+      r.gewerbeart === "hauptberuflich"
+        ? "Hauptberuflich"
+        : r.gewerbeart === "nebenberuflich"
+          ? "Nebenberuflich"
+          : r.gewerbeart,
+    anzahl: r.anzahl,
+    umsatz: r.umsatz,
+    kosten: r.kosten,
+  }));
+}
+
 function getUpcomingAppointments() {
   const now = new Date().toISOString().split("T")[0];
   const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -151,6 +177,7 @@ export default function DashboardPage() {
   const kpis = getKpis();
   const pipelineData = getPipelineData();
   const revenueData = getRevenueByMonth();
+  const gewerbeartData = getGewerbeartData();
   const appointments = getUpcomingAppointments();
   const recentActivity = getRecentActivity();
 
@@ -169,7 +196,10 @@ export default function DashboardPage() {
           <PipelineFunnel data={pipelineData} />
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
+          <GewerbeartChart data={gewerbeartData} />
           <UpcomingAppointments appointments={appointments} />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
           <RecentActivity activities={recentActivity} />
         </div>
       </div>
