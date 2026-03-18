@@ -222,7 +222,7 @@ export default function NutzerPage() {
               <Label>Rolle</Label>
               <Select
                 value={form.role}
-                onValueChange={(v) => setForm({ ...form, role: v })}
+                onValueChange={(v) => setForm({ ...form, role: v ?? "user" })}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
