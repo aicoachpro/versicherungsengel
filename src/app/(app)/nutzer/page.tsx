@@ -90,14 +90,10 @@ export default function NutzerPage() {
         return;
       }
     } else {
-      if (!form.password) {
-        setError("Passwort erforderlich");
-        return;
-      }
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ name: form.name, email: form.email, role: form.role }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -208,16 +204,22 @@ export default function NutzerPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label>{editingUser ? "Neues Passwort (leer = unverändert)" : "Passwort *"}</Label>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required={!editingUser}
-                placeholder={editingUser ? "Nur ausfüllen zum Ändern" : ""}
-              />
-            </div>
+            {editingUser && (
+              <div className="space-y-2">
+                <Label>Neues Passwort (leer = unverändert)</Label>
+                <Input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Nur ausfüllen zum Ändern"
+                />
+              </div>
+            )}
+            {!editingUser && (
+              <p className="text-sm text-muted-foreground rounded-lg border bg-muted/50 p-3">
+                Der Nutzer erhält eine E-Mail mit einem Link, über den er sein Passwort selbst vergeben kann.
+              </p>
+            )}
             <div className="space-y-2">
               <Label>Rolle</Label>
               <Select
