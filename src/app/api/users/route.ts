@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, passwordResetTokens } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { sendWelcomeEmail } from "@/lib/email";
 
 async function requireAdmin() {
   const session = await auth();
@@ -42,8 +44,8 @@ export async function POST(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const body = await req.json();
-  if (!body.name || !body.email || !body.password) {
-    return NextResponse.json({ error: "Name, E-Mail und Passwort erforderlich" }, { status: 400 });
+  if (!body.name || !body.email) {
+    return NextResponse.json({ error: "Name und E-Mail erforderlich" }, { status: 400 });
   }
 
   const existing = db.select().from(users).where(eq(users.email, body.email)).get();
@@ -51,7 +53,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "E-Mail-Adresse bereits vergeben" }, { status: 400 });
   }
 
-  const hash = await bcrypt.hash(body.password, 10);
+  // Set a random temporary password — user will set their own via invite link
+  const tempPassword = crypto.randomBytes(16).toString("hex");
+  const hash = await bcrypt.hash(tempPassword, 10);
   const result = db
     .insert(users)
     .values({
@@ -68,6 +72,24 @@ export async function POST(req: NextRequest) {
       createdAt: users.createdAt,
     })
     .get();
+
+  // Create invite token (24h validity)
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  db.insert(passwordResetTokens).values({
+    userId: result.id,
+    token,
+    expiresAt,
+  }).run();
+
+  // Send welcome email
+  const baseUrl = process.env.AUTH_URL || req.nextUrl.origin;
+  const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
+  try {
+    await sendWelcomeEmail(body.email, setPasswordUrl, body.name, admin.name);
+  } catch (error) {
+    console.error("Failed to send welcome email:", error);
+  }
 
   return NextResponse.json(result, { status: 201 });
 }
