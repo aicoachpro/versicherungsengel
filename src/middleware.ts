@@ -6,8 +6,9 @@ export async function middleware(req: NextRequest) {
   const isPublicPage = pathname === "/login" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/verify-2fa";
   const isWebhook = pathname.startsWith("/api/webhooks");
   const isAuthApi = pathname.startsWith("/api/auth");
+  const isIngestApi = pathname.startsWith("/api/leads/ingest");
 
-  if (isWebhook || isAuthApi) return NextResponse.next();
+  if (isWebhook || isAuthApi || isIngestApi) return NextResponse.next();
 
   const secureCookie = req.nextUrl.protocol === "https:";
   const token = await getToken({
