@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Calendar } from "lucide-react";
+import { Calendar, CalendarCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface Appointment {
@@ -8,6 +8,7 @@ interface Appointment {
   ansprechpartner: string | null;
   termin: string | null;
   phase: string;
+  typ: "Termin" | "Folgetermin";
 }
 
 export function UpcomingAppointments({ appointments }: { appointments: Appointment[] }) {
@@ -24,13 +25,17 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
           </p>
         ) : (
           <div className="space-y-3">
-            {appointments.map((apt) => (
+            {appointments.map((apt, idx) => (
               <div
-                key={apt.id}
+                key={`${apt.id}-${apt.typ}-${idx}`}
                 className="flex items-center gap-3 rounded-lg border p-3"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Calendar className="h-5 w-5 text-primary" />
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${apt.typ === "Folgetermin" ? "bg-emerald-100" : "bg-primary/10"}`}>
+                  {apt.typ === "Folgetermin" ? (
+                    <CalendarCheck className="h-5 w-5 text-emerald-600" />
+                  ) : (
+                    <Calendar className="h-5 w-5 text-primary" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{apt.name}</p>
@@ -47,8 +52,11 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
                         })
                       : "—"}
                   </p>
-                  <Badge variant="secondary" className="text-xs">
-                    {apt.phase}
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs ${apt.typ === "Folgetermin" ? "bg-emerald-100 text-emerald-700" : ""}`}
+                  >
+                    {apt.typ === "Folgetermin" ? "Cross-Selling" : apt.phase}
                   </Badge>
                 </div>
               </div>

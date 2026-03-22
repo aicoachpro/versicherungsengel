@@ -139,7 +139,8 @@ function getUpcomingAppointments() {
     .toISOString()
     .split("T")[0];
 
-  return db
+  // Ersttermine
+  const termine = db
     .select({
       id: leads.id,
       name: leads.name,
@@ -148,15 +149,27 @@ function getUpcomingAppointments() {
       phase: leads.phase,
     })
     .from(leads)
-    .where(
-      and(
-        gte(leads.termin, now),
-        lte(leads.termin, weekLater)
-      )
-    )
-    .orderBy(leads.termin)
-    .limit(5)
-    .all();
+    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater)))
+    .all()
+    .map((t) => ({ ...t, typ: "Termin" as const }));
+
+  // Folgetermine (Cross-Selling)
+  const folgetermine = db
+    .select({
+      id: leads.id,
+      name: leads.name,
+      ansprechpartner: leads.ansprechpartner,
+      termin: leads.folgetermin,
+      phase: leads.phase,
+    })
+    .from(leads)
+    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater)))
+    .all()
+    .map((t) => ({ ...t, typ: "Folgetermin" as const }));
+
+  return [...termine, ...folgetermine]
+    .sort((a, b) => (a.termin || "").localeCompare(b.termin || ""))
+    .slice(0, 5);
 }
 
 function getRecentActivity() {

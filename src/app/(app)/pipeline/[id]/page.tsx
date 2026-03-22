@@ -60,6 +60,7 @@ interface Lead {
   umsatz: number | null;
   notizen: string | null;
   crossSelling: string | null;
+  folgetermin: string | null;
 }
 
 interface Fremdvertrag {
@@ -314,6 +315,12 @@ export default function LeadDetailPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span>Termin: {new Date(lead.termin).toLocaleDateString("de-DE")}</span>
+                </div>
+              )}
+              {lead.folgetermin && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-emerald-600" />
+                  <span>Folgetermin: {new Date(lead.folgetermin).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
               )}
               {lead.notizen && (

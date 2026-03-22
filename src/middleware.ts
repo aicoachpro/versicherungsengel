@@ -7,8 +7,9 @@ export async function middleware(req: NextRequest) {
   const isWebhook = pathname.startsWith("/api/webhooks");
   const isAuthApi = pathname.startsWith("/api/auth");
   const isIngestApi = pathname.startsWith("/api/leads/ingest");
+  const isCronApi = pathname.startsWith("/api/cron");
 
-  if (isWebhook || isAuthApi || isIngestApi) return NextResponse.next();
+  if (isWebhook || isAuthApi || isIngestApi || isCronApi) return NextResponse.next();
 
   const secureCookie = req.nextUrl.protocol === "https:";
   const token = await getToken({
