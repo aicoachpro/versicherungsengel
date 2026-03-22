@@ -45,16 +45,16 @@ export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsPr
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map((card) => (
         <Card key={card.title}>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.bg}`}>
-              <card.icon className={`h-6 w-6 ${card.color}`} />
+          <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-6">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${card.bg}`}>
+              <card.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${card.color}`} />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{card.title}</p>
-              <p className="text-2xl font-bold">{card.value}</p>
+            <div className="min-w-0">
+              <p className="truncate text-xs text-muted-foreground sm:text-sm">{card.title}</p>
+              <p className="text-lg font-bold sm:text-2xl">{card.value}</p>
             </div>
           </CardContent>
         </Card>

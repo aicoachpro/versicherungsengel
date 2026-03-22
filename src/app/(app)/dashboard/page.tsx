@@ -184,22 +184,22 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col">
       <Header title="Dashboard" />
-      <div className="flex-1 space-y-6 p-6">
+      <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6">
         <KpiCards
           openLeads={kpis.openLeads}
           conversionRate={kpis.conversionRate}
           revenue={kpis.revenue}
           roi={kpis.roi}
         />
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <RevenueChart data={revenueData} />
           <PipelineFunnel data={pipelineData} />
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <GewerbeartChart data={gewerbeartData} />
           <UpcomingAppointments appointments={appointments} />
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <RecentActivity activities={recentActivity} />
         </div>
       </div>
