@@ -52,7 +52,7 @@ export function GewerbeartChart({ data }: GewerbeartOverviewProps) {
                   </div>
                   <span className="text-sm text-muted-foreground">Nicht angegeben</span>
                 </div>
-                <span className="text-xl font-bold text-muted-foreground">{unbekannt.anzahl}</span>
+                <span className="text-xl font-bold text-muted-foreground">{unbekannt?.anzahl ?? 0}</span>
               </div>
             )}
           </div>
