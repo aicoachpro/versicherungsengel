@@ -139,6 +139,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Du kannst dich nicht selbst löschen" }, { status: 400 });
   }
 
+  // Zuerst abhängige Datensätze löschen (Foreign Key)
+  db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id)).run();
   db.delete(users).where(eq(users.id, id)).run();
   return NextResponse.json({ success: true });
 }
