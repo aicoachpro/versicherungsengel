@@ -42,6 +42,8 @@ export const leads = sqliteTable("leads", {
   notizen: text("notizen"),
   eingangsdatum: text("eingangsdatum"),
   crossSelling: text("cross_selling"),
+  folgetermin: text("folgetermin"),
+  folgeterminNotified: integer("folgetermin_notified").default(0),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

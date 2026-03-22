@@ -59,6 +59,8 @@ export async function register() {
         notizen TEXT,
         eingangsdatum TEXT,
         cross_selling TEXT,
+        folgetermin TEXT,
+        folgetermin_notified INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now')) NOT NULL,
         updated_at TEXT DEFAULT (datetime('now')) NOT NULL
       );
@@ -94,6 +96,16 @@ export async function register() {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS api_keys_key_unique ON api_keys (key);
     `);
+
+    // Add folgetermin columns if missing (migration for existing DBs)
+    const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as { name: string }[];
+    const colNames = cols.map((c) => c.name);
+    if (!colNames.includes("folgetermin")) {
+      sqlite.exec("ALTER TABLE leads ADD COLUMN folgetermin TEXT");
+    }
+    if (!colNames.includes("folgetermin_notified")) {
+      sqlite.exec("ALTER TABLE leads ADD COLUMN folgetermin_notified INTEGER DEFAULT 0");
+    }
 
     // Seed default admin user if none exists
     const existing = sqlite.prepare("SELECT id FROM users LIMIT 1").get();

@@ -26,6 +26,7 @@ export interface Lead {
   naechsterSchritt: string | null;
   notizen: string | null;
   eingangsdatum: string | null;
+  folgetermin: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -48,6 +48,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     unternehmensgroesse: "",
     umsatzklasse: "",
     termin: "",
+    folgetermin: "",
     eingangsdatum: new Date().toISOString().split("T")[0],
     terminKosten: "320",
     umsatz: "",
@@ -67,6 +68,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         unternehmensgroesse: lead.unternehmensgroesse || "",
         umsatzklasse: lead.umsatzklasse || "",
         termin: lead.termin ? lead.termin.split("T")[0] : "",
+        folgetermin: lead.folgetermin || "",
         eingangsdatum: lead.eingangsdatum ? lead.eingangsdatum.split("T")[0] : "",
         terminKosten: String(lead.terminKosten ?? 320),
         umsatz: lead.umsatz ? String(lead.umsatz) : "",
@@ -77,7 +79,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       setForm({
         name: "", ansprechpartner: "", email: "", telefon: "",
         gewerbeart: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
-        termin: "", eingangsdatum: new Date().toISOString().split("T")[0],
+        termin: "", folgetermin: "", eingangsdatum: new Date().toISOString().split("T")[0],
         terminKosten: "320", umsatz: "",
         naechsterSchritt: "", notizen: "",
       });
@@ -96,6 +98,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       unternehmensgroesse: form.unternehmensgroesse || null,
       umsatzklasse: form.umsatzklasse || null,
       termin: form.termin || null,
+      folgetermin: form.folgetermin || null,
       eingangsdatum: form.eingangsdatum || null,
       terminKosten: form.terminKosten ? Number(form.terminKosten) : 320,
       umsatz: form.umsatz ? Number(form.umsatz) : null,
@@ -213,6 +216,14 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
                 type="date"
                 value={form.termin}
                 onChange={(e) => setForm({ ...form, termin: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Folgetermin (Cross-Selling)</Label>
+              <Input
+                type="datetime-local"
+                value={form.folgetermin}
+                onChange={(e) => setForm({ ...form, folgetermin: e.target.value })}
               />
             </div>
             <div className="space-y-2">

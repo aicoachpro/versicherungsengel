@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     naechsterSchritt: body.naechsterSchritt || null,
     notizen: body.notizen || null,
     eingangsdatum: body.eingangsdatum || new Date().toISOString().split("T")[0],
+    folgetermin: body.folgetermin || null,
   }).returning().get();
 
   return NextResponse.json(result, { status: 201 });
@@ -49,6 +50,11 @@ export async function PATCH(req: NextRequest) {
 
   const { id, ...updates } = body;
   updates.updatedAt = new Date().toISOString();
+
+  // Wenn Folgetermin geändert wird, Benachrichtigungs-Flag zurücksetzen
+  if ("folgetermin" in updates) {
+    updates.folgeterminNotified = 0;
+  }
 
   const result = db
     .update(leads)
