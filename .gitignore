@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -44,8 +45,9 @@ next-env.d.ts
 /data/
 *.db
 
-# claude
-.claude/
+# claude (settings sind lokal, Skills + Guidelines werden committed)
+.claude/settings.local.json
+.claude/launch.json
 cookies.txt
 cookies2.txt
 cookies3.txt
