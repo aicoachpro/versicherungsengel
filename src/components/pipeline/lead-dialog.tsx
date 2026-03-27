@@ -67,7 +67,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         branche: lead.branche || "",
         unternehmensgroesse: lead.unternehmensgroesse || "",
         umsatzklasse: lead.umsatzklasse || "",
-        termin: lead.termin ? lead.termin.split("T")[0] : "",
+        termin: lead.termin || "",
         folgetermin: lead.folgetermin || "",
         eingangsdatum: lead.eingangsdatum ? lead.eingangsdatum.split("T")[0] : "",
         terminKosten: String(lead.terminKosten ?? 320),
@@ -213,7 +213,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
             <div className="space-y-2">
               <Label>Termin</Label>
               <Input
-                type="date"
+                type="datetime-local"
                 value={form.termin}
                 onChange={(e) => setForm({ ...form, termin: e.target.value })}
               />

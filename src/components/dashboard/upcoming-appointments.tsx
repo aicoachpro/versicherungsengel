@@ -46,9 +46,11 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
                 <div className="text-right">
                   <p className="text-sm font-medium">
                     {apt.termin
-                      ? new Date(apt.termin).toLocaleDateString("de-DE", {
+                      ? new Date(apt.termin).toLocaleString("de-DE", {
                           day: "2-digit",
                           month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
                         })
                       : "—"}
                   </p>

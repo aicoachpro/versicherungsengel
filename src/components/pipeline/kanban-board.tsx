@@ -115,10 +115,12 @@ export function KanbanBoard({
                               <CalendarDays className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                               <span className="font-medium">
                                 {aktiverTermin.label}:{" "}
-                                {new Date(aktiverTermin.datum).toLocaleDateString("de-DE", {
+                                {new Date(aktiverTermin.datum).toLocaleString("de-DE", {
                                   day: "2-digit",
                                   month: "2-digit",
                                   year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
                                 })}
                               </span>
                               {pushAktiv && (
