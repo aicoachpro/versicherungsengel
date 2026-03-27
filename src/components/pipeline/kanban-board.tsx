@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, GripVertical, ExternalLink } from "lucide-react";
+import { Edit2, Trash2, GripVertical, ExternalLink, CalendarDays, Bell } from "lucide-react";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
 interface KanbanBoardProps {
@@ -98,21 +98,46 @@ export function KanbanBoard({
                       </div>
                       <GripVertical className="h-4 w-4 text-muted-foreground/40 flex-shrink-0" />
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {lead.branche && (
-                        <Badge variant="outline" className="text-xs">
-                          {lead.branche}
-                        </Badge>
-                      )}
-                      {lead.termin && (
-                        <Badge variant="secondary" className="text-xs">
-                          {new Date(lead.termin).toLocaleDateString("de-DE", {
-                            day: "2-digit",
-                            month: "2-digit",
-                          })}
-                        </Badge>
-                      )}
-                    </div>
+                    {(() => {
+                      const now = new Date();
+                      const terminAbgelaufen = lead.termin && new Date(lead.termin) < now;
+                      const aktiverTermin = terminAbgelaufen && lead.folgetermin
+                        ? { datum: lead.folgetermin, label: "Folgetermin" }
+                        : lead.termin
+                          ? { datum: lead.termin, label: "Termin" }
+                          : null;
+                      const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
+
+                      return (
+                        <>
+                          {aktiverTermin && (
+                            <div className="mt-2 flex items-center gap-1.5 text-xs">
+                              <CalendarDays className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                              <span className="font-medium">
+                                {aktiverTermin.label}:{" "}
+                                {new Date(aktiverTermin.datum).toLocaleDateString("de-DE", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                })}
+                              </span>
+                              {pushAktiv && (
+                                <span title="Push-Erinnerung aktiv">
+                                  <Bell className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {lead.branche && (
+                              <Badge variant="outline" className="text-xs">
+                                {lead.branche}
+                              </Badge>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                     {lead.umsatz != null && lead.umsatz > 0 && (
                       <p className="mt-2 text-xs font-medium text-emerald-600">
                         {new Intl.NumberFormat("de-DE", {
