@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
   const result = db.insert(leads).values({
     name: body.name,
     phase: "Termin eingegangen",
+    termin: body.termin || null,
     ansprechpartner: body.ansprechpartner || null,
     email: body.email || null,
     telefon: body.telefon || null,
