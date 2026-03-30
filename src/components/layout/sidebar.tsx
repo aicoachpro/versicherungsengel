@@ -49,6 +49,7 @@ export function Sidebar() {
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="rounded-md p-1.5 hover:bg-sidebar-accent"
+          aria-label="Menü öffnen"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>

@@ -22,7 +22,7 @@ function ResetForm() {
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
         <p className="font-medium text-red-800">Ungültiger Link</p>
         <p className="mt-2 text-sm text-red-700">Der Reset-Link ist ungültig oder unvollständig.</p>
-        <a href="/forgot-password" className="mt-4 inline-block text-sm text-[#003781] hover:underline">
+        <a href="/forgot-password" className="mt-4 inline-block text-sm text-primary hover:underline">
           Neuen Link anfordern
         </a>
       </div>
@@ -68,7 +68,7 @@ function ResetForm() {
       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
         <p className="font-medium text-emerald-800">Passwort geändert!</p>
         <p className="mt-2 text-sm text-emerald-700">Du kannst dich jetzt mit deinem neuen Passwort anmelden.</p>
-        <a href="/login" className="mt-4 inline-block rounded-md bg-[#003781] px-4 py-2 text-sm text-white hover:bg-[#002a63]">
+        <a href="/login" className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
           Zum Login
         </a>
       </div>
@@ -97,7 +97,7 @@ function ResetForm() {
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" className="w-full bg-[#003781] hover:bg-[#002a63]" disabled={loading}>
+      <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
         {loading ? "Wird gespeichert..." : "Passwort setzen"}
       </Button>
     </form>
@@ -106,11 +106,11 @@ function ResetForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#003781]/5 to-[#c4a035]/5">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-gold/5">
       <div className="w-full max-w-md space-y-8 p-8">
         <div className="text-center">
           <Image src="/logo.png" alt="VÖLKER Finance OHG" width={80} height={80} className="mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-[#003781]">Neues Passwort setzen</h1>
+          <h1 className="text-2xl font-bold text-primary">Neues Passwort setzen</h1>
         </div>
         <Suspense fallback={<div className="text-center text-muted-foreground">Laden...</div>}>
           <ResetForm />

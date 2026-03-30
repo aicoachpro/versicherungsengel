@@ -203,7 +203,7 @@ export default function SettingsPage() {
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               {message && <p className="text-sm text-emerald-600">{message}</p>}
-              <Button type="submit" className="bg-[#003781] hover:bg-[#002a63]">
+              <Button type="submit" className="bg-primary hover:bg-primary/90">
                 Passwort ändern
               </Button>
             </form>
@@ -226,7 +226,7 @@ export default function SettingsPage() {
             {totpError && <p className="text-sm text-destructive">{totpError}</p>}
 
             {!totpEnabled && !setupMode && (
-              <Button onClick={handleSetup2FA} className="bg-[#003781] hover:bg-[#002a63]">
+              <Button onClick={handleSetup2FA} className="bg-primary hover:bg-primary/90">
                 2FA einrichten
               </Button>
             )}
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                     required
                   />
                   <div className="flex gap-2">
-                    <Button type="submit" className="bg-[#003781] hover:bg-[#002a63]">
+                    <Button type="submit" className="bg-primary hover:bg-primary/90">
                       Aktivieren
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setSetupMode(false)}>

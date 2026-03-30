@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 interface PipelineFunnelProps {
@@ -25,14 +26,18 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
       <CardContent>
         <div className="space-y-3">
           {data.map((item) => (
-            <div key={item.phase} className="flex items-center gap-3">
-              <span className="w-40 text-sm text-muted-foreground truncate">
+            <Link
+              key={item.phase}
+              href={`/pipeline?phase=${encodeURIComponent(item.phase)}`}
+              className="flex items-center gap-3 group"
+            >
+              <span className="w-40 text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
                 {item.phase}
               </span>
               <div className="flex-1">
                 <div className="h-8 rounded-md bg-muted overflow-hidden">
                   <div
-                    className={`h-full rounded-md ${phaseColors[item.phase] || "bg-primary"} flex items-center px-3 transition-all`}
+                    className={`h-full rounded-md ${phaseColors[item.phase] || "bg-primary"} flex items-center px-3 transition-all group-hover:opacity-80`}
                     style={{
                       width: `${Math.max((item.count / maxCount) * 100, 8)}%`,
                     }}
@@ -43,7 +48,7 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

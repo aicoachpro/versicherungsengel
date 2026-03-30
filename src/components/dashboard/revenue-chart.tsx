@@ -50,13 +50,13 @@ export function RevenueChart({ data }: RevenueChartProps) {
               <Bar
                 dataKey="kosten"
                 name="Kosten"
-                fill="#c4a035"
+                fill="var(--color-chart-2)"
                 radius={[4, 4, 0, 0]}
               />
               <Bar
                 dataKey="umsatz"
                 name="Umsatz"
-                fill="#003781"
+                fill="var(--color-chart-1)"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>

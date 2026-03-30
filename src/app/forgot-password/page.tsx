@@ -38,11 +38,11 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#003781]/5 to-[#c4a035]/5">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-gold/5">
       <div className="w-full max-w-md space-y-8 p-8">
         <div className="text-center">
           <Image src="/logo.png" alt="VÖLKER Finance OHG" width={80} height={80} className="mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-[#003781]">Passwort vergessen</h1>
+          <h1 className="text-2xl font-bold text-primary">Passwort vergessen</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen.
           </p>
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
             <p className="mt-2 text-sm text-emerald-700">
               Falls ein Account mit dieser E-Mail existiert, erhältst du in Kürze einen Link zum Zurücksetzen.
             </p>
-            <a href="/login" className="mt-4 inline-block text-sm text-[#003781] hover:underline">
+            <a href="/login" className="mt-4 inline-block text-sm text-primary hover:underline">
               Zurück zum Login
             </a>
           </div>
@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button
               type="submit"
-              className="w-full bg-[#003781] hover:bg-[#002a63]"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={loading}
             >
               {loading ? "Wird gesendet..." : "Link senden"}

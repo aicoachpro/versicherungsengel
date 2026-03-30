@@ -66,7 +66,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#003781] via-[#002a63] to-[#001d45]">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary via-primary/80 to-primary/60">
       <Card className="w-full max-w-md border-0 shadow-2xl">
         <CardHeader className="space-y-4 pb-2 text-center">
           <Image
@@ -138,7 +138,7 @@ export default function LoginPage() {
             )}
             <Button
               type="submit"
-              className="w-full bg-[#003781] hover:bg-[#002a63]"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={loading}
             >
               {loading ? "Wird angemeldet..." : needs2fa ? "Bestätigen" : "Anmelden"}
@@ -155,7 +155,7 @@ export default function LoginPage() {
           </form>
           {!needs2fa && (
             <div className="mt-4 text-center">
-              <a href="/forgot-password" className="text-sm text-muted-foreground hover:text-[#003781] hover:underline">
+              <a href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary hover:underline">
                 Passwort vergessen?
               </a>
             </div>

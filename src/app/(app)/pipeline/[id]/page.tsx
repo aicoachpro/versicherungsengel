@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Lead {
   id: number;
@@ -163,6 +164,9 @@ export default function LeadDetailPage() {
 
   // Dokument-Upload State
   const [uploadTyp, setUploadTyp] = useState("Sonstiges");
+
+  // Confirm-Dialog State
+  const [deleteConfirm, setDeleteConfirm] = useState<{type: string, id: number, label: string} | null>(null);
 
   useEffect(() => {
     loadData();
@@ -282,6 +286,7 @@ export default function LeadDetailPage() {
 
   async function handleDeleteVertrag(id: number) {
     await fetch(`/api/insurances?id=${id}`, { method: "DELETE" });
+    setDeleteConfirm(null);
     loadData();
   }
 
@@ -304,6 +309,7 @@ export default function LeadDetailPage() {
 
   async function handleDeleteActivity(id: number) {
     await fetch(`/api/activities?id=${id}`, { method: "DELETE" });
+    setDeleteConfirm(null);
     loadData();
   }
 
@@ -324,6 +330,7 @@ export default function LeadDetailPage() {
 
   async function handleDeleteDocument(id: number) {
     await fetch(`/api/documents?id=${id}`, { method: "DELETE" });
+    setDeleteConfirm(null);
     loadData();
   }
 
@@ -489,7 +496,8 @@ export default function LeadDetailPage() {
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 text-destructive hover:text-destructive flex-shrink-0"
-                      onClick={() => handleDeleteActivity(a.id)}
+                      onClick={() => setDeleteConfirm({ type: "activity", id: a.id, label: `Aktivität vom ${new Date(a.datum).toLocaleDateString("de-DE")}` })}
+                      aria-label="Löschen"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -589,10 +597,10 @@ export default function LeadDetailPage() {
                       <TableCell className="text-sm text-muted-foreground">{v.umfang || "–"}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(v)}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(v)} aria-label="Bearbeiten">
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteVertrag(v.id)}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteConfirm({ type: "vertrag", id: v.id, label: v.bezeichnung })} aria-label="Löschen">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -666,6 +674,7 @@ export default function LeadDetailPage() {
                         size="sm"
                         className="h-7 w-7 p-0"
                         onClick={() => window.open(`/api/documents/download/${d.id}`, "_blank")}
+                        aria-label="Herunterladen"
                       >
                         <Download className="h-3.5 w-3.5" />
                       </Button>
@@ -673,7 +682,8 @@ export default function LeadDetailPage() {
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteDocument(d.id)}
+                        onClick={() => setDeleteConfirm({ type: "document", id: d.id, label: d.name })}
+                        aria-label="Löschen"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -770,6 +780,25 @@ export default function LeadDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Dialog for deletions */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}
+        title={
+          deleteConfirm?.type === "vertrag" ? `Vertrag "${deleteConfirm.label}" löschen?` :
+          deleteConfirm?.type === "activity" ? `${deleteConfirm.label} löschen?` :
+          deleteConfirm?.type === "document" ? `Dokument "${deleteConfirm?.label}" löschen?` :
+          "Wirklich löschen?"
+        }
+        description="Diese Aktion kann nicht rückgängig gemacht werden."
+        onConfirm={() => {
+          if (!deleteConfirm) return;
+          if (deleteConfirm.type === "vertrag") handleDeleteVertrag(deleteConfirm.id);
+          else if (deleteConfirm.type === "activity") handleDeleteActivity(deleteConfirm.id);
+          else if (deleteConfirm.type === "document") handleDeleteDocument(deleteConfirm.id);
+        }}
+      />
 
       {/* Dialog for new Activity */}
       <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>

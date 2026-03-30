@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Shield, ShieldCheck } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface User {
   id: number;
@@ -44,6 +45,8 @@ export default function NutzerPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "user" });
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/users");
@@ -107,13 +110,14 @@ export default function NutzerPage() {
   };
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`Nutzer "${user.name}" wirklich löschen?`)) return;
     const res = await fetch(`/api/users?id=${user.id}`, { method: "DELETE" });
     if (res.ok) {
+      setDeleteTarget(null);
       fetchUsers();
     } else {
       const data = await res.json();
-      alert(data.error || "Fehler beim Löschen");
+      setDeleteError(data.error || "Fehler beim Löschen");
+      setDeleteTarget(null);
     }
   };
 
@@ -124,7 +128,7 @@ export default function NutzerPage() {
         <p className="text-sm text-muted-foreground">
           {userList.length} Nutzer
         </p>
-        <Button onClick={openNew} className="bg-[#003781] hover:bg-[#002a63]">
+        <Button onClick={openNew} className="bg-primary hover:bg-primary/90">
           <Plus className="mr-2 h-4 w-4" />
           Neuer Nutzer
         </Button>
@@ -167,10 +171,10 @@ export default function NutzerPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(user)}>
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(user)} aria-label="Bearbeiten">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(user)}>
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleteTarget(user)} aria-label="Löschen">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -180,6 +184,21 @@ export default function NutzerPage() {
           </TableBody>
         </Table>
       </div>
+
+      {deleteError && (
+        <div className="mx-6 mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          {deleteError}
+          <Button variant="ghost" size="sm" className="ml-2 h-6 px-2 text-xs" onClick={() => setDeleteError("")}>Schließen</Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title={`Nutzer "${deleteTarget?.name}" löschen?`}
+        description="Der Nutzer wird unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+        onConfirm={() => { if (deleteTarget) handleDelete(deleteTarget); }}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
@@ -238,7 +257,7 @@ export default function NutzerPage() {
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Abbrechen
               </Button>
-              <Button type="submit" className="bg-[#003781] hover:bg-[#002a63]">
+              <Button type="submit" className="bg-primary hover:bg-primary/90">
                 {editingUser ? "Speichern" : "Erstellen"}
               </Button>
             </div>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Briefcase, Building2, HelpCircle } from "lucide-react";
 
@@ -26,7 +27,10 @@ export function GewerbeartChart({ data }: GewerbeartOverviewProps) {
           </p>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border p-3">
+            <Link
+              href="/pipeline?gewerbeart=hauptberuflich"
+              className="flex items-center justify-between rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
+            >
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
                   <Briefcase className="h-4 w-4" />
@@ -34,8 +38,11 @@ export function GewerbeartChart({ data }: GewerbeartOverviewProps) {
                 <span className="text-sm font-medium">Hauptberuflich</span>
               </div>
               <span className="text-xl font-bold">{haupt?.anzahl ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
+            </Link>
+            <Link
+              href="/pipeline?gewerbeart=nebenberuflich"
+              className="flex items-center justify-between rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
+            >
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
                   <Building2 className="h-4 w-4" />
@@ -43,7 +50,7 @@ export function GewerbeartChart({ data }: GewerbeartOverviewProps) {
                 <span className="text-sm font-medium">Nebenberuflich</span>
               </div>
               <span className="text-xl font-bold">{neben?.anzahl ?? 0}</span>
-            </div>
+            </Link>
             {(unbekannt?.anzahl ?? 0) > 0 && (
               <div className="flex items-center justify-between rounded-lg border border-dashed p-3">
                 <div className="flex items-center gap-3">
