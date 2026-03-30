@@ -483,7 +483,7 @@ export default function LeadDetailPage() {
                           })}
                         </span>
                       </div>
-                      {a.notiz && <p className="text-sm mt-1">{a.notiz}</p>}
+                      {a.notiz && <p className="text-sm mt-1 whitespace-pre-wrap">{a.notiz}</p>}
                     </div>
                     <Button
                       variant="ghost"
