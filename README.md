@@ -12,8 +12,9 @@ Lead-Management & Versicherungs-CRM fuer Versicherungsvermittler. Fullstack-Weba
 - **Dokumentenverwaltung** — Upload/Download von Angeboten, Policen, E-Mails
 - **Dashboard** — KPIs, Umsatz-Charts, Pipeline-Funnel, Termine
 - **Nutzerverwaltung** — Admin-Panel mit Rollen (Admin/User) und 2FA (TOTP)
+- **Audit-Log** — Protokollierung aller Nutzeraktionen (Admin-Seite mit Filter + Paginierung)
 - **Archiv** — Soft-Delete mit Wiederherstellung
-- **API-Ingest** — Externe Lead-Erfassung (n8n, Webhooks)
+- **API-Ingest** — Externe Lead-Erfassung (n8n, Webhooks) mit Rate-Limiting
 - **MCP-Server** — Claude AI Integration via Model Context Protocol
 
 ## Tech Stack
@@ -104,6 +105,7 @@ versicherungsengel/
 │   │   │   ├── versicherungen/# Vertraege uebergreifend
 │   │   │   ├── archiv/       # Archivierte Leads
 │   │   │   ├── nutzer/       # Nutzerverwaltung (Admin)
+│   │   │   ├── audit-log/    # Audit-Log (Admin)
 │   │   │   └── settings/     # Passwort & 2FA
 │   │   ├── api/              # REST-API Routen
 │   │   │   ├── leads/        # CRUD + Ingest + Search + Export
@@ -113,6 +115,7 @@ versicherungsengel/
 │   │   │   ├── produkte/     # Produktkatalog
 │   │   │   ├── users/        # Nutzerverwaltung
 │   │   │   ├── auth/         # NextAuth + 2FA + Password-Reset
+│   │   │   ├── audit-log/    # Audit-Log API (Admin)
 │   │   │   ├── webhooks/     # Externe Webhooks
 │   │   │   └── cron/         # Folgetermin-Erinnerungen
 │   │   ├── login/
@@ -125,7 +128,7 @@ versicherungsengel/
 │   │   ├── layout/           # Sidebar, Header
 │   │   └── ui/               # shadcn/ui Basiskomponenten
 │   ├── db/                   # Drizzle Schema
-│   └── lib/                  # Auth, E-Mail, Push, Utils
+│   └── lib/                  # Auth, E-Mail, Push, Audit, Rate-Limit, Utils
 ├── mcp-server/               # MCP-Server fuer Claude AI
 ├── data/                     # SQLite-DB + Uploads
 ├── drizzle/                  # SQL-Migrationen
@@ -144,12 +147,13 @@ versicherungsengel/
 | `/api/leads/export/[id]` | GET | Markdown-Export |
 | `/api/activities` | GET, POST, DELETE | Aktivitaeten-Tracking |
 | `/api/insurances` | GET, POST, PATCH, DELETE | Versicherungsvertraege |
-| `/api/documents` | GET, POST, DELETE | Dokumentenverwaltung |
+| `/api/documents` | GET, POST, DELETE | Dokumentenverwaltung (Max 10MB, Typ-Whitelist) |
 | `/api/documents/download/[id]` | GET | Datei-Download |
 | `/api/produkte` | GET, POST | Produktkatalog |
 | `/api/users` | GET, POST, PATCH, DELETE | Nutzerverwaltung (Admin) |
+| `/api/audit-log` | GET | Audit-Log abfragen (Admin) |
 
-### Oeffentliche API-Routen (API-Key via Bearer Token)
+### Oeffentliche API-Routen (API-Key via Bearer Token, Rate-Limited: 60 Req/Min)
 
 | Route | Methode | Beschreibung |
 |-------|---------|-------------|
@@ -195,9 +199,10 @@ leads ──┬──< insurances
 
 produkte (standalone)
 apiKeys (standalone)
+auditLogs (standalone)
 ```
 
-**8 Tabellen:** users, leads, insurances, activities, documents, produkte, passwordResetTokens, apiKeys
+**9 Tabellen:** users, leads, insurances, activities, documents, produkte, passwordResetTokens, apiKeys, auditLogs
 
 Details zum Schema siehe `src/db/schema.ts`.
 
@@ -262,6 +267,9 @@ SQLite-Datenbank und Uploads werden ueber ein Docker Volume (`app_data → /app/
 - JWT-basierte Sessions (kein Server-Side Session Store)
 - TOTP 2FA (6-stellig, 30s Periode, kompatibel mit allen Authenticator-Apps)
 - API-Key-Authentifizierung fuer oeffentliche Endpunkte
+- Rate-Limiting (60 Req/Min pro API-Key, In-Memory Sliding-Window)
+- Upload-Validierung (Max 10MB, MIME-Type + Dateiendung Whitelist)
+- Audit-Log fuer alle schreibenden Operationen (Passwort-Hashes maskiert)
 - Middleware schuetzt alle App-Routen
 - Password-Reset mit Einmal-Tokens (1h Gueltigkeit)
 - User-Einladung mit temporaeren Tokens (24h Gueltigkeit)
