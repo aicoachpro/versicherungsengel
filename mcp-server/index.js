@@ -13,7 +13,7 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// Helper: API-Aufruf
+// Helper: API-Aufruf mit Bearer Token
 async function crmFetch(path, options = {}) {
   const url = `${CRM_URL}${path}`;
   const res = await fetch(url, {
@@ -41,33 +41,32 @@ server.tool(
     query: z.string().describe("Suchbegriff: Firmenname oder Name des Ansprechpartners"),
   },
   async ({ query }) => {
-    const leadsRes = await crmFetch("/api/leads");
-    if (!leadsRes.ok) {
-      return { content: [{ type: "text", text: "Fehler beim Abrufen der Leads." }] };
+    const res = await crmFetch("/api/leads/search", {
+      method: "POST",
+      body: JSON.stringify({ query }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { content: [{ type: "text", text: `Fehler bei der Lead-Suche: ${res.status} — ${text.slice(0, 200)}` }] };
     }
 
-    const leads = await leadsRes.json();
-    const q = query.toLowerCase();
-    const matches = leads.filter(
-      (l) =>
-        (l.name && l.name.toLowerCase().includes(q)) ||
-        (l.ansprechpartner && l.ansprechpartner.toLowerCase().includes(q))
-    );
+    const data = await res.json();
 
-    if (matches.length === 0) {
+    if (data.anzahl === 0) {
       return {
         content: [{ type: "text", text: `Kein Lead gefunden für "${query}". Bitte den Nutzer nach dem korrekten Namen fragen.` }],
       };
     }
 
-    const list = matches.map(
-      (l) => `- **${l.name}** (ID: ${l.id}) — Ansprechpartner: ${l.ansprechpartner || "–"}, Phase: ${l.phase}`
+    const list = data.treffer.map(
+      (l) => `- **${l.name}** (ID: ${l.id}) — Ansprechpartner: ${l.ansprechpartner || "–"}, Phase: ${l.phase}${l.archivedAt ? " [archiviert]" : ""}`
     );
 
     return {
       content: [{
         type: "text",
-        text: `${matches.length} Lead(s) gefunden:\n\n${list.join("\n")}`,
+        text: `${data.anzahl} Lead(s) gefunden:\n\n${list.join("\n")}`,
       }],
     };
   }
@@ -106,6 +105,11 @@ server.tool(
       body: JSON.stringify(body),
     });
 
+    if (!res.ok && res.status !== 201 && res.status !== 300) {
+      const text = await res.text();
+      return { content: [{ type: "text", text: `Fehler: ${res.status} — ${text.slice(0, 200)}` }] };
+    }
+
     const data = await res.json();
 
     if (res.status === 201) {
@@ -118,7 +122,6 @@ server.tool(
     }
 
     if (res.status === 300) {
-      // Mehrere Treffer
       const options = data.treffer
         .map((t) => `- **${t.name}** (ID: ${t.id}) — ${t.ansprechpartner || "–"}`)
         .join("\n");
@@ -144,26 +147,22 @@ server.tool(
     leadId: z.number().describe("ID des Leads"),
   },
   async ({ leadId }) => {
-    // Lead-Daten, Verträge, Aktivitäten parallel laden
-    const [leadsRes, insurancesRes, activitiesRes] = await Promise.all([
-      crmFetch("/api/leads"),
-      crmFetch(`/api/insurances?leadId=${leadId}`),
-      crmFetch(`/api/activities?leadId=${leadId}`),
-    ]);
+    const res = await crmFetch("/api/leads/search", {
+      method: "POST",
+      body: JSON.stringify({ leadId }),
+    });
 
-    if (!leadsRes.ok) {
-      return { content: [{ type: "text", text: "Fehler beim Abrufen der Lead-Daten." }] };
+    if (!res.ok) {
+      const text = await res.text();
+      return { content: [{ type: "text", text: `Fehler: ${res.status} — ${text.slice(0, 200)}` }] };
     }
 
-    const leads = await leadsRes.json();
-    const lead = leads.find((l) => l.id === leadId);
+    const data = await res.json();
+    const lead = data.lead;
 
     if (!lead) {
       return { content: [{ type: "text", text: `Kein Lead mit ID ${leadId} gefunden.` }] };
     }
-
-    const insurances = insurancesRes.ok ? await insurancesRes.json() : [];
-    const activities = activitiesRes.ok ? await activitiesRes.json() : [];
 
     let text = `# ${lead.name}\n\n`;
     text += `**Phase:** ${lead.phase}\n`;
@@ -184,6 +183,9 @@ server.tool(
         if (cs.length > 0) text += `**Cross-Selling:** ${cs.join(", ")}\n`;
       } catch { /* ignore */ }
     }
+
+    const insurances = data.vertrage || [];
+    const activities = data.aktivitaeten || [];
 
     if (insurances.length > 0) {
       text += `\n## Fremdverträge (${insurances.length})\n\n`;
