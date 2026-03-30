@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, apiKeys } from "@/db/schema";
+import { leads } from "@/db/schema";
 import { eq } from "drizzle-orm";
-
-function validateApiKey(req: NextRequest): boolean {
-  const apiKey = req.headers.get("x-api-key");
-  if (!apiKey) return false;
-
-  const key = db.select().from(apiKeys).where(eq(apiKeys.key, apiKey)).get();
-  return !!key;
-}
+import { validateWebhookRequest } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-  }
+  const auth = validateWebhookRequest(req);
+  if (!auth.authorized) return auth.response!;
 
   const openLeads = db
     .select()
@@ -28,9 +20,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-  }
+  const auth = validateWebhookRequest(req);
+  if (!auth.authorized) return auth.response!;
 
   const body = await req.json();
 
