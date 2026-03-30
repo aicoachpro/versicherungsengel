@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, GripVertical, ExternalLink, CalendarDays, Bell } from "lucide-react";
+import { Edit2, Trash2, GripVertical, ExternalLink, CalendarDays, Bell, Archive } from "lucide-react";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
 interface KanbanBoardProps {
@@ -13,6 +13,7 @@ interface KanbanBoardProps {
   onPhaseChange: (leadId: number, newPhase: string) => void;
   onEdit: (lead: Lead) => void;
   onDelete: (id: number) => void;
+  onArchive?: (id: number) => void;
 }
 
 const phaseColors: Record<string, string> = {
@@ -39,6 +40,7 @@ export function KanbanBoard({
   onPhaseChange,
   onEdit,
   onDelete,
+  onArchive,
 }: KanbanBoardProps) {
   const router = useRouter();
   const handleDragStart = (e: React.DragEvent, leadId: number) => {
@@ -160,6 +162,17 @@ export function KanbanBoard({
                         Details
                       </Button>
                       <div className="ml-auto flex gap-1">
+                        {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => onArchive(lead.id)}
+                            title="Archivieren"
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

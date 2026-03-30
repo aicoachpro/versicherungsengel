@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,10 @@ import {
   AlertTriangle,
   FileText,
   ShoppingBag,
+  Download,
+  Upload,
+  MessageSquare,
+  Paperclip,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -75,10 +80,34 @@ interface Fremdvertrag {
   leadId: number | null;
 }
 
+interface Activity {
+  id: number;
+  leadId: number;
+  datum: string;
+  kontaktart: string;
+  notiz: string | null;
+  createdAt: string;
+}
+
+interface Document {
+  id: number;
+  leadId: number;
+  name: string;
+  dateipfad: string;
+  typ: string;
+  createdAt: string;
+}
+
 const SPARTEN = [
   "Haftpflicht", "Inhalt", "Cyber", "D&O", "Flotte",
   "Rechtsschutz", "bAV", "KV", "Sonstiges",
 ];
+
+const KONTAKTARTEN = [
+  "Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "Sonstiges",
+];
+
+const DOKUMENT_TYPEN = ["Angebot", "Police", "E-Mail", "Sonstiges"];
 
 const phaseColors: Record<string, string> = {
   "Termin eingegangen": "bg-blue-100 text-blue-800",
@@ -89,13 +118,25 @@ const phaseColors: Record<string, string> = {
   "Verloren": "bg-red-100 text-red-800",
 };
 
+const kontaktartIcons: Record<string, string> = {
+  "Telefon": "📞",
+  "E-Mail": "📧",
+  "WhatsApp": "💬",
+  "Vor-Ort": "🏢",
+  "LinkedIn": "💼",
+  "Sonstiges": "📝",
+};
+
 export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
   const leadId = Number(params.id);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [vertraege, setVertraege] = useState<Fremdvertrag[]>([]);
+  const [aktivitaeten, setAktivitaeten] = useState<Activity[]>([]);
+  const [dokumente, setDokumente] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVertrag, setEditingVertrag] = useState<Fremdvertrag | null>(null);
@@ -112,22 +153,37 @@ export default function LeadDetailPage() {
   const [crossSellingOptionen, setCrossSellingOptionen] = useState<string[]>([]);
   const [crossSellingSelected, setCrossSellingSelected] = useState<string[]>([]);
 
+  // Aktivität-Dialog State
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityForm, setActivityForm] = useState({
+    datum: new Date().toISOString().slice(0, 16),
+    kontaktart: "Telefon",
+    notiz: "",
+  });
+
+  // Dokument-Upload State
+  const [uploadTyp, setUploadTyp] = useState("Sonstiges");
+
   useEffect(() => {
     loadData();
   }, [leadId]);
 
   async function loadData() {
     setLoading(true);
-    const [leadRes, vertragRes, produktRes, crossSellingRes] = await Promise.all([
+    const [leadRes, vertragRes, produktRes, crossSellingRes, activityRes, docRes] = await Promise.all([
       fetch("/api/leads"),
       fetch(`/api/insurances?leadId=${leadId}`),
       fetch("/api/produkte?kategorie=fremdvertrag"),
       fetch("/api/produkte?kategorie=cross_selling"),
+      fetch(`/api/activities?leadId=${leadId}`),
+      fetch(`/api/documents?leadId=${leadId}`),
     ]);
     const allLeads = await leadRes.json();
     const foundLead = allLeads.find((l: Lead) => l.id === leadId);
     setLead(foundLead || null);
     setVertraege(await vertragRes.json());
+    setAktivitaeten(await activityRes.json());
+    setDokumente(await docRes.json());
 
     const produktList = await produktRes.json();
     setProduktOptionen(produktList.map((p: { name: string }) => p.name));
@@ -135,7 +191,6 @@ export default function LeadDetailPage() {
     const csList = await crossSellingRes.json();
     setCrossSellingOptionen(csList.map((p: { name: string }) => p.name));
 
-    // Parse existing cross-selling selection from lead
     if (foundLead?.crossSelling) {
       try {
         setCrossSellingSelected(JSON.parse(foundLead.crossSelling));
@@ -225,9 +280,56 @@ export default function LeadDetailPage() {
     loadData();
   }
 
-  async function handleDelete(id: number) {
+  async function handleDeleteVertrag(id: number) {
     await fetch(`/api/insurances?id=${id}`, { method: "DELETE" });
     loadData();
+  }
+
+  // Aktivitäten
+  async function handleSaveActivity() {
+    await fetch("/api/activities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId,
+        datum: activityForm.datum,
+        kontaktart: activityForm.kontaktart,
+        notiz: activityForm.notiz || null,
+      }),
+    });
+    setActivityDialogOpen(false);
+    setActivityForm({ datum: new Date().toISOString().slice(0, 16), kontaktart: "Telefon", notiz: "" });
+    loadData();
+  }
+
+  async function handleDeleteActivity(id: number) {
+    await fetch(`/api/activities?id=${id}`, { method: "DELETE" });
+    loadData();
+  }
+
+  // Dokumente
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("leadId", String(leadId));
+    formData.append("typ", uploadTyp);
+
+    await fetch("/api/documents", { method: "POST", body: formData });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    loadData();
+  }
+
+  async function handleDeleteDocument(id: number) {
+    await fetch(`/api/documents?id=${id}`, { method: "DELETE" });
+    loadData();
+  }
+
+  // Export
+  async function handleExport() {
+    window.open(`/api/leads/export/${leadId}`, "_blank");
   }
 
   function isExpiringSoon(ablauf: string | null) {
@@ -266,10 +368,15 @@ export default function LeadDetailPage() {
     <>
       <Header title="Lead Details" />
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Back button */}
-        <Button variant="ghost" onClick={() => router.push("/pipeline")} className="gap-2">
-          <ArrowLeft className="h-4 w-4" /> Zurück zur Pipeline
-        </Button>
+        {/* Back button + Export */}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => router.push("/pipeline")} className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Zurück zur Pipeline
+          </Button>
+          <Button variant="outline" onClick={handleExport} className="gap-2">
+            <Download className="h-4 w-4" /> Übergabedokument
+          </Button>
+        </div>
 
         {/* Lead Info Card */}
         <Card>
@@ -330,6 +437,66 @@ export default function LeadDetailPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Aktivitäten Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">Aktivitäten</CardTitle>
+                <Badge variant="secondary" className="text-xs">{aktivitaeten.length}</Badge>
+              </div>
+              <Button
+                onClick={() => {
+                  setActivityForm({ datum: new Date().toISOString().slice(0, 16), kontaktart: "Telefon", notiz: "" });
+                  setActivityDialogOpen(true);
+                }}
+                size="sm"
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" /> Neue Aktivität
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {aktivitaeten.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p>Noch keine Aktivitäten erfasst</p>
+                <p className="text-xs mt-1">Dokumentiere Telefonate, E-Mails und Meetings</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {aktivitaeten.map((a) => (
+                  <div key={a.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+                    <span className="text-lg mt-0.5">{kontaktartIcons[a.kontaktart] || "📝"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline" className="text-xs">{a.kontaktart}</Badge>
+                        <span className="text-muted-foreground text-xs">
+                          {new Date(a.datum).toLocaleString("de-DE", {
+                            day: "2-digit", month: "2-digit", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      {a.notiz && <p className="text-sm mt-1">{a.notiz}</p>}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive flex-shrink-0"
+                      onClick={() => handleDeleteActivity(a.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -425,7 +592,7 @@ export default function LeadDetailPage() {
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(v)}>
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDelete(v.id)}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeleteVertrag(v.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -434,6 +601,86 @@ export default function LeadDetailPage() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Dokumente Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">Dokumente</CardTitle>
+                <Badge variant="secondary" className="text-xs">{dokumente.length}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={uploadTyp} onValueChange={(v) => { if (v) setUploadTyp(v); }}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOKUMENT_TYPEN.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" /> Hochladen
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {dokumente.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Paperclip className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p>Noch keine Dokumente hochgeladen</p>
+                <p className="text-xs mt-1">Lade Angebote, Policen oder E-Mails hoch</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {dokumente.map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg border">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{d.name}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-xs">{d.typ}</Badge>
+                        <span>{new Date(d.createdAt).toLocaleDateString("de-DE")}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => window.open(`/api/documents/download/${d.id}`, "_blank")}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteDocument(d.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -518,6 +765,60 @@ export default function LeadDetailPage() {
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Abbrechen</Button>
               <Button onClick={handleSave} disabled={!form.bezeichnung}>
                 {editingVertrag ? "Speichern" : "Vertrag anlegen"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for new Activity */}
+      <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Neue Aktivität</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Datum & Uhrzeit *</Label>
+                <Input
+                  type="datetime-local"
+                  value={activityForm.datum}
+                  onChange={(e) => setActivityForm({ ...activityForm, datum: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Kontaktart *</Label>
+                <Select
+                  value={activityForm.kontaktart}
+                  onValueChange={(v) => { if (v) setActivityForm({ ...activityForm, kontaktart: v }); }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KONTAKTARTEN.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {kontaktartIcons[k]} {k}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Notiz</Label>
+              <Textarea
+                value={activityForm.notiz}
+                onChange={(e) => setActivityForm({ ...activityForm, notiz: e.target.value })}
+                placeholder="Was wurde besprochen?"
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setActivityDialogOpen(false)}>Abbrechen</Button>
+              <Button onClick={handleSaveActivity} disabled={!activityForm.datum || !activityForm.kontaktart}>
+                Aktivität speichern
               </Button>
             </div>
           </div>

@@ -44,6 +44,7 @@ export const leads = sqliteTable("leads", {
   crossSelling: text("cross_selling"),
   folgetermin: text("folgetermin"),
   folgeterminNotified: integer("folgetermin_notified").default(0),
+  archivedAt: text("archived_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
@@ -83,6 +84,28 @@ export const passwordResetTokens = sqliteTable("password_reset_tokens", {
   token: text("token").notNull().unique(),
   expiresAt: text("expires_at").notNull(),
   usedAt: text("used_at"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const activities = sqliteTable("activities", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  leadId: integer("lead_id").notNull().references(() => leads.id),
+  datum: text("datum").notNull(),
+  kontaktart: text("kontaktart", {
+    enum: ["Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "Sonstiges"],
+  }).notNull(),
+  notiz: text("notiz"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const documents = sqliteTable("documents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  leadId: integer("lead_id").notNull().references(() => leads.id),
+  name: text("name").notNull(),
+  dateipfad: text("dateipfad").notNull(),
+  typ: text("typ", {
+    enum: ["Angebot", "Police", "E-Mail", "Sonstiges"],
+  }).notNull().default("Sonstiges"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
