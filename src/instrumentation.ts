@@ -95,6 +95,18 @@ export async function register() {
         created_at TEXT DEFAULT (datetime('now')) NOT NULL
       );
       CREATE UNIQUE INDEX IF NOT EXISTS api_keys_key_unique ON api_keys (key);
+
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        user_id INTEGER,
+        user_name TEXT,
+        action TEXT NOT NULL,
+        entity TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        entity_name TEXT,
+        changes TEXT,
+        created_at TEXT DEFAULT (datetime('now')) NOT NULL
+      );
     `);
 
     // Add folgetermin columns if missing (migration for existing DBs)

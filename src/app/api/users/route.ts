@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { sendWelcomeEmail } from "@/lib/email";
+import { logAudit } from "@/lib/audit";
 
 async function requireAdmin() {
   const session = await auth();
@@ -82,6 +83,8 @@ export async function POST(req: NextRequest) {
     expiresAt,
   }).run();
 
+  logAudit({ userId: admin.id, userName: admin.name, action: "create", entity: "user", entityId: result.id, entityName: result.name });
+
   // Send welcome email
   const baseUrl = process.env.AUTH_URL || req.nextUrl.origin;
   const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
@@ -124,6 +127,11 @@ export async function PATCH(req: NextRequest) {
     })
     .get();
 
+  // Passwort-Hash nicht im Audit-Log speichern
+  const safeChanges = { ...updates };
+  if (safeChanges.passwordHash) safeChanges.passwordHash = "[geändert]";
+  logAudit({ userId: admin.id, userName: admin.name, action: "update", entity: "user", entityId: body.id, entityName: result?.name, changes: safeChanges });
+
   return NextResponse.json(result);
 }
 
@@ -149,6 +157,9 @@ export async function DELETE(req: NextRequest) {
     // Zuerst abhängige Datensätze löschen (Foreign Key)
     db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id)).run();
     db.delete(users).where(eq(users.id, id)).run();
+
+    logAudit({ userId: admin.id, userName: admin.name, action: "delete", entity: "user", entityId: id, entityName: userToDelete.name });
+
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";

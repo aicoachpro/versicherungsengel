@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { insurances, leads } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { logAudit, getAuditUser } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
     produkt: body.produkt || null,
   }).returning().get();
 
+  const { userId, userName } = getAuditUser(session);
+  logAudit({ userId, userName, action: "create", entity: "insurance", entityId: result.id, entityName: result.bezeichnung });
+
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -83,6 +87,9 @@ export async function PATCH(req: NextRequest) {
     .returning()
     .get();
 
+  const { userId, userName } = getAuditUser(session);
+  logAudit({ userId, userName, action: "update", entity: "insurance", entityId: id, entityName: result?.bezeichnung, changes: updates });
+
   return NextResponse.json(result);
 }
 
@@ -94,6 +101,11 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
+  const ins = db.select({ bezeichnung: insurances.bezeichnung }).from(insurances).where(eq(insurances.id, Number(id))).get();
   db.delete(insurances).where(eq(insurances.id, Number(id))).run();
+
+  const { userId, userName } = getAuditUser(session);
+  logAudit({ userId, userName, action: "delete", entity: "insurance", entityId: Number(id), entityName: ins?.bezeichnung });
+
   return NextResponse.json({ success: true });
 }
