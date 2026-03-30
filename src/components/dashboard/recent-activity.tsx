@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -32,9 +33,10 @@ export function RecentActivity({ activities }: { activities: Activity[] }) {
         ) : (
           <div className="space-y-3">
             {activities.map((activity) => (
-              <div
+              <Link
                 key={activity.id}
-                className="flex items-center justify-between rounded-lg border p-3"
+                href={`/pipeline/${activity.id}`}
+                className="flex items-center justify-between rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{activity.name}</p>
@@ -48,12 +50,10 @@ export function RecentActivity({ activities }: { activities: Activity[] }) {
                     })}
                   </p>
                 </div>
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${phaseBadgeVariant[activity.phase] || "bg-gray-100 text-gray-800"}`}
-                >
+                <Badge variant="secondary" className={phaseBadgeVariant[activity.phase] || "bg-gray-100 text-gray-800"}>
                   {activity.phase}
-                </span>
-              </div>
+                </Badge>
+              </Link>
             ))}
           </div>
         )}

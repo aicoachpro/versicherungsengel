@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { LeadDialog } from "@/components/pipeline/lead-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, X } from "lucide-react";
 
 export interface Lead {
   id: number;
@@ -43,11 +45,26 @@ const PHASES = [
   "Verloren",
 ] as const;
 
+const OPEN_PHASES = ["Termin eingegangen", "Termin stattgefunden", "Follow-up", "Angebot erstellt"];
+
 export default function PipelinePage() {
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  // Query-Parameter als Filter auswerten
+  useEffect(() => {
+    const filter = searchParams.get("filter");
+    const phase = searchParams.get("phase");
+    const gewerbeart = searchParams.get("gewerbeart");
+
+    if (filter) setActiveFilter(`filter:${filter}`);
+    else if (phase) setActiveFilter(`phase:${phase}`);
+    else if (gewerbeart) setActiveFilter(`gewerbeart:${gewerbeart}`);
+  }, [searchParams]);
 
   const fetchLeads = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -104,9 +121,23 @@ export default function PipelinePage() {
     fetchLeads();
   };
 
-  // Filter: nicht-archivierte Leads + Suchfilter
+  const clearFilter = () => {
+    setActiveFilter(null);
+    window.history.replaceState(null, "", "/pipeline");
+  };
+
+  // Filter: nicht-archivierte Leads + Suchfilter + Dashboard-Filter
   const filteredLeads = leads
     .filter((l) => !l.archivedAt)
+    .filter((l) => {
+      if (!activeFilter) return true;
+      const [type, value] = activeFilter.split(":");
+      if (type === "filter" && value === "offen") return OPEN_PHASES.includes(l.phase);
+      if (type === "filter" && value === "abgeschlossen") return l.phase === "Abgeschlossen";
+      if (type === "phase") return l.phase === value;
+      if (type === "gewerbeart") return l.gewerbeart?.toLowerCase() === value.toLowerCase();
+      return true;
+    })
     .filter((l) => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
@@ -120,14 +151,27 @@ export default function PipelinePage() {
 
   const activeCount = leads.filter((l) => !l.archivedAt).length;
 
+  const filterLabel = activeFilter
+    ? {
+        "filter:offen": "Offene Leads",
+        "filter:abgeschlossen": "Abgeschlossen",
+      }[activeFilter] || activeFilter.split(":")[1]
+    : null;
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Sales Pipeline" />
       <div className="flex items-center justify-between px-6 py-4 gap-4">
         <div className="flex items-center gap-4 flex-1">
           <p className="text-sm text-muted-foreground whitespace-nowrap">
-            {activeCount} Leads aktiv
+            {activeFilter ? `${filteredLeads.length} von ${activeCount}` : `${activeCount}`} Leads aktiv
           </p>
+          {filterLabel && (
+            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={clearFilter}>
+              {filterLabel}
+              <X className="h-3 w-3" />
+            </Badge>
+          )}
           <div className="relative max-w-xs flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -143,7 +187,7 @@ export default function PipelinePage() {
             setEditingLead(null);
             setDialogOpen(true);
           }}
-          className="bg-[#003781] hover:bg-[#002a63]"
+          className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-2 h-4 w-4" />
           Neuer Lead

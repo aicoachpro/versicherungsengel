@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Search, AlertTriangle, Plus, Edit2, Trash2, FileText } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Insurance {
   id: number;
@@ -64,6 +65,7 @@ export default function VersicherungenPage() {
   const [editingInsurance, setEditingInsurance] = useState<Insurance | null>(null);
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [produktOptionen, setProduktOptionen] = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<{id: number, name: string} | null>(null);
   const [form, setForm] = useState({
     bezeichnung: "",
     versicherer: "",
@@ -178,6 +180,7 @@ export default function VersicherungenPage() {
 
   async function handleDelete(id: number) {
     await fetch(`/api/insurances?id=${id}`, { method: "DELETE" });
+    setDeleteTarget(null);
     loadData();
   }
 
@@ -201,7 +204,7 @@ export default function VersicherungenPage() {
               <> · Gesamt: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(totalBeitrag)} / Jahr</>
             )}
           </p>
-          <Button onClick={openNew} className="gap-2 bg-[#003781] hover:bg-[#002a63] ml-auto">
+          <Button onClick={openNew} className="gap-2 bg-primary hover:bg-primary/90 ml-auto">
             <Plus className="h-4 w-4" /> Neuer Vertrag
           </Button>
         </div>
@@ -277,10 +280,10 @@ export default function VersicherungenPage() {
                     <TableCell className="text-sm text-muted-foreground">{ins.umfang || "—"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(ins)}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(ins)} aria-label="Bearbeiten">
                           <Edit2 className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleDelete(ins.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget({ id: ins.id, name: ins.bezeichnung })} aria-label="Löschen">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -391,6 +394,14 @@ export default function VersicherungenPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title={`Vertrag "${deleteTarget?.name}" löschen?`}
+        description="Der Fremdvertrag wird unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+        onConfirm={() => { if (deleteTarget) handleDelete(deleteTarget.id); }}
+      />
     </div>
   );
 }

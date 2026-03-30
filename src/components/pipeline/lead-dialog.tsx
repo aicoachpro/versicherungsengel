@@ -262,7 +262,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Abbrechen
             </Button>
-            <Button type="submit" className="bg-[#003781] hover:bg-[#002a63]">
+            <Button type="submit" className="bg-primary hover:bg-primary/90">
               {lead ? "Speichern" : "Erstellen"}
             </Button>
           </div>
