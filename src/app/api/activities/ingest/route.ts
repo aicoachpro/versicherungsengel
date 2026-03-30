@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, activities, apiKeys } from "@/db/schema";
+import { leads, activities } from "@/db/schema";
 import { eq, like, or } from "drizzle-orm";
+import { validateApiRequest } from "@/lib/api-auth";
 
 // Public API endpoint for Claude Chat / external integrations
-// Authenticated via API key (Bearer token)
+// Authenticated via API key (Bearer token) + Rate-Limited
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "API-Key erforderlich" }, { status: 401 });
-  }
-
-  const key = authHeader.replace("Bearer ", "");
-  const validKey = db.select().from(apiKeys).where(eq(apiKeys.key, key)).get();
-  if (!validKey) {
-    return NextResponse.json({ error: "Ungültiger API-Key" }, { status: 401 });
-  }
+  const auth = validateApiRequest(req);
+  if (!auth.authorized) return auth.response!;
 
   const body = await req.json();
 
