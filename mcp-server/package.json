@@ -1,0 +1,23 @@
+{
+  "name": "versicherungsengel-mcp",
+  "version": "1.0.0",
+  "description": "MCP Server für Versicherungsengel CRM — ermöglicht Claude direkten Zugriff auf Leads und Aktivitäten",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "versicherungsengel-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "mcp",
+    "crm",
+    "versicherungsengel"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "zod": "^4.3.6"
+  }
+}
