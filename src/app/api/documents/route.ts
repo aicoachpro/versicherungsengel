@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { documents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { logAudit, getAuditUser } from "@/lib/audit";
 import path from "path";
 import fs from "fs";
 
@@ -116,6 +117,9 @@ export async function POST(req: NextRequest) {
     typ: safeTyp,
   }).returning().get();
 
+  const { userId, userName } = getAuditUser(session);
+  logAudit({ userId, userName, action: "create", entity: "document", entityId: result.id, entityName: file.name });
+
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -132,6 +136,9 @@ export async function DELETE(req: NextRequest) {
     const filepath = path.join(UPLOAD_DIR, doc.dateipfad);
     if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
     db.delete(documents).where(eq(documents.id, Number(id))).run();
+
+    const { userId, userName } = getAuditUser(session);
+    logAudit({ userId, userName, action: "delete", entity: "document", entityId: Number(id), entityName: doc.name });
   }
 
   return NextResponse.json({ success: true });

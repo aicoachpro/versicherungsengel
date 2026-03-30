@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { logAudit, getAuditUser } from "@/lib/audit";
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
@@ -19,6 +20,15 @@ export async function PATCH(req: NextRequest) {
     .where(eq(leads.id, body.id))
     .returning()
     .get();
+
+  const { userId, userName } = getAuditUser(session);
+  logAudit({
+    userId, userName,
+    action: body.restore ? "restore" : "archive",
+    entity: "lead",
+    entityId: body.id,
+    entityName: result?.name,
+  });
 
   return NextResponse.json(result);
 }

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { activities } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { logAudit, getAuditUser } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
     notiz: body.notiz || null,
   }).returning().get();
 
+  const { userId, userName } = getAuditUser(session);
+  logAudit({ userId, userName, action: "create", entity: "activity", entityId: result.id, entityName: body.kontaktart });
+
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -50,5 +54,9 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   db.delete(activities).where(eq(activities.id, Number(id))).run();
+
+  const { userId, userName } = getAuditUser(session);
+  logAudit({ userId, userName, action: "delete", entity: "activity", entityId: Number(id) });
+
   return NextResponse.json({ success: true });
 }

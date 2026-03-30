@@ -16,6 +16,7 @@ import {
   X,
   Archive,
   CalendarClock,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
   { href: "/archiv", label: "Archiv", icon: Archive },
   { href: "/nutzer", label: "Nutzer", icon: Users, adminOnly: true },
+  { href: "/audit-log", label: "Audit-Log", icon: ClipboardList, adminOnly: true },
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];
 

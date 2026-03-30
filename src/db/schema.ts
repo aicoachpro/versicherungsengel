@@ -115,3 +115,19 @@ export const apiKeys = sqliteTable("api_keys", {
   name: text("name").notNull(),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
+
+export const auditLogs = sqliteTable("audit_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id"),
+  userName: text("user_name"),
+  action: text("action", {
+    enum: ["create", "update", "delete", "archive", "restore"],
+  }).notNull(),
+  entity: text("entity", {
+    enum: ["lead", "insurance", "activity", "document", "user"],
+  }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  entityName: text("entity_name"),
+  changes: text("changes"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
