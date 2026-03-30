@@ -84,7 +84,7 @@ server.tool(
       .default("Sonstiges")
       .describe("Art des Kontakts"),
     datum: z.string().optional().describe("Datum und Uhrzeit (ISO-Format, z.B. 2026-03-30T10:00). Standard: jetzt"),
-    notiz: z.string().describe("Gesprächsnotiz oder Zusammenfassung"),
+    notiz: z.string().describe("Gesprächsnotiz — strukturiert mit Zeilenumbrüchen formatieren. Beispiel:\nThema: Cyber-Versicherung\nBesprochen: Deckungssumme, Selbstbehalt\nErgebnis: Angebot wird erstellt\nNächster Schritt: Angebot bis Freitag senden"),
   },
   async ({ leadId, leadName, kontaktart, datum, notiz }) => {
     if (!leadId && !leadName) {
