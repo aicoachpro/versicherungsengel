@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "VÖLKER Finance | Sales Hub",
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body className="antialiased">
         <SessionProvider>
           <TooltipProvider>{children}</TooltipProvider>
+          <Toaster richColors position="bottom-right" />
         </SessionProvider>
       </body>
     </html>
