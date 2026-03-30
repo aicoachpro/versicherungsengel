@@ -6,10 +6,11 @@ export async function middleware(req: NextRequest) {
   const isPublicPage = pathname === "/login" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/verify-2fa";
   const isWebhook = pathname.startsWith("/api/webhooks");
   const isAuthApi = pathname.startsWith("/api/auth");
-  const isIngestApi = pathname.startsWith("/api/leads/ingest");
+  const isIngestApi = pathname.startsWith("/api/leads/ingest") || pathname.startsWith("/api/activities/ingest");
+  const isSearchApi = pathname.startsWith("/api/leads/search");
   const isCronApi = pathname.startsWith("/api/cron");
 
-  if (isWebhook || isAuthApi || isIngestApi || isCronApi) return NextResponse.next();
+  if (isWebhook || isAuthApi || isIngestApi || isSearchApi || isCronApi) return NextResponse.next();
 
   const secureCookie = req.nextUrl.protocol === "https:";
   const token = await getToken({
