@@ -14,13 +14,17 @@ import {
   Users,
   Menu,
   X,
+  Archive,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
+  { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
+  { href: "/archiv", label: "Archiv", icon: Archive },
   { href: "/nutzer", label: "Nutzer", icon: Users, adminOnly: true },
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];
