@@ -6,14 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Edit2, Trash2, GripVertical, ExternalLink, CalendarDays, Bell, Archive } from "lucide-react";
+import { Trash2, GripVertical, CalendarDays, Bell, Archive } from "lucide-react";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
 interface KanbanBoardProps {
   leads: Lead[];
   phases: string[];
   onPhaseChange: (leadId: number, newPhase: string) => void;
-  onEdit: (lead: Lead) => void;
   onDelete: (id: number) => void;
   onArchive?: (id: number) => void;
 }
@@ -40,7 +39,6 @@ export function KanbanBoard({
   leads,
   phases,
   onPhaseChange,
-  onEdit,
   onDelete,
   onArchive,
 }: KanbanBoardProps) {
@@ -88,17 +86,15 @@ export function KanbanBoard({
                     id={`lead-${lead.id}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
-                    className={`cursor-grab border-t-2 ${phaseColors[phase]} shadow-sm hover:shadow-md transition-all active:cursor-grabbing`}
+                    onClick={() => router.push(`/pipeline/${lead.id}`)}
+                    className={`cursor-pointer border-t-2 ${phaseColors[phase]} shadow-sm hover:shadow-md transition-all active:cursor-grabbing`}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <button
-                            className="text-sm font-medium truncate text-left hover:text-primary hover:underline cursor-pointer"
-                            onClick={() => router.push(`/pipeline/${lead.id}`)}
-                          >
+                          <p className="text-sm font-medium truncate">
                             {lead.name}
-                          </button>
+                          </p>
                           {lead.ansprechpartner && (
                             <p className="text-xs text-muted-foreground truncate">
                               {lead.ansprechpartner}
@@ -158,48 +154,27 @@ export function KanbanBoard({
                           }).format(lead.umsatz)}
                         </p>
                       )}
-                      <div className="mt-2 flex items-center gap-1">
+                      <div className="mt-2 flex items-center justify-end gap-1">
+                        {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}
+                            aria-label={`${lead.name} archivieren`}
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="h-7 gap-1 text-xs px-2"
-                          onClick={() => router.push(`/pipeline/${lead.id}`)}
-                          aria-label={`Details für ${lead.name}`}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: lead.id, name: lead.name }); }}
+                          aria-label={`${lead.name} löschen`}
                         >
-                          <ExternalLink className="h-3 w-3" />
-                          Details
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                        <div className="ml-auto flex gap-1">
-                          {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => onArchive(lead.id)}
-                              aria-label={`${lead.name} archivieren`}
-                            >
-                              <Archive className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => onEdit(lead)}
-                            aria-label={`${lead.name} bearbeiten`}
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget({ id: lead.id, name: lead.name })}
-                            aria-label={`${lead.name} löschen`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
                       </div>
                     </CardContent>
                   </Card>

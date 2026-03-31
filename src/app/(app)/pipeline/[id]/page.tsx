@@ -51,6 +51,8 @@ import {
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { LeadDialog } from "@/components/pipeline/lead-dialog";
+import { toast } from "sonner";
 
 interface Lead {
   id: number;
@@ -59,14 +61,24 @@ interface Lead {
   ansprechpartner: string | null;
   email: string | null;
   telefon: string | null;
+  website: string | null;
+  gewerbeart: string | null;
   branche: string | null;
+  unternehmensgroesse: string | null;
+  umsatzklasse: string | null;
   termin: string | null;
   eingangsdatum: string | null;
   terminKosten: number | null;
   umsatz: number | null;
+  conversion: number | null;
+  naechsterSchritt: string | null;
   notizen: string | null;
   crossSelling: string | null;
   folgetermin: string | null;
+  folgeterminNotified: number;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Fremdvertrag {
@@ -164,6 +176,9 @@ export default function LeadDetailPage() {
 
   // Dokument-Upload State
   const [uploadTyp, setUploadTyp] = useState("Sonstiges");
+
+  // Lead-Edit Dialog State
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Confirm-Dialog State
   const [deleteConfirm, setDeleteConfirm] = useState<{type: string, id: number, label: string} | null>(null);
@@ -334,6 +349,18 @@ export default function LeadDetailPage() {
     loadData();
   }
 
+  // Lead bearbeiten
+  async function handleLeadSave(data: Partial<Lead>) {
+    await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: leadId, ...data }),
+    });
+    toast.success("Lead gespeichert");
+    setEditDialogOpen(false);
+    loadData();
+  }
+
   // Export
   async function handleExport() {
     window.open(`/api/leads/export/${leadId}`, "_blank");
@@ -390,7 +417,17 @@ export default function LeadDetailPage() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl">{lead.name}</CardTitle>
-              <Badge className={phaseColors[lead.phase]}>{lead.phase}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={phaseColors[lead.phase]}>{lead.phase}</Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setEditDialogOpen(true)}
+                >
+                  <Edit2 className="h-4 w-4" /> Bearbeiten
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -798,6 +835,14 @@ export default function LeadDetailPage() {
           else if (deleteConfirm.type === "activity") handleDeleteActivity(deleteConfirm.id);
           else if (deleteConfirm.type === "document") handleDeleteDocument(deleteConfirm.id);
         }}
+      />
+
+      {/* Lead Edit Dialog */}
+      <LeadDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        lead={lead as unknown as Parameters<typeof LeadDialog>[0]["lead"]}
+        onSave={handleLeadSave}
       />
 
       {/* Dialog for new Activity */}
