@@ -16,9 +16,7 @@ const phaseColors: Record<string, { bg: string; text: string }> = {
 
 export function PipelineFunnel({ data }: PipelineFunnelProps) {
   const total = data.reduce((sum, d) => sum + d.count, 0);
-  // Trichter: Breite proportional zur Phase-Reihenfolge (breit → schmal)
-  const funnelData = data.filter((d) => d.phase !== "Verloren");
-  const verloren = data.find((d) => d.phase === "Verloren");
+  const maxCount = Math.max(...data.map((d) => d.count), 1);
 
   return (
     <Card>
@@ -29,9 +27,8 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          {funnelData.map((item, i) => {
-            const widthPercent = 100 - (i * (60 / Math.max(funnelData.length - 1, 1)));
+        <div className="space-y-3">
+          {data.map((item) => {
             const colors = phaseColors[item.phase] || { bg: "bg-primary", text: "text-primary" };
             return (
               <Link
@@ -46,7 +43,9 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
                   <div className="h-8 rounded-md bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-md ${colors.bg} flex items-center px-3 transition-all group-hover:opacity-80`}
-                      style={{ width: `${Math.max(widthPercent, 8)}%` }}
+                      style={{
+                        width: `${Math.max((item.count / maxCount) * 100, 8)}%`,
+                      }}
                     >
                       <span className="text-xs font-medium text-white">
                         {item.count}
@@ -58,15 +57,6 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
             );
           })}
         </div>
-        {verloren && verloren.count > 0 && (
-          <Link
-            href="/pipeline?scrollToPhase=Verloren"
-            className="mt-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span className="h-2 w-2 rounded-full bg-red-400" />
-            {verloren.count} Verloren
-          </Link>
-        )}
       </CardContent>
     </Card>
   );
