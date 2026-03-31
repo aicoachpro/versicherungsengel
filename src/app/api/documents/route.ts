@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   const bytes = await file.arrayBuffer();
   fs.writeFileSync(filepath, Buffer.from(bytes));
 
-  const validTypes = ["Angebot", "Police", "Beratungsprotokoll", "E-Mail", "Sonstiges"] as const;
+  const validTypes = ["Angebot", "Police", "Beratungsprotokoll", "Gesprächsleitfaden", "E-Mail", "Sonstiges"] as const;
   const safeTyp = validTypes.includes(typ as typeof validTypes[number])
     ? (typ as typeof validTypes[number])
     : "Sonstiges";

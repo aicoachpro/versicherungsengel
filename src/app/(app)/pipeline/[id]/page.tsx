@@ -120,7 +120,7 @@ const KONTAKTARTEN = [
   "Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "Sonstiges",
 ];
 
-const DOKUMENT_TYPEN = ["Angebot", "Police", "Beratungsprotokoll", "E-Mail", "Sonstiges"];
+const DOKUMENT_TYPEN = ["Angebot", "Police", "Beratungsprotokoll", "Gesprächsleitfaden", "E-Mail", "Sonstiges"];
 
 const phaseColors: Record<string, string> = {
   "Termin eingegangen": "bg-blue-100 text-blue-800",
