@@ -270,7 +270,7 @@ export default function WiedervorlagePage() {
                     ? "border-amber-200 bg-amber-50/50 dark:bg-amber-950/10"
                     : ""
               }>
-                <CardContent className="flex items-center gap-4 p-4">
+                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4">
                   {/* Icon */}
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg flex-shrink-0 ${
                     item.urgency === "high" ? "bg-red-100 text-red-600" :
@@ -293,7 +293,7 @@ export default function WiedervorlagePage() {
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap sm:flex-nowrap">
                     <Button
                       variant="outline"
                       size="sm"
