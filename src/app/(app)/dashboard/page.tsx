@@ -11,6 +11,7 @@ import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointmen
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { GewerbeartChart } from "@/components/dashboard/gewerbeart-chart";
 import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
+import { ReportButton } from "@/components/dashboard/report-button";
 
 function getKpis() {
   const openLeads = db
@@ -220,7 +221,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col">
-      <Header title="Dashboard" />
+      <Header title="Dashboard" actions={<ReportButton />} />
       <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6">
         <KpiCards
           openLeads={kpis.openLeads}
