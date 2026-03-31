@@ -29,7 +29,7 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
             {appointments.map((apt, idx) => (
               <Link
                 key={`${apt.id}-${apt.typ}-${idx}`}
-                href={`/pipeline/${apt.id}`}
+                href={`/pipeline?leadId=${apt.id}&scrollToPhase=${encodeURIComponent(apt.phase)}`}
                 className="flex items-center gap-3 rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
               >
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${apt.typ === "Folgetermin" ? "bg-emerald-100" : "bg-primary/10"}`}>

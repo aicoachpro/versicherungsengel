@@ -69,6 +69,7 @@ export function KanbanBoard({
           return (
             <div
               key={phase}
+              id={`phase-${phase.replace(/\s+/g, "-").toLowerCase()}`}
               className="w-72 flex-shrink-0"
               onDrop={(e) => handleDrop(e, phase)}
               onDragOver={handleDragOver}
@@ -84,6 +85,7 @@ export function KanbanBoard({
                 {phaseLeads.map((lead) => (
                   <Card
                     key={lead.id}
+                    id={`lead-${lead.id}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                     className={`cursor-grab border-t-2 ${phaseColors[phase]} shadow-sm hover:shadow-md transition-all active:cursor-grabbing`}

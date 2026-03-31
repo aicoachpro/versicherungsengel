@@ -28,7 +28,7 @@ export function GewerbeartChart({ data }: GewerbeartOverviewProps) {
         ) : (
           <div className="space-y-3">
             <Link
-              href="/pipeline?gewerbeart=hauptberuflich"
+              href="/pipeline?gewerbeart=hauptberuflich&scrollToPhase=Termin%20eingegangen"
               className="flex items-center justify-between rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
             >
               <div className="flex items-center gap-3">
@@ -40,7 +40,7 @@ export function GewerbeartChart({ data }: GewerbeartOverviewProps) {
               <span className="text-xl font-bold">{haupt?.anzahl ?? 0}</span>
             </Link>
             <Link
-              href="/pipeline?gewerbeart=nebenberuflich"
+              href="/pipeline?gewerbeart=nebenberuflich&scrollToPhase=Termin%20eingegangen"
               className="flex items-center justify-between rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
             >
               <div className="flex items-center gap-3">

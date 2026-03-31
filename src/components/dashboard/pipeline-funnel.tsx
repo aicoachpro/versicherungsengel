@@ -28,7 +28,7 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
           {data.map((item) => (
             <Link
               key={item.phase}
-              href={`/pipeline?phase=${encodeURIComponent(item.phase)}`}
+              href={`/pipeline?scrollToPhase=${encodeURIComponent(item.phase)}`}
               className="flex items-center gap-3 group"
             >
               <span className="w-40 text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
