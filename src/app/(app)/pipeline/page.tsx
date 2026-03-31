@@ -20,6 +20,9 @@ export interface Lead {
   email: string | null;
   telefon: string | null;
   website: string | null;
+  strasse: string | null;
+  plz: string | null;
+  ort: string | null;
   gewerbeart: string | null;
   branche: string | null;
   unternehmensgroesse: string | null;

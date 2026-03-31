@@ -85,6 +85,16 @@ try {
   console.log("Added 'folgetermin_typ' column to leads table");
 }
 
+// Add address fields to leads if not exist
+for (const col of ["strasse", "plz", "ort"]) {
+  try {
+    sqlite.prepare(`SELECT ${col} FROM leads LIMIT 1`).get();
+  } catch {
+    sqlite.prepare(`ALTER TABLE leads ADD COLUMN ${col} TEXT`).run();
+    console.log(`Added '${col}' column to leads table`);
+  }
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

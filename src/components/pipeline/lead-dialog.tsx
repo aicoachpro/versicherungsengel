@@ -44,6 +44,9 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     ansprechpartner: "",
     email: "",
     telefon: "",
+    strasse: "",
+    plz: "",
+    ort: "",
     gewerbeart: "",
     branche: "",
     unternehmensgroesse: "",
@@ -65,6 +68,9 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         ansprechpartner: lead.ansprechpartner || "",
         email: lead.email || "",
         telefon: lead.telefon || "",
+        strasse: lead.strasse || "",
+        plz: lead.plz || "",
+        ort: lead.ort || "",
         gewerbeart: lead.gewerbeart || "",
         branche: lead.branche || "",
         unternehmensgroesse: lead.unternehmensgroesse || "",
@@ -81,6 +87,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     } else {
       setForm({
         name: "", ansprechpartner: "", email: "", telefon: "",
+        strasse: "", plz: "", ort: "",
         gewerbeart: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
         termin: "", folgetermin: "", folgeterminTyp: "",
         eingangsdatum: new Date().toISOString().split("T")[0],
@@ -97,6 +104,9 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       ansprechpartner: form.ansprechpartner || null,
       email: form.email || null,
       telefon: form.telefon || null,
+      strasse: form.strasse || null,
+      plz: form.plz || null,
+      ort: form.ort || null,
       gewerbeart: form.gewerbeart || null,
       branche: form.branche || null,
       unternehmensgroesse: form.unternehmensgroesse || null,
@@ -148,6 +158,27 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
               <Input
                 value={form.telefon}
                 onChange={(e) => setForm({ ...form, telefon: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Straße + Hausnummer</Label>
+              <Input
+                value={form.strasse}
+                onChange={(e) => setForm({ ...form, strasse: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>PLZ</Label>
+              <Input
+                value={form.plz}
+                onChange={(e) => setForm({ ...form, plz: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Ort</Label>
+              <Input
+                value={form.ort}
+                onChange={(e) => setForm({ ...form, ort: e.target.value })}
               />
             </div>
             <div className="space-y-2">
