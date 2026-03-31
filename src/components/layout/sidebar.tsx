@@ -16,6 +16,7 @@ import {
   X,
   Archive,
   CalendarClock,
+  CalendarDays,
   ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils";
 const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
+  { href: "/kalender", label: "Kalender", icon: CalendarDays },
   { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
   { href: "/archiv", label: "Archiv", icon: Archive },
