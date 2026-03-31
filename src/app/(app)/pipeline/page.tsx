@@ -60,7 +60,6 @@ function PipelineContent() {
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
@@ -121,23 +120,13 @@ function PipelineContent() {
   };
 
   const handleSave = async (data: Partial<Lead>) => {
-    if (editingLead) {
-      await fetch("/api/leads", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingLead.id, ...data }),
-      });
-      toast.success("Lead gespeichert");
-    } else {
-      await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      toast.success("Lead erstellt");
-    }
+    await fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    toast.success("Lead erstellt");
     setDialogOpen(false);
-    setEditingLead(null);
     fetchLeads();
   };
 
@@ -219,10 +208,7 @@ function PipelineContent() {
           </div>
         </div>
         <Button
-          onClick={() => {
-            setEditingLead(null);
-            setDialogOpen(true);
-          }}
+          onClick={() => setDialogOpen(true)}
           className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -234,10 +220,6 @@ function PipelineContent() {
           leads={filteredLeads}
           phases={PHASES as unknown as string[]}
           onPhaseChange={handlePhaseChange}
-          onEdit={(lead) => {
-            setEditingLead(lead);
-            setDialogOpen(true);
-          }}
           onDelete={handleDelete}
           onArchive={handleArchive}
         />
@@ -245,7 +227,7 @@ function PipelineContent() {
       <LeadDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        lead={editingLead}
+        lead={null}
         onSave={handleSave}
       />
     </div>
