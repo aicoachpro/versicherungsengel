@@ -217,6 +217,21 @@ export default function WiedervorlagePage() {
     loadData();
   }
 
+  async function handleMarkDone(lead: Lead) {
+    await fetch("/api/activities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: lead.id,
+        datum: new Date().toISOString().slice(0, 16),
+        kontaktart: "Sonstiges",
+        notiz: "Wiedervorlage erledigt",
+      }),
+    });
+    toast.success(`${lead.name} als erledigt markiert`);
+    loadData();
+  }
+
   const highCount = items.filter((i) => i.urgency === "high").length;
   const mediumCount = items.filter((i) => i.urgency === "medium").length;
 
@@ -302,6 +317,15 @@ export default function WiedervorlagePage() {
                     >
                       <CalendarPlus className="h-3.5 w-3.5" />
                       Termin
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => handleMarkDone(item.lead)}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Erledigt
                     </Button>
                     <Button
                       variant="ghost"
