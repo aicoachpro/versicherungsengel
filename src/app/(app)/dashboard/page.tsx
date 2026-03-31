@@ -10,6 +10,7 @@ import { PipelineFunnel } from "@/components/dashboard/pipeline-funnel";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { GewerbeartChart } from "@/components/dashboard/gewerbeart-chart";
+import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
 
 function getKpis() {
   const openLeads = db
@@ -186,11 +187,33 @@ function getRecentActivity() {
     .all();
 }
 
+function getLeadTrend() {
+  // Leads pro Woche der letzten 8 Wochen
+  const result = db
+    .select({
+      week: sql<string>`strftime('%Y-W%W', ${leads.createdAt})`,
+      weekStart: sql<string>`date(${leads.createdAt}, 'weekday 1', '-7 days')`,
+      count: sql<number>`count(*)`,
+    })
+    .from(leads)
+    .where(sql`${leads.createdAt} >= date('now', '-8 weeks')`)
+    .groupBy(sql`strftime('%Y-W%W', ${leads.createdAt})`)
+    .orderBy(sql`strftime('%Y-W%W', ${leads.createdAt})`)
+    .all();
+
+  return result.map((r) => {
+    const d = new Date(r.weekStart);
+    const label = `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.`;
+    return { week: label, leads: r.count };
+  });
+}
+
 export default function DashboardPage() {
   const kpis = getKpis();
   const pipelineData = getPipelineData();
   const revenueData = getRevenueByMonth();
   const gewerbeartData = getGewerbeartData();
+  const leadTrend = getLeadTrend();
   const appointments = getUpcomingAppointments();
   const recentActivity = getRecentActivity();
 
@@ -209,10 +232,11 @@ export default function DashboardPage() {
           <PipelineFunnel data={pipelineData} />
         </div>
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+          <LeadTrendChart data={leadTrend} />
           <GewerbeartChart data={gewerbeartData} />
-          <UpcomingAppointments appointments={appointments} />
         </div>
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+          <UpcomingAppointments appointments={appointments} />
           <RecentActivity activities={recentActivity} />
         </div>
       </div>
