@@ -154,7 +154,7 @@ function getUpcomingAppointments() {
     .all()
     .map((t) => ({ ...t, typ: "Termin" as const }));
 
-  // Folgetermine (Cross-Selling)
+  // Folgetermine
   const folgetermine = db
     .select({
       id: leads.id,
@@ -162,6 +162,7 @@ function getUpcomingAppointments() {
       ansprechpartner: leads.ansprechpartner,
       termin: leads.folgetermin,
       phase: leads.phase,
+      folgeterminTyp: leads.folgeterminTyp,
     })
     .from(leads)
     .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater)))

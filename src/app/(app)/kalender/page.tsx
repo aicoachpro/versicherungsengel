@@ -16,6 +16,7 @@ interface CalendarEvent {
   ansprechpartner: string | null;
   date: string;
   type: "Termin" | "Folgetermin";
+  folgeterminTyp?: string;
   phase: string;
 }
 
@@ -162,7 +163,7 @@ export default function KalenderPage() {
                 <span className="h-2.5 w-2.5 rounded-full bg-primary" /> Termin
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Cross-Selling
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Folgetermin
               </span>
             </div>
             <Button
@@ -292,7 +293,7 @@ export default function KalenderPage() {
                                 event.type === "Folgetermin" ? "bg-emerald-100 text-emerald-700" : ""
                               )}
                             >
-                              {event.type === "Folgetermin" ? "Cross-Selling" : event.phase}
+                              {event.type === "Folgetermin" ? (event.folgeterminTyp || "Nachfassen") : event.phase}
                             </Badge>
                             {formatTime(event.date) && (
                               <span className="text-muted-foreground">{formatTime(event.date)}</span>

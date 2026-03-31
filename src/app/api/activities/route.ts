@@ -11,15 +11,23 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId");
-  if (!leadId) return NextResponse.json({ error: "Missing leadId" }, { status: 400 });
 
+  if (leadId) {
+    const result = db
+      .select()
+      .from(activities)
+      .where(eq(activities.leadId, Number(leadId)))
+      .orderBy(desc(activities.datum))
+      .all();
+    return NextResponse.json(result);
+  }
+
+  // Ohne leadId: alle Aktivitäten (für Wiedervorlage)
   const result = db
     .select()
     .from(activities)
-    .where(eq(activities.leadId, Number(leadId)))
     .orderBy(desc(activities.datum))
     .all();
-
   return NextResponse.json(result);
 }
 
