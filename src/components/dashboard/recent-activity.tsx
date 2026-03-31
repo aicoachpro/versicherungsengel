@@ -35,7 +35,7 @@ export function RecentActivity({ activities }: { activities: Activity[] }) {
             {activities.map((activity) => (
               <Link
                 key={activity.id}
-                href={`/pipeline/${activity.id}`}
+                href={`/pipeline?leadId=${activity.id}&scrollToPhase=${encodeURIComponent(activity.phase)}`}
                 className="flex items-center justify-between rounded-lg border p-3 transition-shadow hover:shadow-sm hover:border-primary/30"
               >
                 <div className="min-w-0 flex-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
@@ -49,6 +49,14 @@ const PHASES = [
 const OPEN_PHASES = ["Termin eingegangen", "Termin stattgefunden", "Follow-up", "Angebot erstellt"];
 
 export default function PipelinePage() {
+  return (
+    <Suspense>
+      <PipelineContent />
+    </Suspense>
+  );
+}
+
+function PipelineContent() {
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -56,15 +64,38 @@ export default function PipelinePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
-  // Query-Parameter als Filter auswerten
+  // Query-Parameter als Filter auswerten + zur Spalte/Kachel scrollen
   useEffect(() => {
     const filter = searchParams.get("filter");
     const phase = searchParams.get("phase");
     const gewerbeart = searchParams.get("gewerbeart");
+    const scrollToPhase = searchParams.get("scrollToPhase");
+    const leadId = searchParams.get("leadId");
 
     if (filter) setActiveFilter(`filter:${filter}`);
     else if (phase) setActiveFilter(`phase:${phase}`);
     else if (gewerbeart) setActiveFilter(`gewerbeart:${gewerbeart}`);
+
+    // Scroll zur Phase-Spalte
+    const targetPhase = scrollToPhase || phase;
+    if (targetPhase) {
+      setTimeout(() => {
+        const el = document.getElementById(`phase-${targetPhase.replace(/\s+/g, "-").toLowerCase()}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }, 150);
+    }
+
+    // Scroll zur Lead-Kachel + Highlight
+    if (leadId) {
+      setTimeout(() => {
+        const el = document.getElementById(`lead-${leadId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+          setTimeout(() => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 3000);
+        }
+      }, 300);
+    }
   }, [searchParams]);
 
   const fetchLeads = useCallback(async () => {

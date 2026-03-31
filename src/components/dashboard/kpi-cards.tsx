@@ -17,7 +17,7 @@ export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsPr
       icon: Target,
       color: "text-blue-600",
       bg: "bg-blue-50",
-      href: "/pipeline?filter=offen",
+      href: "/pipeline?filter=offen&scrollToPhase=Termin%20eingegangen",
     },
     {
       title: "Conversion Rate",
@@ -25,7 +25,7 @@ export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsPr
       icon: TrendingUp,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
-      href: "/pipeline?filter=abgeschlossen",
+      href: "/pipeline?filter=abgeschlossen&scrollToPhase=Abgeschlossen",
     },
     {
       title: "Umsatz",
@@ -37,7 +37,7 @@ export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsPr
       icon: DollarSign,
       color: "text-amber-600",
       bg: "bg-amber-50",
-      href: "/pipeline?sort=umsatz",
+      href: "/pipeline?filter=abgeschlossen&scrollToPhase=Abgeschlossen",
     },
     {
       title: "ROI",
@@ -45,7 +45,7 @@ export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsPr
       icon: BarChart3,
       color: "text-purple-600",
       bg: "bg-purple-50",
-      href: "/pipeline?sort=roi",
+      href: "/pipeline?scrollToPhase=Abgeschlossen",
     },
   ];
 
