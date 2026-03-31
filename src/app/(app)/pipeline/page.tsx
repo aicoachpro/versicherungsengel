@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, X } from "lucide-react";
+import { toast } from "sonner";
 
 export interface Lead {
   id: number;
@@ -95,12 +96,14 @@ export default function PipelinePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editingLead.id, ...data }),
       });
+      toast.success("Lead gespeichert");
     } else {
       await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      toast.success("Lead erstellt");
     }
     setDialogOpen(false);
     setEditingLead(null);
@@ -109,6 +112,7 @@ export default function PipelinePage() {
 
   const handleDelete = async (id: number) => {
     await fetch(`/api/leads?id=${id}`, { method: "DELETE" });
+    toast.success("Lead gelöscht");
     fetchLeads();
   };
 
@@ -118,6 +122,7 @@ export default function PipelinePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
+    toast.success("Lead archiviert");
     fetchLeads();
   };
 

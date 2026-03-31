@@ -19,17 +19,17 @@ export function Header({ title }: { title: string }) {
     .toUpperCase() || "U";
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
-      <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+    <header className="flex h-16 items-center justify-between border-b bg-card/80 backdrop-blur-sm px-6">
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
 
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-accent cursor-pointer outline-none">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+        <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer outline-none">
+            <Avatar className="h-8 w-8 ring-2 ring-primary/10">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm">{session?.user?.name}</span>
+            <span className="text-sm font-medium">{session?.user?.name}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>

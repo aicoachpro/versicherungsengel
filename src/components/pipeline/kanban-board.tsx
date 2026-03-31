@@ -80,13 +80,13 @@ export function KanbanBoard({
                   {phaseLeads.length}
                 </Badge>
               </div>
-              <div className="space-y-3 min-h-[200px] rounded-lg bg-muted/50 p-2">
+              <div className="space-y-3 min-h-[200px] rounded-xl bg-muted/40 p-2 border border-border/50">
                 {phaseLeads.map((lead) => (
                   <Card
                     key={lead.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
-                    className={`cursor-grab border-t-2 ${phaseColors[phase]} hover:shadow-md transition-shadow active:cursor-grabbing`}
+                    className={`cursor-grab border-t-2 ${phaseColors[phase]} shadow-sm hover:shadow-md transition-all active:cursor-grabbing`}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between">

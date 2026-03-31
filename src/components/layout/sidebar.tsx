@@ -20,14 +20,20 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
   { href: "/archiv", label: "Archiv", icon: Archive },
-  { href: "/nutzer", label: "Nutzer", icon: Users, adminOnly: true },
-  { href: "/audit-log", label: "Audit-Log", icon: ClipboardList, adminOnly: true },
+];
+
+const adminNav = [
+  { href: "/nutzer", label: "Nutzer", icon: Users },
+  { href: "/audit-log", label: "Audit-Log", icon: ClipboardList },
+];
+
+const settingsNav = [
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];
 
@@ -37,10 +43,27 @@ export function Sidebar() {
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }) => {
+    const isActive = pathname === href || pathname.startsWith(href + "/");
+    return (
+      <Link
+        href={href}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+            : "text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
+        )}
+      >
+        <Icon className={cn("h-[18px] w-[18px]", isActive && "text-gold")} />
+        {label}
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -54,7 +77,7 @@ export function Sidebar() {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         <Image src="/logo.png" alt="Logo" width={28} height={28} className="rounded" />
-        <span className="text-sm font-semibold">VÖLKER Finance</span>
+        <span className="text-sm font-semibold tracking-tight">VÖLKER Finance</span>
       </div>
 
       {/* Overlay */}
@@ -73,49 +96,54 @@ export function Sidebar() {
         )}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
+        <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
           <Image
             src="/logo.png"
             alt="VÖLKER Finance OHG"
-            width={48}
-            height={48}
-            className="rounded-lg"
+            width={44}
+            height={44}
+            className="rounded-xl"
           />
           <div>
-            <p className="text-sm font-semibold leading-tight">VÖLKER Finance</p>
-            <p className="text-xs text-sidebar-foreground/60">Sales Hub</p>
+            <p className="text-sm font-semibold leading-tight tracking-tight">VÖLKER Finance</p>
+            <p className="text-[11px] text-sidebar-foreground/40 font-medium tracking-wide uppercase">Sales Hub</p>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems
-            .filter((item) => !item.adminOnly || isAdmin)
-            .map((item) => {
-              const isActive =
-                pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-1">
+            {mainNav.map((item) => (
+              <NavLink key={item.href} {...item} />
+            ))}
+          </div>
+
+          {isAdmin && (
+            <>
+              <div className="my-4 mx-3 border-t border-sidebar-border" />
+              <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/30">
+                Admin
+              </p>
+              <div className="space-y-1">
+                {adminNav.map((item) => (
+                  <NavLink key={item.href} {...item} />
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="my-4 mx-3 border-t border-sidebar-border" />
+          <div className="space-y-1">
+            {settingsNav.map((item) => (
+              <NavLink key={item.href} {...item} />
+            ))}
+          </div>
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-sidebar-border px-3 py-4">
-          <div className="flex items-center gap-2 px-3 py-2 text-xs text-sidebar-foreground/50">
-            <Shield className="h-4 w-4" />
+        <div className="border-t border-sidebar-border px-5 py-4">
+          <div className="flex items-center gap-2 text-[11px] text-sidebar-foreground/30 font-medium">
+            <Shield className="h-3.5 w-3.5" />
             Allianz Generalvertretung
           </div>
         </div>
