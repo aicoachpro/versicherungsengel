@@ -107,7 +107,7 @@ export const documents = sqliteTable("documents", {
   name: text("name").notNull(),
   dateipfad: text("dateipfad").notNull(),
   typ: text("typ", {
-    enum: ["Angebot", "Police", "E-Mail", "Sonstiges"],
+    enum: ["Angebot", "Police", "Beratungsprotokoll", "E-Mail", "Sonstiges"],
   }).notNull().default("Sonstiges"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
