@@ -77,6 +77,14 @@ if (!existingProdukte) {
   console.log(`Seeded ${crossSellingProducts.length} standard cross-selling products`);
 }
 
+// Add folgetermin_typ column to leads if not exists
+try {
+  sqlite.prepare("SELECT folgetermin_typ FROM leads LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE leads ADD COLUMN folgetermin_typ TEXT").run();
+  console.log("Added 'folgetermin_typ' column to leads table");
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

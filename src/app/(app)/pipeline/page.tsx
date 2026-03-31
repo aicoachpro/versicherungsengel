@@ -31,6 +31,7 @@ export interface Lead {
   notizen: string | null;
   eingangsdatum: string | null;
   folgetermin: string | null;
+  folgeterminTyp: string | null;
   folgeterminNotified: number;
   archivedAt: string | null;
   createdAt: string;

@@ -28,6 +28,7 @@ interface LeadDialogProps {
 }
 
 const GEWERBEARTEN = ["hauptberuflich", "nebenberuflich"];
+const FOLGETERMIN_TYPEN = ["Nachfassen", "Cross-Selling", "Beratung", "Angebot nachfassen", "Sonstiges"];
 
 const BRANCHEN = [
   "Bau", "Handwerk", "Dienstleistung", "Produktion", "IT",
@@ -49,6 +50,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     umsatzklasse: "",
     termin: "",
     folgetermin: "",
+    folgeterminTyp: "",
     eingangsdatum: new Date().toISOString().split("T")[0],
     terminKosten: "320",
     umsatz: "",
@@ -69,6 +71,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         umsatzklasse: lead.umsatzklasse || "",
         termin: lead.termin || "",
         folgetermin: lead.folgetermin || "",
+        folgeterminTyp: lead.folgeterminTyp || "",
         eingangsdatum: lead.eingangsdatum ? lead.eingangsdatum.split("T")[0] : "",
         terminKosten: String(lead.terminKosten ?? 320),
         umsatz: lead.umsatz ? String(lead.umsatz) : "",
@@ -79,7 +82,8 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       setForm({
         name: "", ansprechpartner: "", email: "", telefon: "",
         gewerbeart: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
-        termin: "", folgetermin: "", eingangsdatum: new Date().toISOString().split("T")[0],
+        termin: "", folgetermin: "", folgeterminTyp: "",
+        eingangsdatum: new Date().toISOString().split("T")[0],
         terminKosten: "320", umsatz: "",
         naechsterSchritt: "", notizen: "",
       });
@@ -99,6 +103,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       umsatzklasse: form.umsatzklasse || null,
       termin: form.termin || null,
       folgetermin: form.folgetermin || null,
+      folgeterminTyp: form.folgeterminTyp || null,
       eingangsdatum: form.eingangsdatum || null,
       terminKosten: form.terminKosten ? Number(form.terminKosten) : 320,
       umsatz: form.umsatz ? Number(form.umsatz) : null,
@@ -219,12 +224,26 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
               />
             </div>
             <div className="space-y-2">
-              <Label>Folgetermin (Cross-Selling)</Label>
+              <Label>Folgetermin</Label>
               <Input
                 type="datetime-local"
                 value={form.folgetermin}
                 onChange={(e) => setForm({ ...form, folgetermin: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Folgetermin-Typ</Label>
+              <Select
+                value={form.folgeterminTyp}
+                onValueChange={(v) => setForm({ ...form, folgeterminTyp: v ?? "" })}
+              >
+                <SelectTrigger><SelectValue placeholder="Auswählen" /></SelectTrigger>
+                <SelectContent>
+                  {FOLGETERMIN_TYPEN.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Termin-Kosten (€)</Label>

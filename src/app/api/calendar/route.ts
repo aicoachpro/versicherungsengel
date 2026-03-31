@@ -16,6 +16,7 @@ export async function GET() {
       phase: leads.phase,
       termin: leads.termin,
       folgetermin: leads.folgetermin,
+      folgeterminTyp: leads.folgeterminTyp,
     })
     .from(leads)
     .where(or(isNotNull(leads.termin), isNotNull(leads.folgetermin)))
@@ -42,6 +43,7 @@ export async function GET() {
         ansprechpartner: lead.ansprechpartner,
         date: lead.folgetermin,
         type: "Folgetermin" as const,
+        folgeterminTyp: lead.folgeterminTyp || "Nachfassen",
         phase: lead.phase,
       });
     }

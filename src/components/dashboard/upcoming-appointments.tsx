@@ -10,6 +10,7 @@ interface Appointment {
   termin: string | null;
   phase: string;
   typ: "Termin" | "Folgetermin";
+  folgeterminTyp?: string | null;
 }
 
 export function UpcomingAppointments({ appointments }: { appointments: Appointment[] }) {
@@ -60,7 +61,7 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
                     variant="secondary"
                     className={`text-xs ${apt.typ === "Folgetermin" ? "bg-emerald-100 text-emerald-700" : ""}`}
                   >
-                    {apt.typ === "Folgetermin" ? "Cross-Selling" : apt.phase}
+                    {apt.typ === "Folgetermin" ? (apt.folgeterminTyp || "Nachfassen") : apt.phase}
                   </Badge>
                 </div>
               </Link>

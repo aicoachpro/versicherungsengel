@@ -43,6 +43,9 @@ export const leads = sqliteTable("leads", {
   eingangsdatum: text("eingangsdatum"),
   crossSelling: text("cross_selling"),
   folgetermin: text("folgetermin"),
+  folgeterminTyp: text("folgetermin_typ", {
+    enum: ["Nachfassen", "Cross-Selling", "Beratung", "Angebot nachfassen", "Sonstiges"],
+  }),
   folgeterminNotified: integer("folgetermin_notified").default(0),
   archivedAt: text("archived_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
