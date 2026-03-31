@@ -10,7 +10,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { signOut, useSession } from "next-auth/react";
 
-export function Header({ title }: { title: string }) {
+export function Header({ title, actions }: { title: string; actions?: React.ReactNode }) {
   const { data: session } = useSession();
   const initials = session?.user?.name
     ?.split(" ")
@@ -22,7 +22,9 @@ export function Header({ title }: { title: string }) {
     <header className="flex h-16 items-center justify-between border-b bg-card/80 backdrop-blur-sm px-6">
       <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
 
-      <DropdownMenu>
+      <div className="flex items-center gap-3">
+        {actions}
+        <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer outline-none">
             <Avatar className="h-8 w-8 ring-2 ring-primary/10">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
@@ -38,6 +40,7 @@ export function Header({ title }: { title: string }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   );
 }
