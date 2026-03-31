@@ -19,6 +19,7 @@ import {
   CalendarDays,
   ClipboardList,
   Upload,
+  MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,13 @@ const adminNav = [
 
 const settingsNav = [
   { href: "/settings", label: "Einstellungen", icon: Settings },
+];
+
+const mobileBottomNav = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/pipeline", label: "Pipeline", icon: Kanban },
+  { href: "/kalender", label: "Kalender", icon: CalendarDays },
+  { href: "/wiedervorlage", label: "Aufgaben", icon: CalendarClock },
 ];
 
 export function Sidebar() {
@@ -152,6 +160,37 @@ export function Sidebar() {
           </div>
         </div>
       </aside>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t bg-sidebar text-sidebar-foreground md:hidden">
+        {mobileBottomNav.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || pathname.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors",
+                isActive
+                  ? "text-gold"
+                  : "text-sidebar-foreground/50"
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              {label}
+            </Link>
+          );
+        })}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className={cn(
+            "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors text-sidebar-foreground/50"
+          )}
+        >
+          <MoreHorizontal className="h-5 w-5" />
+          Mehr
+        </button>
+      </nav>
     </>
   );
 }
