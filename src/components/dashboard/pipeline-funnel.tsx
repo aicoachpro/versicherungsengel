@@ -29,7 +29,7 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {funnelData.map((item, i) => {
             const widthPercent = 100 - (i * (60 / Math.max(funnelData.length - 1, 1)));
             const colors = phaseColors[item.phase] || { bg: "bg-primary", text: "text-primary" };
@@ -37,18 +37,22 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
               <Link
                 key={item.phase}
                 href={`/pipeline?scrollToPhase=${encodeURIComponent(item.phase)}`}
-                className="block group"
+                className="flex items-center gap-3 group"
               >
-                <div
-                  className={`${colors.bg} mx-auto rounded-md py-2 px-3 flex items-center justify-between transition-all group-hover:opacity-80`}
-                  style={{ width: `${widthPercent}%` }}
-                >
-                  <span className="text-xs font-medium text-white truncate">
-                    {item.phase}
-                  </span>
-                  <span className="text-sm font-bold text-white">
-                    {item.count}
-                  </span>
+                <span className="w-40 text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                  {item.phase}
+                </span>
+                <div className="flex-1">
+                  <div className="h-8 rounded-md bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-md ${colors.bg} flex items-center px-3 transition-all group-hover:opacity-80`}
+                      style={{ width: `${Math.max(widthPercent, 8)}%` }}
+                    >
+                      <span className="text-xs font-medium text-white">
+                        {item.count}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </Link>
             );
