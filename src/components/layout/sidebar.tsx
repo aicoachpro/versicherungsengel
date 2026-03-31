@@ -18,6 +18,7 @@ import {
   CalendarClock,
   CalendarDays,
   ClipboardList,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const mainNav = [
   { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
   { href: "/archiv", label: "Archiv", icon: Archive },
+  { href: "/import", label: "Lead-Import", icon: Upload },
 ];
 
 const adminNav = [
