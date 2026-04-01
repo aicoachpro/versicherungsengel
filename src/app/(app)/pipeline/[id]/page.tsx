@@ -472,18 +472,18 @@ export default function LeadDetailPage() {
                         : "An Superchat übertragen"}
                   </Button>
                 )}
-                {lead.telefon && (
+                {(lead.superchatContactId || lead.telefon) && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="gap-2"
                     onClick={() => {
-                      const phone = lead.telefon!.replace(/[^0-9+]/g, "");
-                      const parts = (lead.ansprechpartner || lead.name || "").split(" ");
-                      const firstname = parts[0] || "";
-                      const lastname = parts.slice(1).join(" ") || "";
-                      const url = `https://app.superchat.de/inbox/find/?wa=${encodeURIComponent(phone)}&firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}`;
-                      window.open(url, "_blank");
+                      if (lead.superchatContactId) {
+                        window.open(`https://app.superchat.de/contacts/${lead.superchatContactId}`, "_blank");
+                      } else {
+                        const phone = lead.telefon!.replace(/[^0-9+]/g, "");
+                        window.open(`https://wa.me/${phone}`, "_blank");
+                      }
                     }}
                   >
                     <MessageSquare className="h-4 w-4" /> In Superchat öffnen
