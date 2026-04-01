@@ -18,6 +18,16 @@ const SC_CA = {
   ORT: "ca_caCze4Tq3cslzGpZLTzgG",
 };
 
+// Mapping VE-Sparten → Superchat Lead Produkt Optionen (multi_select)
+const SPARTE_MAPPING: Record<string, string> = {
+  "Haftpflicht": "Haftpflichtversicherung",
+  "Inhalt": "Firmenversicherung",
+  "D&O": "Vermögensschadenhaftpflicht",
+  "Flotte": "Flottenversicherung",
+  "Rechtsschutz": "Rechtsschutzversicherung",
+  "KV": "privaten Krankenversicherung",
+};
+
 /**
  * Lead an Superchat übertragen (Create oder Update).
  * Body: { leadId: number }
@@ -45,20 +55,23 @@ export async function POST(req: NextRequest) {
   }
   const email = lead.email || undefined;
 
-  // Erstes Versicherungsprodukt als Leadprodukt
-  const firstInsurance = db.select().from(insurances).where(eq(insurances.leadId, leadId)).get();
-  const leadprodukt = firstInsurance?.sparte || firstInsurance?.bezeichnung || "";
+  // Versicherungsprodukte als Lead Produkt (multi_select)
+  const allInsurances = db.select().from(insurances).where(eq(insurances.leadId, leadId)).all();
+  const produkte = allInsurances
+    .map((i) => SPARTE_MAPPING[i.sparte || ""] || "")
+    .filter(Boolean);
 
   // Custom Attributes
   const custom_attributes: Array<{ id: string; value: string | string[] }> = [
     { id: SC_CA.LEADQUELLE, value: "Versicherungsengel" },
     { id: SC_CA.KUNDENTYP, value: ["Lead"] },
+    { id: SC_CA.LEAD_CONVERSION, value: "Offen" },
   ];
   if (lead.eingangsdatum) {
     custom_attributes.push({ id: SC_CA.LEADEINGANGSDATUM, value: lead.eingangsdatum.split("T")[0] });
   }
-  if (leadprodukt) {
-    custom_attributes.push({ id: SC_CA.LEADPRODUKT, value: leadprodukt });
+  if (produkte.length) {
+    custom_attributes.push({ id: SC_CA.LEADPRODUKT, value: produkte });
   }
   if (lead.strasse) {
     custom_attributes.push({ id: SC_CA.STRASSE, value: lead.strasse });
