@@ -26,6 +26,7 @@ export const leads = sqliteTable("leads", {
   strasse: text("strasse"),
   plz: text("plz"),
   ort: text("ort"),
+  superchatContactId: text("superchat_contact_id"),
   branche: text("branche", {
     enum: ["Bau", "Handwerk", "Dienstleistung", "Produktion", "IT", "Gesundheit", "Logistik", "Handel", "Gastronomie", "Immobilien", "Sonstiges"],
   }),
