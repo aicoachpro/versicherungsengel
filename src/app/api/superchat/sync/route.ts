@@ -88,12 +88,10 @@ export async function POST(req: NextRequest) {
     let action: "create" | "update" = "create";
 
     if (contactId) {
-      // Bestehenden Kontakt aktualisieren
+      // Bestehenden Kontakt aktualisieren (ohne Handles — können durch Geister-Kontakte blockiert sein)
       await updateContact(contactId, {
         first_name,
         last_name,
-        phone,
-        email,
         custom_attributes,
       });
       action = "update";
