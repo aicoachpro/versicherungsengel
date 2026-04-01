@@ -49,26 +49,26 @@ export function MonthFilter() {
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       <Button
         variant={isAll ? "default" : "outline"}
-        size="sm"
+        size="xs"
         onClick={() => navigate(month, year, true)}
       >
         Gesamt
       </Button>
-      <div className="flex items-center gap-0.5 rounded-xl border border-black/[0.08] bg-background shadow-sm shadow-black/[0.03]">
-        <Button variant="ghost" size="icon-sm" onClick={prev}>
-          <ChevronLeft className="h-4 w-4" />
+      <div className="flex items-center gap-0 rounded-lg border border-black/[0.08] bg-background shadow-sm shadow-black/[0.03]">
+        <Button variant="ghost" size="icon-xs" onClick={prev}>
+          <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
         <button
           onClick={goToCurrentMonth}
-          className="min-w-[130px] px-2 text-center text-sm font-medium"
+          className="min-w-[90px] sm:min-w-[120px] px-1 text-center text-xs sm:text-sm font-medium whitespace-nowrap"
         >
-          {isAll ? "Alle Monate" : `${MONTH_NAMES[month - 1]} ${year}`}
+          {isAll ? "Alle" : `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`}
         </button>
-        <Button variant="ghost" size="icon-sm" onClick={next} disabled={isCurrentMonth && !isAll}>
-          <ChevronRight className="h-4 w-4" />
+        <Button variant="ghost" size="icon-xs" onClick={next} disabled={isCurrentMonth && !isAll}>
+          <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
     </div>

@@ -253,9 +253,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const recentActivity = getRecentActivity();
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-x-hidden">
       <Header title="Dashboard" actions={<div className="flex items-center gap-2"><MonthFilter /><ReportButton /></div>} />
-      <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6">
+      <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6 overflow-x-hidden">
         <KpiCards
           newLeads={kpis.newLeads}
           openLeads={kpis.openLeads}

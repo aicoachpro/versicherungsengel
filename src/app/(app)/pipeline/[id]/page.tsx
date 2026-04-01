@@ -486,61 +486,53 @@ export default function LeadDetailPage() {
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <CardTitle className="text-xl">{lead.name}</CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Badge className={phaseColors[lead.phase]}>{lead.phase}</Badge>
                 {(lead.telefon || lead.email) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                  <button
+                    className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium text-secondary-foreground transition-all hover:bg-secondary/70 active:scale-[0.97] disabled:opacity-50"
                     onClick={handleSyncToSuperchat}
                     disabled={superchatSyncing}
                   >
-                    <Upload className="h-4 w-4" />
+                    <Upload className="h-3.5 w-3.5" />
                     {superchatSyncing
                       ? "Übertrage..."
                       : lead.superchatContactId
-                        ? "Superchat aktualisieren"
-                        : "An Superchat übertragen"}
-                  </Button>
+                        ? "Aktualisieren"
+                        : "An Superchat"}
+                  </button>
                 )}
                 {lead.telefon && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
+                  <button
+                    className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium text-secondary-foreground transition-all hover:bg-secondary/70 active:scale-[0.97]"
                     onClick={() => {
                       let phone = lead.telefon!.replace(/[^0-9]/g, "");
                       if (phone.startsWith("0")) phone = "49" + phone.slice(1);
                       window.open(`https://app.superchat.de/inbox/find/?wa=${phone}`, "_blank");
                     }}
                   >
-                    <MessageSquare className="h-4 w-4" /> In Superchat öffnen
-                  </Button>
+                    <MessageSquare className="h-3.5 w-3.5" /> Superchat
+                  </button>
                 )}
                 {!lead.reklamiertAt && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                  <button
+                    className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1.5 text-[13px] font-medium text-destructive transition-all hover:bg-destructive/15 active:scale-[0.97]"
                     onClick={() => setReklamationDialogOpen(true)}
                   >
-                    <AlertTriangle className="h-4 w-4" /> Reklamieren
-                  </Button>
+                    <AlertTriangle className="h-3.5 w-3.5" /> Reklamieren
+                  </button>
                 )}
                 {lead.reklamiertAt && (
-                  <Badge className="bg-red-100 text-red-700 border-red-300">
+                  <Badge variant="destructive">
                     Reklamiert ({lead.reklamationStatus})
                   </Badge>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.97]"
                   onClick={() => setEditDialogOpen(true)}
                 >
-                  <Edit2 className="h-4 w-4" /> Bearbeiten
-                </Button>
+                  <Edit2 className="h-3.5 w-3.5" /> Bearbeiten
+                </button>
               </div>
             </div>
           </CardHeader>
