@@ -59,7 +59,7 @@ export function KpiCards({ newLeads, openLeads, conversionRate, revenue, roi }: 
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
       {cards.map((card) => (
         <Link key={card.title} href={card.href}>
           <Card className="shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
