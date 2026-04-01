@@ -13,7 +13,9 @@ async function superchatFetch(endpoint: string, options?: RequestInit) {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Superchat API ${res.status}: ${body}`);
+    const error = new Error(`Superchat API ${res.status}: ${body}`) as Error & { status: number };
+    error.status = res.status;
+    throw error;
   }
 
   return res.json();
@@ -47,6 +49,10 @@ export async function createContact(data: {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export async function searchContacts(query: string) {
+  return superchatFetch(`/contacts?query=${encodeURIComponent(query)}`);
 }
 
 export async function updateContact(
