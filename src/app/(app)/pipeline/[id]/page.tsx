@@ -497,16 +497,34 @@ export default function LeadDetailPage() {
               <CardTitle className="text-xl">{lead.name}</CardTitle>
               <div className="flex items-center gap-2">
                 <Badge className={phaseColors[lead.phase]}>{lead.phase}</Badge>
-                {lead.superchatContactId ? (
+                {lead.telefon && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="gap-2 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                    onClick={() => {
+                      const phone = lead.telefon!.replace(/[^0-9+]/g, "");
+                      const parts = (lead.ansprechpartner || lead.name || "").split(" ");
+                      const firstname = parts[0] || "";
+                      const lastname = parts.slice(1).join(" ") || "";
+                      const url = `https://app.superchat.de/inbox/find/?wa=${encodeURIComponent(phone)}&firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}`;
+                      window.open(url, "_blank");
+                    }}
+                  >
+                    <MessageSquare className="h-4 w-4" /> In Superchat öffnen
+                  </Button>
+                )}
+                {lead.superchatContactId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
                     onClick={() => setSuperchatDialogOpen(true)}
                   >
                     <Send className="h-4 w-4" /> Nachricht senden
                   </Button>
-                ) : (
+                )}
+                {!lead.superchatContactId && (
                   <Button
                     variant="outline"
                     size="sm"

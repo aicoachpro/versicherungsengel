@@ -5,7 +5,7 @@ async function superchatFetch(endpoint: string, options?: RequestInit) {
   const res = await fetch(`${SUPERCHAT_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${SUPERCHAT_API_KEY}`,
+      "x-api-key": SUPERCHAT_API_KEY,
       "Content-Type": "application/json",
       ...options?.headers,
     },
