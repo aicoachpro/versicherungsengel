@@ -32,7 +32,7 @@ export async function createContact(data: {
   last_name?: string;
   phone?: string;
   email?: string;
-  custom_attributes?: Array<{ id: string; value: string }>;
+  custom_attributes?: Array<{ id: string; value: string | string[] }>;
 }) {
   const handles: Array<{ type: string; value: string }> = [];
   if (data.phone) handles.push({ type: "phone", value: data.phone });
@@ -56,7 +56,7 @@ export async function updateContact(
     last_name?: string;
     phone?: string;
     email?: string;
-    custom_attributes?: Array<{ id: string; value: string }>;
+    custom_attributes?: Array<{ id: string; value: string | string[] }>;
   }
 ) {
   const body: Record<string, unknown> = {};

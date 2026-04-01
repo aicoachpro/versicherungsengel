@@ -49,10 +49,10 @@ export async function POST(req: NextRequest) {
   const firstInsurance = db.select().from(insurances).where(eq(insurances.leadId, leadId)).get();
   const leadprodukt = firstInsurance?.sparte || firstInsurance?.bezeichnung || "";
 
-  // Custom Attributes (nur text-Felder, keine single_select ohne bekannte Optionen)
-  const custom_attributes: Array<{ id: string; value: string }> = [
+  // Custom Attributes
+  const custom_attributes: Array<{ id: string; value: string | string[] }> = [
     { id: SC_CA.LEADQUELLE, value: "Versicherungsengel" },
-    { id: SC_CA.KUNDENTYP, value: "Lead" },
+    { id: SC_CA.KUNDENTYP, value: ["Lead"] },
   ];
   if (lead.eingangsdatum) {
     custom_attributes.push({ id: SC_CA.LEADEINGANGSDATUM, value: lead.eingangsdatum.split("T")[0] });
