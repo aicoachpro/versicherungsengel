@@ -51,8 +51,29 @@ export async function createContact(data: {
   });
 }
 
-export async function searchContacts(query: string) {
-  return superchatFetch(`/contacts?query=${encodeURIComponent(query)}`);
+export async function findContactByHandle(handle: string): Promise<{ id: string } | null> {
+  // Superchat API hat keine Suchfunktion — Kontakte paginiert laden und nach Handle matchen
+  let offset = 0;
+  const limit = 100;
+  const normalizedHandle = handle.replace(/[^0-9a-zA-Z@.+]/g, "").toLowerCase();
+
+  while (true) {
+    const result = await superchatFetch(`/contacts?limit=${limit}&offset=${offset}`);
+    const contacts = result?.data || result?.items || (Array.isArray(result) ? result : []);
+
+    if (!contacts.length) return null;
+
+    for (const contact of contacts) {
+      const handles: Array<{ type: string; value: string }> = contact.handles || [];
+      const match = handles.some((h) =>
+        h.value.replace(/[^0-9a-zA-Z@.+]/g, "").toLowerCase() === normalizedHandle
+      );
+      if (match) return contact;
+    }
+
+    if (contacts.length < limit) return null;
+    offset += limit;
+  }
 }
 
 export async function updateContact(

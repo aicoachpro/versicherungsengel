@@ -4,7 +4,7 @@ import { leads, insurances } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
-import { createContact, updateContact, searchContacts } from "@/lib/superchat";
+import { createContact, updateContact, findContactByHandle } from "@/lib/superchat";
 
 // Superchat Custom Attribute IDs (workspace-spezifisch)
 const SC_CA = {
@@ -118,13 +118,12 @@ export async function POST(req: NextRequest) {
       } catch (createErr: unknown) {
         const err409 = createErr as Error & { status?: number };
         if (err409.status === 409) {
-          // Kontakt existiert bereits — suchen und aktualisieren
-          const searchQuery = phone || email || "";
-          const searchResult = await searchContacts(searchQuery);
-          const existing = searchResult?.data?.[0];
+          // Kontakt existiert bereits — nach Handle (Telefon/E-Mail) suchen
+          const existing = (phone ? await findContactByHandle(phone) : null)
+            || (email ? await findContactByHandle(email) : null);
           if (!existing?.id) {
             return NextResponse.json(
-              { error: "Kontakt existiert in Superchat, konnte aber nicht gefunden werden" },
+              { error: "Kontakt existiert in Superchat, konnte aber nicht gefunden werden. Bitte manuell in Superchat verknüpfen." },
               { status: 409 }
             );
           }
