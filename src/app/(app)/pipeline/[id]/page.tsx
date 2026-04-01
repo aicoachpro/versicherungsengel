@@ -78,6 +78,9 @@ interface Lead {
   crossSelling: string | null;
   folgetermin: string | null;
   folgeterminNotified: number;
+  reklamiertAt: string | null;
+  reklamationStatus: string | null;
+  reklamationNotiz: string | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -187,6 +190,11 @@ export default function LeadDetailPage() {
 
   // Superchat State
   const [superchatSyncing, setSuperchatSyncing] = useState(false);
+
+  // Reklamation State
+  const [reklamationDialogOpen, setReklamationDialogOpen] = useState(false);
+  const [reklamationNotiz, setReklamationNotiz] = useState("");
+  const [reklamationLoading, setReklamationLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -398,6 +406,30 @@ export default function LeadDetailPage() {
     loadData();
   }
 
+  // Reklamation
+  async function handleReklamation() {
+    setReklamationLoading(true);
+    try {
+      const res = await fetch("/api/leads/reklamation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, notiz: reklamationNotiz }),
+      });
+      if (res.ok) {
+        toast.success("Lead als reklamiert markiert");
+        setReklamationDialogOpen(false);
+        setReklamationNotiz("");
+        loadData();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Fehler");
+      }
+    } catch {
+      toast.error("Verbindungsfehler");
+    }
+    setReklamationLoading(false);
+  }
+
   // Export
   async function handleExport() {
     window.open(`/api/leads/export/${leadId}`, "_blank");
@@ -485,6 +517,21 @@ export default function LeadDetailPage() {
                   >
                     <MessageSquare className="h-4 w-4" /> In Superchat öffnen
                   </Button>
+                )}
+                {!lead.reklamiertAt && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => setReklamationDialogOpen(true)}
+                  >
+                    <AlertTriangle className="h-4 w-4" /> Reklamieren
+                  </Button>
+                )}
+                {lead.reklamiertAt && (
+                  <Badge className="bg-red-100 text-red-700 border-red-300">
+                    Reklamiert ({lead.reklamationStatus})
+                  </Badge>
                 )}
                 <Button
                   variant="outline"
@@ -925,6 +972,39 @@ export default function LeadDetailPage() {
         lead={lead as unknown as Parameters<typeof LeadDialog>[0]["lead"]}
         onSave={handleLeadSave}
       />
+
+      {/* Reklamation Dialog */}
+      <Dialog open={reklamationDialogOpen} onOpenChange={setReklamationDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Lead reklamieren</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Der Lead wird als reklamiert markiert. Bei Genehmigung werden die Terminkosten ({lead.terminKosten || 320}€) gutgeschrieben.
+            </p>
+            <div>
+              <Label>Begründung (optional)</Label>
+              <Textarea
+                value={reklamationNotiz}
+                onChange={(e) => setReklamationNotiz(e.target.value)}
+                placeholder="Grund der Reklamation..."
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setReklamationDialogOpen(false)}>Abbrechen</Button>
+              <Button
+                variant="destructive"
+                onClick={handleReklamation}
+                disabled={reklamationLoading}
+              >
+                {reklamationLoading ? "Wird reklamiert..." : "Reklamieren"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog for new Activity */}
       <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>

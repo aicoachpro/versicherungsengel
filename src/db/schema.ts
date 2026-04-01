@@ -51,6 +51,11 @@ export const leads = sqliteTable("leads", {
     enum: ["Nachfassen", "Cross-Selling", "Beratung", "Angebot nachfassen", "Sonstiges"],
   }),
   folgeterminNotified: integer("folgetermin_notified").default(0),
+  reklamiertAt: text("reklamiert_at"),
+  reklamationStatus: text("reklamation_status", {
+    enum: ["offen", "genehmigt", "abgelehnt"],
+  }),
+  reklamationNotiz: text("reklamation_notiz"),
   archivedAt: text("archived_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),

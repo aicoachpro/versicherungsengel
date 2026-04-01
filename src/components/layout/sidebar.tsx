@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Archive,
+  AlertTriangle,
   CalendarClock,
   CalendarDays,
   ClipboardList,
@@ -30,6 +31,7 @@ const mainNav = [
   { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
   { href: "/archiv", label: "Archiv", icon: Archive },
+  { href: "/reklamationen", label: "Reklamationen", icon: AlertTriangle },
   { href: "/import", label: "Lead-Import", icon: Upload },
 ];
 

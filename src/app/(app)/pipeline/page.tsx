@@ -8,6 +8,13 @@ import { LeadDialog } from "@/components/pipeline/lead-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -66,6 +73,8 @@ function PipelineContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [filterMonat, setFilterMonat] = useState<string>("alle");
+  const [filterJahr, setFilterJahr] = useState<string>("alle");
 
   // Query-Parameter als Filter auswerten + zur Spalte/Kachel scrollen
   useEffect(() => {
@@ -176,6 +185,14 @@ function PipelineContent() {
         (l.branche && l.branche.toLowerCase().includes(q)) ||
         (l.email && l.email.toLowerCase().includes(q))
       );
+    })
+    .filter((l) => {
+      const datum = l.eingangsdatum || l.createdAt;
+      if (!datum) return true;
+      const d = new Date(datum);
+      if (filterJahr !== "alle" && d.getFullYear() !== parseInt(filterJahr)) return false;
+      if (filterMonat !== "alle" && (d.getMonth() + 1) !== parseInt(filterMonat)) return false;
+      return true;
     });
 
   const activeCount = leads.filter((l) => !l.archivedAt).length;
@@ -210,6 +227,38 @@ function PipelineContent() {
               className="pl-9 h-9"
             />
           </div>
+          <Select value={filterMonat} onValueChange={(v) => { if (v) setFilterMonat(v); }}>
+            <SelectTrigger className="w-[120px] h-9">
+              <SelectValue placeholder="Monat" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="alle">Alle Monate</SelectItem>
+              <SelectItem value="1">Januar</SelectItem>
+              <SelectItem value="2">Februar</SelectItem>
+              <SelectItem value="3">März</SelectItem>
+              <SelectItem value="4">April</SelectItem>
+              <SelectItem value="5">Mai</SelectItem>
+              <SelectItem value="6">Juni</SelectItem>
+              <SelectItem value="7">Juli</SelectItem>
+              <SelectItem value="8">August</SelectItem>
+              <SelectItem value="9">September</SelectItem>
+              <SelectItem value="10">Oktober</SelectItem>
+              <SelectItem value="11">November</SelectItem>
+              <SelectItem value="12">Dezember</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterJahr} onValueChange={(v) => { if (v) setFilterJahr(v); }}>
+            <SelectTrigger className="w-[100px] h-9">
+              <SelectValue placeholder="Jahr" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="alle">Alle Jahre</SelectItem>
+              <SelectItem value="2024">2024</SelectItem>
+              <SelectItem value="2025">2025</SelectItem>
+              <SelectItem value="2026">2026</SelectItem>
+              <SelectItem value="2027">2027</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button
           onClick={() => setDialogOpen(true)}
