@@ -95,6 +95,14 @@ for (const col of ["strasse", "plz", "ort"]) {
   }
 }
 
+// Add superchat_contact_id column to leads if not exists
+try {
+  sqlite.prepare("SELECT superchat_contact_id FROM leads LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE leads ADD COLUMN superchat_contact_id TEXT").run();
+  console.log("Added 'superchat_contact_id' column to leads table");
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

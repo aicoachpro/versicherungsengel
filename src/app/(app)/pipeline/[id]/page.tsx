@@ -47,6 +47,9 @@ import {
   Upload,
   MessageSquare,
   Paperclip,
+  Send,
+  Link,
+  Unlink,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -62,6 +65,7 @@ interface Lead {
   email: string | null;
   telefon: string | null;
   website: string | null;
+  superchatContactId: string | null;
   gewerbeart: string | null;
   branche: string | null;
   unternehmensgroesse: string | null;
@@ -182,6 +186,15 @@ export default function LeadDetailPage() {
 
   // Confirm-Dialog State
   const [deleteConfirm, setDeleteConfirm] = useState<{type: string, id: number, label: string} | null>(null);
+
+  // Superchat State
+  const [superchatDialogOpen, setSuperchatDialogOpen] = useState(false);
+  const [superchatMessage, setSuperchatMessage] = useState("");
+  const [superchatSending, setSuperchatSending] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkSearch, setLinkSearch] = useState("");
+  const [linkResults, setLinkResults] = useState<Array<{ id: string; name: string; phone?: string; email?: string }>>([]);
+  const [linkSearching, setLinkSearching] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -361,6 +374,71 @@ export default function LeadDetailPage() {
     loadData();
   }
 
+  // Superchat
+  async function handleSendSuperchat() {
+    if (!superchatMessage.trim()) return;
+    setSuperchatSending(true);
+    try {
+      const res = await fetch("/api/superchat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, text: superchatMessage }),
+      });
+      if (res.ok) {
+        toast.success("Nachricht gesendet");
+        setSuperchatMessage("");
+        setSuperchatDialogOpen(false);
+        loadData();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Fehler beim Senden");
+      }
+    } catch {
+      toast.error("Verbindungsfehler");
+    }
+    setSuperchatSending(false);
+  }
+
+  async function handleSearchSuperchat() {
+    if (!linkSearch.trim()) return;
+    setLinkSearching(true);
+    try {
+      const res = await fetch(`/api/superchat?search=${encodeURIComponent(linkSearch)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLinkResults(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      toast.error("Superchat-Suche fehlgeschlagen");
+    }
+    setLinkSearching(false);
+  }
+
+  async function handleLinkContact(contactId: string) {
+    const res = await fetch("/api/superchat", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId, superchatContactId: contactId }),
+    });
+    if (res.ok) {
+      toast.success("Superchat-Kontakt verknüpft");
+      setLinkDialogOpen(false);
+      setLinkSearch("");
+      setLinkResults([]);
+      loadData();
+    }
+  }
+
+  async function handleUnlinkContact() {
+    await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: leadId, superchatContactId: null }),
+    });
+    toast.success("Superchat-Verknüpfung entfernt");
+    loadData();
+  }
+
   // Export
   async function handleExport() {
     window.open(`/api/leads/export/${leadId}`, "_blank");
@@ -419,6 +497,25 @@ export default function LeadDetailPage() {
               <CardTitle className="text-xl">{lead.name}</CardTitle>
               <div className="flex items-center gap-2">
                 <Badge className={phaseColors[lead.phase]}>{lead.phase}</Badge>
+                {lead.superchatContactId ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                    onClick={() => setSuperchatDialogOpen(true)}
+                  >
+                    <Send className="h-4 w-4" /> Nachricht senden
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setLinkDialogOpen(true)}
+                  >
+                    <Link className="h-4 w-4" /> Superchat verknüpfen
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -466,6 +563,20 @@ export default function LeadDetailPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span>Termin: {new Date(lead.termin).toLocaleDateString("de-DE")}</span>
+                </div>
+              )}
+              {lead.superchatContactId && (
+                <div className="flex items-center gap-2 text-sm">
+                  <MessageSquare className="h-4 w-4 text-emerald-600" />
+                  <span className="text-emerald-600">Superchat verknüpft</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={handleUnlinkContact}
+                  >
+                    <Unlink className="h-3 w-3" />
+                  </Button>
                 </div>
               )}
               {lead.folgetermin && (
@@ -844,6 +955,78 @@ export default function LeadDetailPage() {
         lead={lead as unknown as Parameters<typeof LeadDialog>[0]["lead"]}
         onSave={handleLeadSave}
       />
+
+      {/* Superchat Nachricht senden Dialog */}
+      <Dialog open={superchatDialogOpen} onOpenChange={setSuperchatDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nachricht an {lead.name} senden</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Textarea
+              value={superchatMessage}
+              onChange={(e) => setSuperchatMessage(e.target.value)}
+              placeholder="Nachricht eingeben..."
+              rows={4}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSuperchatDialogOpen(false)}>Abbrechen</Button>
+              <Button
+                onClick={handleSendSuperchat}
+                disabled={!superchatMessage.trim() || superchatSending}
+                className="gap-2"
+              >
+                <Send className="h-4 w-4" />
+                {superchatSending ? "Sende..." : "Senden"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Superchat Kontakt verknüpfen Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Superchat-Kontakt verknüpfen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="flex gap-2">
+              <Input
+                value={linkSearch}
+                onChange={(e) => setLinkSearch(e.target.value)}
+                placeholder="Name, Telefon oder E-Mail..."
+                onKeyDown={(e) => e.key === "Enter" && handleSearchSuperchat()}
+              />
+              <Button onClick={handleSearchSuperchat} disabled={linkSearching}>
+                {linkSearching ? "..." : "Suchen"}
+              </Button>
+            </div>
+            {linkResults.length > 0 && (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {linkResults.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                    onClick={() => handleLinkContact(c.id)}
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {[c.phone, c.email].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <Link className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {linkResults.length === 0 && linkSearch && !linkSearching && (
+              <p className="text-sm text-muted-foreground text-center py-4">Keine Kontakte gefunden</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog for new Activity */}
       <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>
