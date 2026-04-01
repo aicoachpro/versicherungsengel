@@ -69,9 +69,30 @@ export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { leadId, status } = await req.json();
-  if (!leadId || !status) {
-    return NextResponse.json({ error: "leadId und status sind Pflichtfelder" }, { status: 400 });
+  const { leadId, status, notiz } = await req.json();
+  if (!leadId) {
+    return NextResponse.json({ error: "leadId ist Pflichtfeld" }, { status: 400 });
+  }
+
+  // Nur Notiz aktualisieren (ohne Statusänderung)
+  if (notiz !== undefined && !status) {
+    const lead = db.select().from(leads).where(eq(leads.id, leadId)).get();
+    if (!lead) return NextResponse.json({ error: "Lead nicht gefunden" }, { status: 404 });
+
+    const result = db
+      .update(leads)
+      .set({ reklamationNotiz: notiz, updatedAt: new Date().toISOString() })
+      .where(eq(leads.id, leadId))
+      .returning()
+      .get();
+
+    const { userId, userName } = getAuditUser(session);
+    logAudit({ userId, userName, action: "update", entity: "lead", entityId: leadId, entityName: `Reklamation-Notiz: ${lead.name}` });
+    return NextResponse.json(result);
+  }
+
+  if (!status) {
+    return NextResponse.json({ error: "status ist Pflichtfeld" }, { status: 400 });
   }
   if (status !== "genehmigt" && status !== "abgelehnt") {
     return NextResponse.json({ error: "Status muss 'genehmigt' oder 'abgelehnt' sein" }, { status: 400 });
