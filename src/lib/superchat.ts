@@ -1,5 +1,4 @@
-const SUPERCHAT_BASE_URL =
-  process.env.SUPERCHAT_BASE_URL || "https://api.superchat.com/v1";
+const SUPERCHAT_BASE_URL = "https://api.superchat.com/v1.0";
 const SUPERCHAT_API_KEY = process.env.SUPERCHAT_API_KEY || "";
 
 async function superchatFetch(endpoint: string, options?: RequestInit) {
