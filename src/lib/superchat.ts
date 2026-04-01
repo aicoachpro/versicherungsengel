@@ -59,7 +59,7 @@ export async function findContactByHandle(handle: string): Promise<{ id: string 
 
   while (true) {
     const result = await superchatFetch(`/contacts?limit=${limit}&offset=${offset}`);
-    const contacts = result?.data || result?.items || (Array.isArray(result) ? result : []);
+    const contacts = result?.results || result?.data || (Array.isArray(result) ? result : []);
 
     if (!contacts.length) return null;
 
