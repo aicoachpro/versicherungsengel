@@ -484,9 +484,9 @@ export default function LeadDetailPage() {
         {/* Lead Info Card */}
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <CardTitle className="text-xl">{lead.name}</CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge className={phaseColors[lead.phase]}>{lead.phase}</Badge>
                 {(lead.telefon || lead.email) && (
                   <Button
