@@ -19,10 +19,6 @@ async function superchatFetch(endpoint: string, options?: RequestInit) {
   return res.json();
 }
 
-export async function getContacts(limit = 50, offset = 0) {
-  return superchatFetch(`/contacts?limit=${limit}&offset=${offset}`);
-}
-
 export async function getContact(contactId: string) {
   return superchatFetch(`/contacts/${contactId}`);
 }
@@ -31,34 +27,50 @@ export async function getConversations(contactId: string) {
   return superchatFetch(`/contacts/${contactId}/conversations`);
 }
 
-export async function getMessages(conversationId: string) {
-  return superchatFetch(`/conversations/${conversationId}/messages`);
-}
-
-export async function sendMessage(
-  conversationId: string,
-  text: string
-) {
-  return superchatFetch(`/messages`, {
-    method: "POST",
-    body: JSON.stringify({
-      conversation_id: conversationId,
-      body: { text },
-    }),
-  });
-}
-
 export async function createContact(data: {
-  name: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
   email?: string;
+  custom_attributes?: Array<{ id: string; value: string }>;
 }) {
+  const handles: Array<{ type: string; value: string }> = [];
+  if (data.phone) handles.push({ type: "phone", value: data.phone });
+  if (data.email) handles.push({ type: "mail", value: data.email });
+
+  const body: Record<string, unknown> = { handles };
+  if (data.first_name) body.first_name = data.first_name;
+  if (data.last_name) body.last_name = data.last_name;
+  if (data.custom_attributes?.length) body.custom_attributes = data.custom_attributes;
+
   return superchatFetch(`/contacts`, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
 }
 
-export async function searchContacts(query: string) {
-  return superchatFetch(`/contacts?search=${encodeURIComponent(query)}`);
+export async function updateContact(
+  contactId: string,
+  data: {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    email?: string;
+    custom_attributes?: Array<{ id: string; value: string }>;
+  }
+) {
+  const body: Record<string, unknown> = {};
+  if (data.first_name !== undefined) body.first_name = data.first_name;
+  if (data.last_name !== undefined) body.last_name = data.last_name;
+  if (data.custom_attributes?.length) body.custom_attributes = data.custom_attributes;
+
+  const handles: Array<{ type: string; value: string }> = [];
+  if (data.phone) handles.push({ type: "phone", value: data.phone });
+  if (data.email) handles.push({ type: "mail", value: data.email });
+  if (handles.length) body.handles = handles;
+
+  return superchatFetch(`/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
