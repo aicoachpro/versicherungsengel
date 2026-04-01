@@ -43,6 +43,7 @@ export interface Lead {
   folgetermin: string | null;
   folgeterminTyp: string | null;
   folgeterminNotified: number;
+  reklamiertAt: string | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -166,7 +167,7 @@ function PipelineContent() {
 
   // Filter: nicht-archivierte Leads + Suchfilter + Dashboard-Filter
   const filteredLeads = leads
-    .filter((l) => !l.archivedAt)
+    .filter((l) => !l.archivedAt && !l.reklamiertAt)
     .filter((l) => {
       if (!activeFilter) return true;
       const [type, value] = activeFilter.split(":");
@@ -195,7 +196,7 @@ function PipelineContent() {
       return true;
     });
 
-  const activeCount = leads.filter((l) => !l.archivedAt).length;
+  const activeCount = leads.filter((l) => !l.archivedAt && !l.reklamiertAt).length;
 
   const filterLabel = activeFilter
     ? {
