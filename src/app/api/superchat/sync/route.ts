@@ -4,7 +4,7 @@ import { leads, insurances } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
-import { createContact, updateContact } from "@/lib/superchat";
+import { createContact, updateContact, searchContacts } from "@/lib/superchat";
 
 // Superchat Custom Attribute IDs (workspace-spezifisch)
 const SC_CA = {
@@ -105,15 +105,42 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const result = await createContact({
-        first_name,
-        last_name,
-        phone,
-        email,
-        custom_attributes,
-      });
-      contactId = result.id;
-      action = "create";
+      try {
+        const result = await createContact({
+          first_name,
+          last_name,
+          phone,
+          email,
+          custom_attributes,
+        });
+        contactId = result.id;
+        action = "create";
+      } catch (createErr: unknown) {
+        const err409 = createErr as Error & { status?: number };
+        if (err409.status === 409) {
+          // Kontakt existiert bereits — suchen und aktualisieren
+          const searchQuery = phone || email || "";
+          const searchResult = await searchContacts(searchQuery);
+          const existing = searchResult?.data?.[0];
+          if (!existing?.id) {
+            return NextResponse.json(
+              { error: "Kontakt existiert in Superchat, konnte aber nicht gefunden werden" },
+              { status: 409 }
+            );
+          }
+          contactId = existing.id;
+          await updateContact(contactId!, {
+            first_name,
+            last_name,
+            phone,
+            email,
+            custom_attributes,
+          });
+          action = "update";
+        } else {
+          throw createErr;
+        }
+      }
 
       // superchatContactId am Lead speichern
       db.update(leads)
