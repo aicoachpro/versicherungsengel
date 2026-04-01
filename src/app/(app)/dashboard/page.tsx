@@ -12,36 +12,57 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { GewerbeartChart } from "@/components/dashboard/gewerbeart-chart";
 import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
 import { ReportButton } from "@/components/dashboard/report-button";
+import { MonthFilter } from "@/components/dashboard/month-filter";
 
-function getKpis() {
+type DateRange = { from: string; to: string } | null;
+
+function getDateRange(month?: number, year?: number): DateRange {
+  if (!month || !year) return null;
+  const from = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const to = `${year}-${String(month).padStart(2, "0")}-${lastDay}T23:59:59`;
+  return { from, to };
+}
+
+function dateFilter(range: DateRange) {
+  if (!range) return undefined;
+  return and(gte(leads.eingangsdatum, range.from), lte(leads.eingangsdatum, range.to));
+}
+
+function getKpis(range: DateRange) {
+  const filter = dateFilter(range);
+
   const openLeads = db
     .select({ count: sql<number>`count(*)` })
     .from(leads)
-    .where(
-      sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`
+    .where(filter
+      ? and(sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`, filter)
+      : sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`
     )
     .get();
 
   const totalLeads = db
     .select({ count: sql<number>`count(*)` })
     .from(leads)
+    .where(filter || undefined)
     .get();
 
   const wonLeads = db
     .select({ count: sql<number>`count(*)` })
     .from(leads)
-    .where(eq(leads.phase, "Abgeschlossen"))
+    .where(filter ? and(eq(leads.phase, "Abgeschlossen"), filter) : eq(leads.phase, "Abgeschlossen"))
     .get();
 
   const totalRevenue = db
     .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
     .from(leads)
-    .where(eq(leads.phase, "Abgeschlossen"))
+    .where(filter ? and(eq(leads.phase, "Abgeschlossen"), filter) : eq(leads.phase, "Abgeschlossen"))
     .get();
 
   const totalCosts = db
     .select({ total: sql<number>`coalesce(sum(${leads.terminKosten}), 0)` })
     .from(leads)
+    .where(filter || undefined)
     .get();
 
   const conversionRate =
@@ -55,6 +76,7 @@ function getKpis() {
       : 0;
 
   return {
+    newLeads: totalLeads?.count || 0,
     openLeads: openLeads?.count || 0,
     conversionRate: Math.round(conversionRate * 10) / 10,
     revenue: totalRevenue?.total || 0,
@@ -62,7 +84,7 @@ function getKpis() {
   };
 }
 
-function getPipelineData() {
+function getPipelineData(range: DateRange) {
   const phases = [
     "Termin eingegangen",
     "Termin stattgefunden",
@@ -71,12 +93,13 @@ function getPipelineData() {
     "Abgeschlossen",
     "Verloren",
   ] as const;
+  const filter = dateFilter(range);
 
   return phases.map((phase) => {
     const result = db
       .select({ count: sql<number>`count(*)` })
       .from(leads)
-      .where(eq(leads.phase, phase))
+      .where(filter ? and(eq(leads.phase, phase), filter) : eq(leads.phase, phase))
       .get();
     return { phase, count: result?.count || 0 };
   });
@@ -110,7 +133,8 @@ function getRevenueByMonth() {
     }));
 }
 
-function getGewerbeartData() {
+function getGewerbeartData(range: DateRange) {
+  const filter = dateFilter(range);
   const result = db
     .select({
       gewerbeart: sql<string>`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`,
@@ -119,6 +143,7 @@ function getGewerbeartData() {
       kosten: sql<number>`coalesce(sum(${leads.terminKosten}), 0)`,
     })
     .from(leads)
+    .where(filter || undefined)
     .groupBy(sql`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`)
     .all();
 
@@ -210,20 +235,29 @@ function getLeadTrend() {
   });
 }
 
-export default function DashboardPage() {
-  const kpis = getKpis();
-  const pipelineData = getPipelineData();
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; all?: string }> }) {
+  const params = await searchParams;
+  const now = new Date();
+  const hasFilter = params.month && params.year;
+  const isAll = !hasFilter || params.all === "1";
+  const month = isAll ? undefined : parseInt(params.month!);
+  const year = isAll ? undefined : parseInt(params.year!);
+  const range = month && year ? getDateRange(month, year) : null;
+
+  const kpis = getKpis(range);
+  const pipelineData = getPipelineData(range);
   const revenueData = getRevenueByMonth();
-  const gewerbeartData = getGewerbeartData();
+  const gewerbeartData = getGewerbeartData(range);
   const leadTrend = getLeadTrend();
   const appointments = getUpcomingAppointments();
   const recentActivity = getRecentActivity();
 
   return (
     <div className="flex flex-col">
-      <Header title="Dashboard" actions={<ReportButton />} />
+      <Header title="Dashboard" actions={<div className="flex items-center gap-2"><MonthFilter /><ReportButton /></div>} />
       <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6">
         <KpiCards
+          newLeads={kpis.newLeads}
           openLeads={kpis.openLeads}
           conversionRate={kpis.conversionRate}
           revenue={kpis.revenue}

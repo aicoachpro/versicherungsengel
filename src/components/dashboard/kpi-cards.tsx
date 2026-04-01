@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, Target, DollarSign, BarChart3 } from "lucide-react";
+import { TrendingUp, Target, DollarSign, BarChart3, UserPlus } from "lucide-react";
 
 interface KpiCardsProps {
+  newLeads: number;
   openLeads: number;
   conversionRate: number;
   revenue: number;
   roi: number;
 }
 
-export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsProps) {
+export function KpiCards({ newLeads, openLeads, conversionRate, revenue, roi }: KpiCardsProps) {
   const cards = [
+    {
+      title: "Neue Leads",
+      value: newLeads.toString(),
+      icon: UserPlus,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+      href: "/pipeline",
+    },
     {
       title: "Offene Leads",
       value: openLeads.toString(),
@@ -50,7 +59,7 @@ export function KpiCards({ openLeads, conversionRate, revenue, roi }: KpiCardsPr
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
       {cards.map((card) => (
         <Link key={card.title} href={card.href}>
           <Card className="shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
