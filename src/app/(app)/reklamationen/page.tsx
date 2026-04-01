@@ -253,8 +253,8 @@ export default function ReklamationenPage() {
                         <TableCell>
                           <Badge className={cfg.color}>{cfg.label}</Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {lead.reklamationNotiz || "—"}
+                        <TableCell className="max-w-xs">
+                          <NotizCell lead={lead} />
                         </TableCell>
                       </TableRow>
                     );
