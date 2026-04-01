@@ -36,7 +36,13 @@ export async function POST(req: NextRequest) {
   const parts = (lead.ansprechpartner || lead.name || "").split(" ");
   const first_name = parts[0] || "";
   const last_name = parts.slice(1).join(" ") || "";
-  const phone = lead.telefon?.replace(/[^0-9+]/g, "") || undefined;
+  // Telefon in E.164 konvertieren: 0179... → +49179...
+  let phone = lead.telefon?.replace(/[^0-9+]/g, "") || undefined;
+  if (phone && phone.startsWith("0")) {
+    phone = "+49" + phone.slice(1);
+  } else if (phone && !phone.startsWith("+")) {
+    phone = "+" + phone;
+  }
   const email = lead.email || undefined;
 
   // Erstes Versicherungsprodukt als Leadprodukt
