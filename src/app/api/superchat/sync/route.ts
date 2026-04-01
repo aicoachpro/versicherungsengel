@@ -118,23 +118,29 @@ export async function POST(req: NextRequest) {
       } catch (createErr: unknown) {
         const err409 = createErr as Error & { status?: number };
         if (err409.status === 409) {
-          // Kontakt existiert bereits — nach Handle (Telefon/E-Mail) suchen
+          // Kontakt existiert bereits — per Cursor-Pagination suchen
           const existing = (phone ? await findContactByHandle(phone) : null)
             || (email ? await findContactByHandle(email) : null);
-          if (!existing?.id) {
+          if (existing?.id) {
+            contactId = existing.id;
+            // Handles NICHT mitsenden — die existieren ja schon
+            await updateContact(contactId!, {
+              first_name,
+              last_name,
+              custom_attributes,
+            });
+            action = "update";
+          } else {
+            // Kontakt existiert in Superchat aber ist über API nicht findbar
+            // (z.B. WhatsApp-Konversations-Kontakte). Manuelle Verknüpfung nötig.
             return NextResponse.json(
-              { error: "Kontakt existiert in Superchat, konnte aber nicht gefunden werden. Bitte manuell in Superchat verknüpfen." },
+              {
+                error: "Kontakt existiert bereits in Superchat mit dieser Nummer/E-Mail. Bitte öffne Superchat, suche den Kontakt und verknüpfe ihn manuell.",
+                needsManualLink: true,
+              },
               { status: 409 }
             );
           }
-          contactId = existing.id;
-          // Handles NICHT mitsenden — die existieren ja schon und würden erneut 409 auslösen
-          await updateContact(contactId!, {
-            first_name,
-            last_name,
-            custom_attributes,
-          });
-          action = "update";
         } else {
           throw createErr;
         }
