@@ -128,11 +128,10 @@ export async function POST(req: NextRequest) {
             );
           }
           contactId = existing.id;
+          // Handles NICHT mitsenden — die existieren ja schon und würden erneut 409 auslösen
           await updateContact(contactId!, {
             first_name,
             last_name,
-            phone,
-            email,
             custom_attributes,
           });
           action = "update";

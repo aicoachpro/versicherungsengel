@@ -52,16 +52,18 @@ export async function createContact(data: {
 }
 
 export async function findContactByHandle(handle: string): Promise<{ id: string } | null> {
-  // Superchat API hat keine Suchfunktion — Kontakte paginiert laden und nach Handle matchen
-  let offset = 0;
+  // Superchat API hat keine Suchfunktion — Cursor-basiert paginieren, max 10 Seiten
   const limit = 100;
+  const maxPages = 10;
   const normalizedHandle = handle.replace(/[^0-9a-zA-Z@.+]/g, "").toLowerCase();
+  let cursor: string | null = null;
 
-  while (true) {
-    const result = await superchatFetch(`/contacts?limit=${limit}&offset=${offset}`);
-    const contacts = result?.results || result?.data || (Array.isArray(result) ? result : []);
-
-    if (!contacts.length) return null;
+  for (let page = 0; page < maxPages; page++) {
+    const url = cursor
+      ? `/contacts?limit=${limit}&after=${cursor}`
+      : `/contacts?limit=${limit}`;
+    const result = await superchatFetch(url);
+    const contacts = result?.results || [];
 
     for (const contact of contacts) {
       const handles: Array<{ type: string; value: string }> = contact.handles || [];
@@ -71,9 +73,11 @@ export async function findContactByHandle(handle: string): Promise<{ id: string 
       if (match) return contact;
     }
 
-    if (contacts.length < limit) return null;
-    offset += limit;
+    cursor = result?.pagination?.next_cursor || null;
+    if (!cursor || contacts.length < limit) return null;
   }
+
+  return null;
 }
 
 export async function updateContact(
