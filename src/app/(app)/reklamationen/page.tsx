@@ -14,9 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, XCircle, Clock, ExternalLink } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Pencil, Check, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 interface Lead {
   id: number;
@@ -41,6 +42,7 @@ export default function ReklamationenPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState<{ leadId: number; status: string; name: string } | null>(null);
+  const [editingNotiz, setEditingNotiz] = useState<{ leadId: number; value: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -71,6 +73,60 @@ export default function ReklamationenPage() {
       toast.error(err.error || "Fehler");
     }
     setConfirmAction(null);
+  }
+
+  async function handleNotizSave(leadId: number, notiz: string) {
+    const res = await fetch("/api/leads/reklamation", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId, notiz }),
+    });
+    if (res.ok) {
+      toast.success("Begründung aktualisiert");
+      setEditingNotiz(null);
+      loadData();
+    } else {
+      toast.error("Fehler beim Speichern");
+    }
+  }
+
+  function NotizCell({ lead }: { lead: Lead }) {
+    const isEditing = editingNotiz?.leadId === lead.id;
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <Input
+            value={editingNotiz.value}
+            onChange={(e) => setEditingNotiz({ leadId: lead.id, value: e.target.value })}
+            className="h-7 text-sm"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleNotizSave(lead.id, editingNotiz.value);
+              if (e.key === "Escape") setEditingNotiz(null);
+            }}
+          />
+          <Button size="icon-xs" variant="ghost" onClick={() => handleNotizSave(lead.id, editingNotiz.value)}>
+            <Check className="h-3.5 w-3.5 text-green-600" />
+          </Button>
+          <Button size="icon-xs" variant="ghost" onClick={() => setEditingNotiz(null)}>
+            <X className="h-3.5 w-3.5 text-red-500" />
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-1 group">
+        <span className="truncate">{lead.reklamationNotiz || "—"}</span>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => setEditingNotiz({ leadId: lead.id, value: lead.reklamationNotiz || "" })}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </div>
+    );
   }
 
   const offene = leads.filter((l) => l.reklamationStatus === "offen");
@@ -122,8 +178,8 @@ export default function ReklamationenPage() {
                           ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE")
                           : "—"}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {lead.reklamationNotiz || "—"}
+                      <TableCell className="max-w-xs">
+                        <NotizCell lead={lead} />
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -197,8 +253,8 @@ export default function ReklamationenPage() {
                         <TableCell>
                           <Badge className={cfg.color}>{cfg.label}</Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {lead.reklamationNotiz || "—"}
+                        <TableCell className="max-w-xs">
+                          <NotizCell lead={lead} />
                         </TableCell>
                       </TableRow>
                     );
