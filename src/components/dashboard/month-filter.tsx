@@ -14,9 +14,10 @@ export function MonthFilter() {
   const searchParams = useSearchParams();
 
   const now = new Date();
+  const hasFilter = searchParams.has("month") && searchParams.has("year");
+  const isAll = !hasFilter || searchParams.get("all") === "1";
   const month = parseInt(searchParams.get("month") || String(now.getMonth() + 1));
   const year = parseInt(searchParams.get("year") || String(now.getFullYear()));
-  const isAll = searchParams.get("all") === "1";
 
   const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
 

@@ -238,9 +238,10 @@ function getLeadTrend() {
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; all?: string }> }) {
   const params = await searchParams;
   const now = new Date();
-  const isAll = params.all === "1";
-  const month = isAll ? undefined : parseInt(params.month || String(now.getMonth() + 1));
-  const year = isAll ? undefined : parseInt(params.year || String(now.getFullYear()));
+  const hasFilter = params.month && params.year;
+  const isAll = !hasFilter || params.all === "1";
+  const month = isAll ? undefined : parseInt(params.month!);
+  const year = isAll ? undefined : parseInt(params.year!);
   const range = month && year ? getDateRange(month, year) : null;
 
   const kpis = getKpis(range);
