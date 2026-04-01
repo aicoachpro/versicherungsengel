@@ -67,13 +67,13 @@ export function Sidebar() {
       <Link
         href={href}
         className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
+          "flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-200",
           isActive
-            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-            : "text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
         )}
       >
-        <Icon className={cn("h-[18px] w-[18px]", isActive && "text-gold")} />
+        <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive && "text-primary")} />
         {label}
       </Link>
     );
@@ -82,7 +82,7 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center gap-3 border-b bg-sidebar px-4 text-sidebar-foreground md:hidden">
+      <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/80 backdrop-blur-xl px-4 text-sidebar-foreground md:hidden">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="rounded-md p-1.5 hover:bg-sidebar-accent"
@@ -105,22 +105,22 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed z-50 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform duration-200 md:relative md:translate-x-0",
+          "fixed z-50 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground transition-transform duration-200 md:relative md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
+        <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
           <Image
             src="/logo.png"
             alt="VÖLKER Finance OHG"
-            width={44}
-            height={44}
-            className="rounded-xl"
+            width={36}
+            height={36}
+            className="rounded-[10px]"
           />
           <div>
-            <p className="text-sm font-semibold leading-tight tracking-tight">VÖLKER Finance</p>
-            <p className="text-[11px] text-sidebar-foreground/40 font-medium tracking-wide uppercase">Sales Hub</p>
+            <p className="text-[13px] font-semibold leading-tight tracking-tight text-sidebar-foreground">VÖLKER Finance</p>
+            <p className="text-[11px] text-sidebar-foreground/40 font-medium">Sales Hub</p>
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t bg-sidebar text-sidebar-foreground md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground md:hidden">
         {mobileBottomNav.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
@@ -174,7 +174,7 @@ export function Sidebar() {
               className={cn(
                 "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors",
                 isActive
-                  ? "text-gold"
+                  ? "text-primary"
                   : "text-sidebar-foreground/50"
               )}
             >
