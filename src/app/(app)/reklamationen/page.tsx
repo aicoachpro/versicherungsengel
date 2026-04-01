@@ -186,7 +186,7 @@ export default function ReklamationenPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-1 text-green-600 border-green-300 hover:bg-green-50"
+                            className="gap-1"
                             onClick={() => setConfirmAction({ leadId: lead.id, status: "genehmigt", name: lead.name })}
                           >
                             <CheckCircle2 className="h-4 w-4" /> Genehmigen
@@ -194,7 +194,7 @@ export default function ReklamationenPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-1 text-red-600 border-red-300 hover:bg-red-50"
+                            className="gap-1 text-destructive"
                             onClick={() => setConfirmAction({ leadId: lead.id, status: "abgelehnt", name: lead.name })}
                           >
                             <XCircle className="h-4 w-4" /> Ablehnen

@@ -492,7 +492,7 @@ export default function LeadDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                    className="gap-2"
                     onClick={handleSyncToSuperchat}
                     disabled={superchatSyncing}
                   >
@@ -522,7 +522,7 @@ export default function LeadDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                    className="gap-2 text-destructive"
                     onClick={() => setReklamationDialogOpen(true)}
                   >
                     <AlertTriangle className="h-4 w-4" /> Reklamieren
