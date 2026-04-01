@@ -23,6 +23,9 @@ export const leads = sqliteTable("leads", {
   email: text("email"),
   telefon: text("telefon"),
   website: text("website"),
+  strasse: text("strasse"),
+  plz: text("plz"),
+  ort: text("ort"),
   branche: text("branche", {
     enum: ["Bau", "Handwerk", "Dienstleistung", "Produktion", "IT", "Gesundheit", "Logistik", "Handel", "Gastronomie", "Immobilien", "Sonstiges"],
   }),
