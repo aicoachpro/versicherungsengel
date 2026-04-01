@@ -1,6 +1,6 @@
 # Versicherungsengel — AI System Reference
 
-**Version:** 1.0.0 | **Stand:** 2026-03-24
+**Version:** 1.0.0 | **Stand:** 2026-04-01
 **Repository:** https://github.com/aicoachpro/versicherungsengel.git
 
 ## Identität
