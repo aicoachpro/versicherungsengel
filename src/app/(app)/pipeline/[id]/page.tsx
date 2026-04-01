@@ -387,16 +387,6 @@ export default function LeadDetailPage() {
       if (res.ok) {
         toast.success(data.action === "create" ? "Kontakt in Superchat angelegt" : "Superchat-Kontakt aktualisiert");
         loadData();
-      } else if (data.needsManualLink) {
-        // Kontakt existiert in Superchat, aber API kann ihn nicht finden
-        const phone = lead?.telefon?.replace(/[^0-9]/g, "") || "";
-        const waPhone = phone.startsWith("0") ? "49" + phone.slice(1) : phone;
-        const superchatUrl = `https://app.superchat.de/inbox/find/?wa=${waPhone}`;
-        toast(
-          "Kontakt existiert bereits in Superchat. Bitte dort suchen und hier über 'In Superchat öffnen' verknüpfen.",
-          { duration: 8000 }
-        );
-        window.open(superchatUrl, "_blank");
       } else {
         toast.error(data.error || "Superchat-Fehler");
       }

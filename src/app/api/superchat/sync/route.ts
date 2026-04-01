@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
   try {
     let contactId = lead.superchatContactId;
-    let action: "create" | "update";
+    let action: "create" | "update" = "create";
 
     if (contactId) {
       // Bestehenden Kontakt aktualisieren
@@ -105,44 +105,53 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      try {
-        const result = await createContact({
-          first_name,
-          last_name,
-          phone,
-          email,
-          custom_attributes,
-        });
-        contactId = result.id;
-        action = "create";
-      } catch (createErr: unknown) {
-        const err409 = createErr as Error & { status?: number };
-        if (err409.status === 409) {
-          // Kontakt existiert bereits — per Cursor-Pagination suchen
-          const existing = (phone ? await findContactByHandle(phone) : null)
-            || (email ? await findContactByHandle(email) : null);
-          if (existing?.id) {
-            contactId = existing.id;
-            // Handles NICHT mitsenden — die existieren ja schon
-            await updateContact(contactId!, {
-              first_name,
-              last_name,
-              custom_attributes,
-            });
-            action = "update";
-          } else {
-            // Kontakt existiert in Superchat aber ist über API nicht findbar
-            // (z.B. WhatsApp-Konversations-Kontakte). Manuelle Verknüpfung nötig.
-            return NextResponse.json(
-              {
-                error: "Kontakt existiert bereits in Superchat mit dieser Nummer/E-Mail. Bitte öffne Superchat, suche den Kontakt und verknüpfe ihn manuell.",
-                needsManualLink: true,
-              },
-              { status: 409 }
-            );
-          }
+      // Versuche Create mit verschiedenen Handle-Kombinationen bei 409
+      const attempts: Array<{ phone?: string; email?: string }> = [
+        { phone, email },                          // 1. Beide Handles
+        ...(phone && email ? [{ phone }, { email }] : []),  // 2. Einzeln
+      ];
+
+      let created = false;
+      for (const handles of attempts) {
+        if (!handles.phone && !handles.email) continue;
+        try {
+          const result = await createContact({
+            first_name,
+            last_name,
+            phone: handles.phone,
+            email: handles.email,
+            custom_attributes,
+          });
+          contactId = result.id;
+          action = "create";
+          created = true;
+          break;
+        } catch (err: unknown) {
+          const e = err as Error & { status?: number };
+          if (e.status !== 409) throw err;
+          // 409 → nächsten Versuch probieren
+        }
+      }
+
+      if (!created) {
+        // Alle Handle-Kombinationen blockiert — Kontakt per API suchen
+        const existing = (phone ? await findContactByHandle(phone) : null)
+          || (email ? await findContactByHandle(email) : null);
+        if (existing?.id) {
+          contactId = existing.id;
+          await updateContact(contactId!, { first_name, last_name, custom_attributes });
+          action = "update";
         } else {
-          throw createErr;
+          // Handles existieren als Geister-Kontakte → mit Lead-spezifischer E-Mail anlegen
+          const fallbackEmail = `lead-${leadId}@ve.voelkergroup.cloud`;
+          const result = await createContact({
+            first_name,
+            last_name,
+            email: fallbackEmail,
+            custom_attributes,
+          });
+          contactId = result.id;
+          action = "create";
         }
       }
 
