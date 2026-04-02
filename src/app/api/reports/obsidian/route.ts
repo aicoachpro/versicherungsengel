@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
   const monthName = MONTH_NAMES[month - 1];
   const prevMonthName = MONTH_NAMES[prevMonth - 1];
   const isoDate = now.toISOString().split("T")[0];
+  const monthFirstDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const dateStr = now.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const markdown = `---
@@ -149,10 +150,10 @@ ${pipelineRows}
 ${branchenRows}
 
 ---
-*Automatisch generiert von [[${b.companyName}]]*
+*Automatisch generiert aus ${b.companyName}*
 `;
 
-  const filename = `${isoDate}-versicherungsengel-monatsreport.md`;
+  const filename = `${monthFirstDate}-versicherungsengel-monatsreport.md`;
 
   // Write to vault if configured
   const written = writeToVault(filename, markdown);

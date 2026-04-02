@@ -151,7 +151,7 @@ conversion: ${cur.conversion.toFixed(1)}
 # Wochenreport KW ${kw} / ${year}
 
 > ${from} bis ${sunday.toISOString().split("T")[0]} — erstellt am ${dateStr}
-> Monatsreport: [[${isoDate.slice(0, 7)}-01-versicherungsengel-monatsreport|${monthName} ${year}]]
+> Monatsreport: [[${from.slice(0, 7)}-01-versicherungsengel-monatsreport|${monthName} ${year}]]
 
 ## KPIs
 
@@ -183,7 +183,7 @@ ${upcomingRows}
 ${pipelineRows}
 
 ---
-*Automatisch generiert von [[${b.companyName}]]*
+*Automatisch generiert aus ${b.companyName}*
 `;
 
   const filename = `${isoDate}-versicherungsengel-wochenreport.md`;
