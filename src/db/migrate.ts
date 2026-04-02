@@ -103,6 +103,15 @@ try {
   console.log("Added 'superchat_contact_id' column to leads table");
 }
 
+// Create settings table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {
