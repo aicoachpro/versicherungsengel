@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Shield } from "lucide-react";
+import { useBranding } from "@/hooks/use-branding";
 
 export default function LoginPage() {
+  const branding = useBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
@@ -71,7 +73,7 @@ export default function LoginPage() {
         <CardHeader className="space-y-4 pb-2 text-center">
           <Image
             src="/logo.png"
-            alt="VÖLKER Finance OHG"
+            alt={branding.companyName}
             width={80}
             height={80}
             className="mx-auto"
@@ -79,11 +81,13 @@ export default function LoginPage() {
           />
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              VÖLKER Finance OHG
+              {branding.companyName}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Sales Hub – Allianz Generalvertretung
-            </p>
+            {branding.subtitle && (
+              <p className="text-sm text-muted-foreground">
+                {branding.subtitle}
+              </p>
+            )}
           </div>
         </CardHeader>
         <CardContent>

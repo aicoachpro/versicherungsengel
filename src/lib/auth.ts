@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import * as OTPAuth from "otpauth";
+import { getBranding } from "@/lib/branding";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -43,7 +44,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           const totp = new OTPAuth.TOTP({
-            issuer: "VÖLKER Finance",
+            issuer: getBranding().companyName,
             label: user.email,
             algorithm: "SHA1",
             digits: 6,

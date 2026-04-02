@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-gold/5">
       <div className="w-full max-w-md space-y-8 p-8">
         <div className="text-center">
-          <Image src="/logo.png" alt="VÖLKER Finance OHG" width={80} height={80} className="mx-auto mb-4" />
+          <Image src="/logo.png" alt="Logo" width={80} height={80} className="mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary">Passwort vergessen</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen.

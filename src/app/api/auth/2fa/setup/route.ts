@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
+import { getBranding } from "@/lib/branding";
 
 export async function POST() {
   const session = await auth();
@@ -24,7 +25,7 @@ export async function POST() {
 
   const secret = new OTPAuth.Secret({ size: 20 });
   const totp = new OTPAuth.TOTP({
-    issuer: "VÖLKER Finance",
+    issuer: getBranding().companyName,
     label: user.email,
     algorithm: "SHA1",
     digits: 6,

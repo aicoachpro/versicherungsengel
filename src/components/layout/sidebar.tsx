@@ -27,6 +27,7 @@ import {
   Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBranding } from "@/hooks/use-branding";
 
 const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -61,6 +62,7 @@ export function Sidebar() {
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const branding = useBranding();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -98,7 +100,7 @@ export function Sidebar() {
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         <Image src="/logo.png" alt="Logo" width={28} height={28} className="rounded" />
-        <span className="text-sm font-semibold tracking-tight">VÖLKER Finance</span>
+        <span className="text-sm font-semibold tracking-tight">{branding.companyName}</span>
       </div>
 
       {/* Overlay */}
@@ -120,14 +122,14 @@ export function Sidebar() {
         <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
           <Image
             src="/logo.png"
-            alt="VÖLKER Finance OHG"
+            alt={branding.companyName}
             width={36}
             height={36}
             className="rounded-[10px]"
           />
           <div>
-            <p className="text-[13px] font-semibold leading-tight tracking-tight text-sidebar-foreground">VÖLKER Finance</p>
-            <p className="text-[11px] text-sidebar-foreground/40 font-medium">Sales Hub</p>
+            <p className="text-[13px] font-semibold leading-tight tracking-tight text-sidebar-foreground">{branding.companyName}</p>
+            {branding.subtitle && <p className="text-[11px] text-sidebar-foreground/40 font-medium">{branding.subtitle}</p>}
           </div>
         </div>
 
@@ -190,7 +192,7 @@ export function Sidebar() {
         <div className="border-t border-sidebar-border px-5 py-4">
           <div className="flex items-center gap-2 text-[11px] text-sidebar-foreground/30 font-medium">
             <Shield className="h-3.5 w-3.5" />
-            Allianz Generalvertretung
+            {branding.subtitle || branding.companyName}
           </div>
         </div>
       </aside>

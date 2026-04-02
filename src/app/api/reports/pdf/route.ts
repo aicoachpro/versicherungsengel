@@ -4,6 +4,7 @@ import { leads } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { jsPDF } from "jspdf";
+import { getBranding } from "@/lib/branding";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -40,15 +41,16 @@ export async function GET(req: NextRequest) {
   // PDF generieren
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const b = getBranding();
 
   // Header
   doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text("VÖLKER Finance OHG", 14, 20);
+  doc.text(b.companyName, 14, 20);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100);
-  doc.text("Allianz Generalvertretung", 14, 27);
+  doc.text(b.subtitle || "", 14, 27);
   doc.text(`Bericht: ${formatDate(from)} – ${formatDate(to)}`, 14, 33);
   doc.text(`Erstellt: ${formatDate(new Date().toISOString().split("T")[0])}`, 14, 39);
 
@@ -136,7 +138,7 @@ export async function GET(req: NextRequest) {
   const pageHeight = doc.internal.pageSize.getHeight();
   doc.setFontSize(8);
   doc.setTextColor(150);
-  doc.text("Versicherungsengel CRM — VÖLKER Finance OHG", 14, pageHeight - 10);
+  doc.text(`${b.companyName}${b.subtitle ? " — " + b.subtitle : ""}`, 14, pageHeight - 10);
   doc.text(`Seite 1`, pageWidth - 25, pageHeight - 10);
 
   // PDF ausgeben
