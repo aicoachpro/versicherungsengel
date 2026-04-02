@@ -29,40 +29,41 @@ function dateFilter(range: DateRange) {
   return and(gte(leads.eingangsdatum, range.from), lte(leads.eingangsdatum, range.to));
 }
 
+// Genehmigte Reklamationen aus allen KPIs ausschließen — Kosten wurden gutgeschrieben
+const notGenehmigtReklamiert = sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`;
+
 function getKpis(range: DateRange) {
   const filter = dateFilter(range);
+  const baseFilter = filter ? and(notGenehmigtReklamiert, filter) : notGenehmigtReklamiert;
 
   const openLeads = db
     .select({ count: sql<number>`count(*)` })
     .from(leads)
-    .where(filter
-      ? and(sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`, filter)
-      : sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`
-    )
+    .where(and(sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`, baseFilter))
     .get();
 
   const totalLeads = db
     .select({ count: sql<number>`count(*)` })
     .from(leads)
-    .where(filter || undefined)
+    .where(baseFilter)
     .get();
 
   const wonLeads = db
     .select({ count: sql<number>`count(*)` })
     .from(leads)
-    .where(filter ? and(eq(leads.phase, "Abgeschlossen"), filter) : eq(leads.phase, "Abgeschlossen"))
+    .where(and(eq(leads.phase, "Abgeschlossen"), baseFilter))
     .get();
 
   const totalRevenue = db
     .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
     .from(leads)
-    .where(filter ? and(eq(leads.phase, "Abgeschlossen"), filter) : eq(leads.phase, "Abgeschlossen"))
+    .where(and(eq(leads.phase, "Abgeschlossen"), baseFilter))
     .get();
 
   const totalCosts = db
     .select({ total: sql<number>`coalesce(sum(${leads.terminKosten}), 0)` })
     .from(leads)
-    .where(filter || undefined)
+    .where(baseFilter)
     .get();
 
   const conversionRate =
@@ -94,12 +95,13 @@ function getPipelineData(range: DateRange) {
     "Verloren",
   ] as const;
   const filter = dateFilter(range);
+  const baseFilter = filter ? and(notGenehmigtReklamiert, filter) : notGenehmigtReklamiert;
 
   return phases.map((phase) => {
     const result = db
       .select({ count: sql<number>`count(*)` })
       .from(leads)
-      .where(filter ? and(eq(leads.phase, phase), filter) : eq(leads.phase, phase))
+      .where(and(eq(leads.phase, phase), baseFilter))
       .get();
     return { phase, count: result?.count || 0 };
   });
@@ -113,6 +115,7 @@ function getRevenueByMonth() {
       costs: sql<number>`coalesce(sum(${leads.terminKosten}), 0)`,
     })
     .from(leads)
+    .where(notGenehmigtReklamiert)
     .groupBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .orderBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .limit(6)
@@ -135,6 +138,7 @@ function getRevenueByMonth() {
 
 function getGewerbeartData(range: DateRange) {
   const filter = dateFilter(range);
+  const baseFilter = filter ? and(notGenehmigtReklamiert, filter) : notGenehmigtReklamiert;
   const result = db
     .select({
       gewerbeart: sql<string>`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`,
@@ -143,7 +147,7 @@ function getGewerbeartData(range: DateRange) {
       kosten: sql<number>`coalesce(sum(${leads.terminKosten}), 0)`,
     })
     .from(leads)
-    .where(filter || undefined)
+    .where(baseFilter)
     .groupBy(sql`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`)
     .all();
 
