@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { and, eq, lte, gte } from "drizzle-orm";
 import { sendPushoverNotification } from "@/lib/pushover";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET(req: NextRequest) {
   // Einfache Absicherung per Secret-Header oder Query-Param
@@ -46,6 +47,13 @@ export async function GET(req: NextRequest) {
     const success = await sendPushoverNotification({
       title: "🗓 Folgetermin in 1 Stunde",
       message: `${lead.name}${lead.ansprechpartner ? ` (${lead.ansprechpartner})` : ""} — ${zeitStr}`,
+    });
+
+    createNotification({
+      type: "folgetermin",
+      title: "Folgetermin in 1 Stunde",
+      message: `${lead.name}${lead.ansprechpartner ? ` (${lead.ansprechpartner})` : ""} — ${zeitStr}`,
+      entityId: lead.id,
     });
 
     if (success) {

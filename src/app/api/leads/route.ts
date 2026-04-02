@@ -4,6 +4,7 @@ import { leads } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET() {
   const session = await auth();
@@ -66,6 +67,15 @@ export async function PATCH(req: NextRequest) {
     .where(eq(leads.id, id))
     .returning()
     .get();
+
+  if (updates.phase === "Abgeschlossen" || updates.phase === "Verloren") {
+    createNotification({
+      type: "phase_change",
+      title: updates.phase === "Abgeschlossen" ? "Lead abgeschlossen" : "Lead verloren",
+      message: result?.name || `Lead #${id}`,
+      entityId: id,
+    });
+  }
 
   const { userId, userName } = getAuditUser(session);
   logAudit({ userId, userName, action: "update", entity: "lead", entityId: id, entityName: result?.name, changes: updates });

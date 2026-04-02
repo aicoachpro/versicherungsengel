@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { signOut, useSession } from "next-auth/react";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 export function Header({ title, actions }: { title: string; actions?: React.ReactNode }) {
   const { data: session } = useSession();
@@ -24,6 +25,7 @@ export function Header({ title, actions }: { title: string; actions?: React.Reac
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {actions}
+        <NotificationBell />
         <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-1.5 sm:gap-2 rounded-full px-2 sm:px-2.5 py-1 hover:bg-accent transition-all duration-200 cursor-pointer outline-none">
             <Avatar className="h-7 w-7">

@@ -128,6 +128,18 @@ export const apiKeys = sqliteTable("api_keys", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
+export const notifications = sqliteTable("notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  type: text("type", {
+    enum: ["new_lead", "folgetermin", "phase_change", "reklamation", "system"],
+  }).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  entityId: integer("entity_id"),
+  readAt: text("read_at"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),

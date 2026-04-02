@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { validateApiRequest } from "@/lib/api-auth";
 import { parseTermin } from "@/lib/parse-termin";
+import { createNotification } from "@/lib/notifications";
 
 // Public API endpoint for n8n / external integrations
 // Authenticated via API key (Bearer token) + Rate-Limited
@@ -35,6 +36,13 @@ export async function POST(req: NextRequest) {
     notizen: body.notizen || null,
     eingangsdatum: new Date().toISOString().split("T")[0],
   }).returning().get();
+
+  createNotification({
+    type: "new_lead",
+    title: "Neuer Lead eingegangen",
+    message: `${result.name}${result.branche ? ` — ${result.branche}` : ""}`,
+    entityId: result.id,
+  });
 
   return NextResponse.json({ success: true, lead: result }, { status: 201 });
 }
