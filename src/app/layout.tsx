@@ -4,11 +4,15 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { getBranding } from "@/lib/branding";
 
-export const metadata: Metadata = {
-  title: "VÖLKER Finance | Sales Hub",
-  description: "Sales Hub für VÖLKER Finance OHG – Allianz Generalvertretung",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const b = getBranding();
+  return {
+    title: `${b.companyName}${b.subtitle ? " | " + b.subtitle : ""}`,
+    description: b.subtitle ? `${b.subtitle} – ${b.companyName}` : b.companyName,
+  };
+}
 
 export default function RootLayout({
   children,

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { getBranding } from "@/lib/branding";
 
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
 
   const monthName = MONTH_NAMES[month - 1];
   const dateStr = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const b = getBranding();
 
   const markdown = `---
 tags: [sales-hub, monatsreport, ${year}]
@@ -61,7 +63,7 @@ created: ${new Date().toISOString().split("T")[0]}
 
 # Monatsauswertung ${monthName} ${year}
 
-> Erstellt am ${dateStr} aus VÖLKER Finance Sales Hub
+> Erstellt am ${dateStr} aus ${b.companyName}
 
 ## KPIs
 
@@ -87,7 +89,7 @@ ${pipelineRows}
 ${branchenRows}
 
 ---
-*Automatisch generiert von [[VÖLKER Finance Sales Hub]]*
+*Automatisch generiert von [[${b.companyName}]]*
 `;
 
   const filename = `Monatsreport_${year}-${String(month).padStart(2, "0")}_${monthName}.md`;

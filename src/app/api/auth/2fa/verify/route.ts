@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import * as OTPAuth from "otpauth";
+import { getBranding } from "@/lib/branding";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const totp = new OTPAuth.TOTP({
-    issuer: "VÖLKER Finance",
+    issuer: getBranding().companyName,
     label: user.email,
     algorithm: "SHA1",
     digits: 6,
