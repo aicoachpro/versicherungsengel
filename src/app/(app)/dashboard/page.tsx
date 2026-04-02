@@ -161,10 +161,12 @@ function getGewerbeartData(range: DateRange) {
 }
 
 function getUpcomingAppointments() {
-  const now = new Date().toISOString().split("T")[0];
+  const now = new Date().toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM für exakten Zeitvergleich
   const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split("T")[0] + "T23:59";
+
+  const notReklamiert = sql`${leads.reklamiertAt} IS NULL`;
 
   // Ersttermine
   const termine = db
@@ -176,7 +178,7 @@ function getUpcomingAppointments() {
       phase: leads.phase,
     })
     .from(leads)
-    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater)))
+    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater), notReklamiert))
     .all()
     .map((t) => ({ ...t, typ: "Termin" as const }));
 
@@ -191,7 +193,7 @@ function getUpcomingAppointments() {
       folgeterminTyp: leads.folgeterminTyp,
     })
     .from(leads)
-    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater)))
+    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater), notReklamiert))
     .all()
     .map((t) => ({ ...t, typ: "Folgetermin" as const }));
 
@@ -207,8 +209,10 @@ function getRecentActivity() {
       name: leads.name,
       phase: leads.phase,
       updatedAt: leads.updatedAt,
+      reklamiertAt: leads.reklamiertAt,
     })
     .from(leads)
+    .where(sql`${leads.reklamiertAt} IS NULL`)
     .orderBy(sql`${leads.updatedAt} DESC`)
     .limit(8)
     .all();

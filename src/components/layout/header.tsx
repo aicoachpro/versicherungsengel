@@ -19,19 +19,19 @@ export function Header({ title, actions }: { title: string; actions?: React.Reac
     .toUpperCase() || "U";
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border/60 bg-background/70 backdrop-blur-xl px-6">
-      <h1 className="text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+    <header className="flex h-14 items-center justify-between border-b border-border/60 bg-background/70 backdrop-blur-xl px-4 sm:px-6">
+      <h1 className="text-lg font-semibold tracking-tight text-foreground truncate mr-2">{title}</h1>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {actions}
         <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 rounded-full px-2.5 py-1 hover:bg-accent transition-all duration-200 cursor-pointer outline-none">
+        <DropdownMenuTrigger className="flex items-center gap-1.5 sm:gap-2 rounded-full px-2 sm:px-2.5 py-1 hover:bg-accent transition-all duration-200 cursor-pointer outline-none">
             <Avatar className="h-7 w-7">
               <AvatarFallback className="bg-gradient-to-b from-primary to-primary/80 text-primary-foreground text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">{session?.user?.name}</span>
+            <span className="text-sm font-medium hidden sm:inline">{session?.user?.name}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
