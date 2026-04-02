@@ -6,12 +6,110 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
-import { Shield, Key, Smartphone } from "lucide-react";
+import {
+  Shield,
+  Key,
+  Smartphone,
+  Building2,
+  BookOpen,
+  Bell,
+  Send,
+  Mail,
+  MessageSquare,
+  Check,
+  Loader2,
+} from "lucide-react";
 import Image from "next/image";
+
+type SettingsMap = Record<string, string>;
+
+interface SettingsSectionProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  fields: { key: string; label: string; placeholder: string; type?: string }[];
+  settings: SettingsMap;
+  onSave: (values: SettingsMap) => Promise<void>;
+}
+
+function isActive(fields: { key: string }[], settings: SettingsMap) {
+  return fields.some((f) => {
+    const val = settings[f.key];
+    return val && val !== "" && val !== "***";
+  });
+}
+
+function SettingsSection({ icon, title, description, fields, settings, onSave }: SettingsSectionProps) {
+  const [values, setValues] = useState<SettingsMap>({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const active = isActive(fields, settings);
+
+  useEffect(() => {
+    const v: SettingsMap = {};
+    for (const f of fields) {
+      v[f.key] = settings[f.key] || "";
+    }
+    setValues(v);
+  }, [settings, fields]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    await onSave(values);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            {icon}
+            {title}
+          </h3>
+          <Badge variant={active ? "default" : "secondary"}>
+            {active ? "Aktiv" : "Nicht konfiguriert"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {fields.map((f) => (
+          <div key={f.key} className="space-y-2">
+            <Label>{f.label}</Label>
+            <Input
+              type={f.type || "text"}
+              placeholder={f.placeholder}
+              value={values[f.key] || ""}
+              onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              onFocus={(e) => {
+                // Clear masked values on focus so user can enter new value
+                const val = e.target.value;
+                if (val.includes("...") && val.length <= 10) {
+                  setValues((prev) => ({ ...prev, [f.key]: "" }));
+                }
+              }}
+            />
+          </div>
+        ))}
+        <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
+          {saving ? "Speichere…" : saved ? "Gespeichert" : "Speichern"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const [settings, setSettings] = useState<SettingsMap>({});
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,14 +127,14 @@ export default function SettingsPage() {
   const [disablePassword, setDisablePassword] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/2fa/setup", { method: "GET" }).catch(() => {});
-    // Check 2FA status
-    fetch("/api/auth/change-password", {
-      method: "GET",
-    }).catch(() => {});
-  }, []);
+    if (isAdmin) {
+      fetch("/api/settings")
+        .then((r) => r.json())
+        .then((data) => setSettings(data))
+        .catch(() => {});
+    }
+  }, [isAdmin]);
 
-  // Fetch 2FA status on load
   useEffect(() => {
     async function check2faStatus() {
       try {
@@ -49,6 +147,19 @@ export default function SettingsPage() {
     }
     check2faStatus();
   }, []);
+
+  const saveSection = async (values: SettingsMap) => {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    });
+    if (res.ok) {
+      // Reload all settings to get fresh masked values
+      const fresh = await fetch("/api/settings").then((r) => r.json());
+      setSettings(fresh);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,10 +245,99 @@ export default function SettingsPage() {
     }
   };
 
+  const COMPANY_FIELDS = [
+    { key: "company.name", label: "Firmenname", placeholder: "z.B. Mustermann Versicherungen" },
+    { key: "company.subtitle", label: "Untertitel", placeholder: "z.B. Allianz Generalvertretung" },
+    { key: "company.color", label: "Primärfarbe (Hex)", placeholder: "#003781" },
+  ];
+
+  const OBSIDIAN_FIELDS = [
+    { key: "obsidian.vaultPath", label: "Vault-Pfad", placeholder: "/Users/name/Obsidian/MeinVault" },
+    { key: "obsidian.reportFolder", label: "Report-Ordner im Vault", placeholder: "Reports/Sales Hub" },
+  ];
+
+  const PUSHOVER_FIELDS = [
+    { key: "pushover.userKey", label: "User Key", placeholder: "Pushover User Key" },
+    { key: "pushover.apiToken", label: "API Token", placeholder: "Pushover API Token" },
+  ];
+
+  const TELEGRAM_FIELDS = [
+    { key: "telegram.botToken", label: "Bot Token", placeholder: "123456:ABC-DEF..." },
+    { key: "telegram.chatId", label: "Chat ID", placeholder: "123456789" },
+  ];
+
+  const EMAIL_FIELDS = [
+    { key: "email.resendApiKey", label: "Resend API Key", placeholder: "re_..." },
+    { key: "email.fromAddress", label: "Absenderadresse", placeholder: "noreply@example.com" },
+  ];
+
+  const SUPERCHAT_FIELDS = [
+    { key: "superchat.apiKey", label: "API Key", placeholder: "Superchat API Key" },
+  ];
+
   return (
     <div className="flex flex-col">
       <Header title="Einstellungen" />
       <div className="flex-1 p-6 space-y-6 max-w-2xl">
+        {/* Admin-only sections */}
+        {isAdmin && (
+          <>
+            <SettingsSection
+              icon={<Building2 className="h-5 w-5" />}
+              title="Firma"
+              description="Name und Branding deiner Instanz. Wird in Sidebar, Login, E-Mails und Reports angezeigt."
+              fields={COMPANY_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+
+            <SettingsSection
+              icon={<BookOpen className="h-5 w-5" />}
+              title="Obsidian"
+              description="Vault-Pfad für automatischen Report-Export. Ohne Pfad werden Reports als Download angeboten."
+              fields={OBSIDIAN_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+
+            <SettingsSection
+              icon={<Bell className="h-5 w-5" />}
+              title="Pushover"
+              description="Push-Benachrichtigungen für Folgetermine und neue Leads."
+              fields={PUSHOVER_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+
+            <SettingsSection
+              icon={<Send className="h-5 w-5" />}
+              title="Telegram"
+              description="Telegram-Bot für Benachrichtigungen und Self-Healing Alerts."
+              fields={TELEGRAM_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+
+            <SettingsSection
+              icon={<Mail className="h-5 w-5" />}
+              title="E-Mail (Resend)"
+              description="E-Mail-Versand für Passwort-Reset und Willkommensnachrichten."
+              fields={EMAIL_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+
+            <SettingsSection
+              icon={<MessageSquare className="h-5 w-5" />}
+              title="Superchat"
+              description="Superchat-Integration für Kontakt-Synchronisation."
+              fields={SUPERCHAT_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+          </>
+        )}
+
         {/* Account Info */}
         <Card>
           <CardHeader>
