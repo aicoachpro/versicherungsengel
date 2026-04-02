@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 import {
   LayoutDashboard,
   Kanban,
@@ -21,6 +22,8 @@ import {
   ClipboardList,
   Upload,
   MoreHorizontal,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +59,9 @@ export function Sidebar() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -153,6 +159,23 @@ export function Sidebar() {
             ))}
           </div>
         </nav>
+
+        {/* Dark Mode Toggle */}
+        <div className="mx-3 mb-2">
+          {mounted && (
+            <button
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium text-sidebar-foreground/50 transition-all duration-200 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            >
+              {resolvedTheme === "dark" ? (
+                <Sun className="h-[18px] w-[18px] shrink-0" />
+              ) : (
+                <Moon className="h-[18px] w-[18px] shrink-0" />
+              )}
+              {resolvedTheme === "dark" ? "Light Mode" : "Dark Mode"}
+            </button>
+          )}
+        </div>
 
         {/* Footer */}
         <div className="border-t border-sidebar-border px-5 py-4">
