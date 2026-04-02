@@ -24,6 +24,7 @@ import {
   MoreHorizontal,
   Sun,
   Moon,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -160,22 +161,30 @@ export function Sidebar() {
           </div>
         </nav>
 
-        {/* Dark Mode Toggle */}
-        <div className="mx-3 mb-2">
-          {mounted && (
-            <button
-              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium text-sidebar-foreground/50 transition-all duration-200 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            >
-              {resolvedTheme === "dark" ? (
-                <Sun className="h-[18px] w-[18px] shrink-0" />
-              ) : (
-                <Moon className="h-[18px] w-[18px] shrink-0" />
-              )}
-              {resolvedTheme === "dark" ? "Light Mode" : "Dark Mode"}
-            </button>
-          )}
-        </div>
+        {/* Theme Toggle — Light / Dark / System */}
+        {mounted && (
+          <div className="mx-3 mb-2 flex items-center rounded-xl bg-sidebar-accent/40 p-1">
+            {([
+              { value: "light", icon: Sun, label: "Hell" },
+              { value: "system", icon: Monitor, label: "Auto" },
+              { value: "dark", icon: Moon, label: "Dunkel" },
+            ] as const).map(({ value, icon: Icon, label }) => (
+              <button
+                key={value}
+                onClick={() => setTheme(value)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all duration-200",
+                  theme === value
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="border-t border-sidebar-border px-5 py-4">
