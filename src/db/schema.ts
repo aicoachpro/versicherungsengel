@@ -140,6 +140,12 @@ export const notifications = sqliteTable("notifications", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),
