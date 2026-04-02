@@ -21,7 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, ArrowRight, RotateCcw } from "lucide-react";
+import { Upload, FileSpreadsheet, FileText, CheckCircle2, XCircle, ArrowRight, RotateCcw, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -73,10 +75,19 @@ interface ImportResult {
   details: { row: number; success: boolean; error?: string; name?: string }[];
 }
 
+type ImportMode = "csv" | "pdf";
+
+interface PdfLead {
+  name?: string;
+  [key: string]: string | number | null | undefined;
+}
+
 export default function ImportPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
+  const [mode, setMode] = useState<ImportMode>("csv");
   const [step, setStep] = useState<Step>("upload");
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -84,6 +95,10 @@ export default function ImportPage() {
   const [mapping, setMapping] = useState<Record<number, string>>({});
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+
+  // PDF-spezifisch
+  const [pdfLeads, setPdfLeads] = useState<PdfLead[]>([]);
+  const [pdfExtracting, setPdfExtracting] = useState(false);
 
   function parseFile(file: File) {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -181,6 +196,48 @@ export default function ImportPage() {
     setImporting(false);
   }
 
+  async function handlePdfUpload(file: File) {
+    setPdfExtracting(true);
+    setFileName(file.name);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/leads/import/pdf", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error); setPdfExtracting(false); return; }
+      setPdfLeads(data.leads);
+      setStep("preview");
+      toast.success(`${data.leads.length} Lead(s) aus PDF erkannt`);
+    } catch { toast.error("PDF-Upload fehlgeschlagen"); }
+    setPdfExtracting(false);
+  }
+
+  async function handlePdfImport() {
+    setImporting(true);
+    const validLeads = pdfLeads.filter((l) => l.name);
+    try {
+      const res = await fetch("/api/leads/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: validLeads }),
+      });
+      const data = await res.json();
+      setResult(data);
+      setStep("result");
+      if (data.imported > 0) toast.success(`${data.imported} Leads importiert`);
+      if (data.failed > 0) toast.error(`${data.failed} fehlgeschlagen`);
+    } catch { toast.error("Import fehlgeschlagen"); }
+    setImporting(false);
+  }
+
+  function updatePdfLead(index: number, field: string, value: string) {
+    setPdfLeads((prev) => prev.map((l, i) => i === index ? { ...l, [field]: value } : l));
+  }
+
+  function removePdfLead(index: number) {
+    setPdfLeads((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function reset() {
     setStep("upload");
     setFileName("");
@@ -188,17 +245,41 @@ export default function ImportPage() {
     setRows([]);
     setMapping({});
     setResult(null);
+    setPdfLeads([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (pdfInputRef.current) pdfInputRef.current.value = "";
   }
 
   return (
     <div className="flex flex-col h-full">
       <Header title="Lead-Import" />
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-6">
+        {/* Mode Tabs */}
+        <div className="flex gap-2">
+          <Button
+            variant={mode === "csv" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setMode("csv"); reset(); }}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            CSV / Excel
+          </Button>
+          <Button
+            variant={mode === "pdf" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setMode("pdf"); reset(); }}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            PDF (KI-Import)
+          </Button>
+        </div>
+
         {/* Steps */}
         <div className="flex items-center gap-2 text-sm">
-          {["Upload", "Zuordnung", "Vorschau", "Ergebnis"].map((label, i) => {
-            const steps: Step[] = ["upload", "mapping", "preview", "result"];
+          {(mode === "csv" ? ["Upload", "Zuordnung", "Vorschau", "Ergebnis"] : ["Upload", "Vorschau", "Ergebnis"]).map((label, i) => {
+            const csvSteps: Step[] = ["upload", "mapping", "preview", "result"];
+            const pdfSteps: Step[] = ["upload", "preview", "result"];
+            const steps = mode === "csv" ? csvSteps : pdfSteps;
             const isActive = steps.indexOf(step) >= i;
             return (
               <div key={label} className="flex items-center gap-2">
@@ -209,8 +290,8 @@ export default function ImportPage() {
           })}
         </div>
 
-        {/* Step 1: Upload */}
-        {step === "upload" && (
+        {/* CSV Upload */}
+        {step === "upload" && mode === "csv" && (
           <Card>
             <CardHeader>
               <CardTitle>CSV oder Excel hochladen</CardTitle>
@@ -237,6 +318,104 @@ export default function ImportPage() {
                   if (file) parseFile(file);
                 }}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PDF Upload */}
+        {step === "upload" && mode === "pdf" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>PDF mit KI analysieren</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Claude liest das PDF und extrahiert automatisch Lead-Daten. Du kannst vor dem Import alles prüfen und korrigieren.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div
+                className="border-2 border-dashed rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => !pdfExtracting && pdfInputRef.current?.click()}
+              >
+                {pdfExtracting ? (
+                  <>
+                    <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
+                    <p className="text-sm font-medium">KI analysiert PDF...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Das kann einige Sekunden dauern</p>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">PDF hier ablegen oder klicken</p>
+                    <p className="text-xs text-muted-foreground mt-1">Max. 10 MB, Lead-Daten werden per KI extrahiert</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handlePdfUpload(file);
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PDF Preview */}
+        {step === "preview" && mode === "pdf" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Erkannte Leads prüfen</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {fileName} — {pdfLeads.length} Lead(s) erkannt. Prüfe und korrigiere die Daten vor dem Import.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {pdfLeads.map((lead, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">Lead {i + 1}: {lead.name || "—"}</p>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => removePdfLead(i)}>
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {[
+                      { key: "name", label: "Firma *" },
+                      { key: "ansprechpartner", label: "Ansprechpartner" },
+                      { key: "email", label: "E-Mail" },
+                      { key: "telefon", label: "Telefon" },
+                      { key: "strasse", label: "Straße" },
+                      { key: "plz", label: "PLZ" },
+                      { key: "ort", label: "Ort" },
+                      { key: "branche", label: "Branche" },
+                      { key: "notizen", label: "Notizen" },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="space-y-1">
+                        <Label className="text-xs">{label}</Label>
+                        <Input
+                          value={String(lead[key] || "")}
+                          onChange={(e) => updatePdfLead(i, key, e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {pdfLeads.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">Keine Leads erkannt</p>
+              )}
+              <div className="flex items-center justify-between pt-4">
+                <Button variant="outline" onClick={reset}>Abbrechen</Button>
+                <Button onClick={handlePdfImport} disabled={importing || pdfLeads.filter(l => l.name).length === 0}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {importing ? "Importiere..." : `${pdfLeads.filter(l => l.name).length} Leads importieren`}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
