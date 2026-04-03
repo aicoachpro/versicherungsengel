@@ -41,6 +41,7 @@ export function LeadTrendChart({ data }: LeadTrendChartProps) {
                 <Tooltip
                   formatter={(value) => [`${value} Leads`, "Neue Leads"]}
                   labelFormatter={(label) => `KW ab ${label}`}
+                  cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
                   contentStyle={{
                     backgroundColor: "var(--color-card)",
                     borderColor: "var(--color-border)",

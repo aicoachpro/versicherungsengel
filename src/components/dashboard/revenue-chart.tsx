@@ -167,6 +167,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
                 />
                 <Tooltip
                   formatter={(value) => currencyFormatter.format(Number(value))}
+                  cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
                   contentStyle={{
                     backgroundColor: "var(--color-card)",
                     borderColor: "var(--color-border)",
