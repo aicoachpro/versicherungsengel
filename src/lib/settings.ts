@@ -29,13 +29,16 @@ const SECRET_KEYS = new Set([
 ]);
 
 export function getSetting(key: string): string {
-  const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  if (row && row.value !== "") return row.value;
+  try {
+    const row = db.select().from(settings).where(eq(settings.key, key)).get();
+    if (row && row.value !== "") return row.value;
+  } catch {
+    // Table may not exist yet (e.g. during Docker build) — fall through to env fallback
+  }
   return ENV_FALLBACKS[key]?.() ?? "";
 }
 
 export function getSettings(prefix: string): Record<string, string> {
-  const rows = db.select().from(settings).all();
   const result: Record<string, string> = {};
 
   // All known keys with this prefix
@@ -46,10 +49,15 @@ export function getSettings(prefix: string): Record<string, string> {
   }
 
   // Also include any DB rows with this prefix not in fallbacks
-  for (const row of rows) {
-    if (row.key.startsWith(prefix + ".")) {
-      result[row.key] = row.value || result[row.key] || "";
+  try {
+    const rows = db.select().from(settings).all();
+    for (const row of rows) {
+      if (row.key.startsWith(prefix + ".")) {
+        result[row.key] = row.value || result[row.key] || "";
+      }
     }
+  } catch {
+    // Table may not exist yet
   }
 
   return result;
