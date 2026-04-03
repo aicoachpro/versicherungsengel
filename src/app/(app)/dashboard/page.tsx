@@ -35,22 +35,43 @@ const notGenehmigtReklamiert = sql`(${leads.reklamiertAt} IS NULL OR ${leads.rek
 
 function getLeadBudget() {
   const budget = parseInt(getSetting("company.leadBudget") || "10", 10);
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   const result = db
     .select({
+      month: sql<string>`strftime('%Y-%m', ${leads.eingangsdatum})`,
       total: sql<number>`count(*)`,
       reklamiert: sql<number>`sum(CASE WHEN ${leads.reklamationStatus} = 'genehmigt' THEN 1 ELSE 0 END)`,
     })
     .from(leads)
-    .where(sql`strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonth}`)
+    .groupBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
+    .orderBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
+    .all();
+
+  const months = result
+    .filter((r) => r.month != null)
+    .map((r) => ({
+      month: r.month,
+      total: r.total,
+      reklamiert: r.reklamiert || 0,
+      netto: r.total - (r.reklamiert || 0),
+    }));
+
+  return { budget, months };
+}
+
+function getWonLeadsCount(range: DateRange) {
+  const filter = dateFilter(range);
+  const baseFilter = filter
+    ? and(sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`, filter)
+    : sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`;
+
+  const result = db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(and(eq(leads.phase, "Abgeschlossen"), baseFilter))
     .get();
 
-  const total = result?.total || 0;
-  const reklamiert = result?.reklamiert || 0;
-
-  return { budget, total, reklamiert, netto: total - reklamiert };
+  return result?.count || 0;
 }
 
 function getKpis(range: DateRange) {
@@ -276,6 +297,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const range = month && year ? getDateRange(month, year) : null;
 
   const kpis = getKpis(range);
+  const wonLeads = getWonLeadsCount(range);
   const leadBudget = getLeadBudget();
   const pipelineData = getPipelineData(range);
   const revenueData = getRevenueByMonth();
@@ -289,7 +311,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <Header title="Dashboard" actions={<div className="flex items-center gap-2"><MonthFilter /><ReportButton /></div>} />
       <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6 overflow-x-hidden">
         <KpiCards
-          newLeads={kpis.newLeads}
+          wonLeads={wonLeads}
           openLeads={kpis.openLeads}
           conversionRate={kpis.conversionRate}
           revenue={kpis.revenue}
