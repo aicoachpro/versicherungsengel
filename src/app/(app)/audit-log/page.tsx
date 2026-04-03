@@ -121,6 +121,7 @@ export default function AuditLogPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
   // Debounce fuer Suchfeld
   useEffect(() => {
@@ -230,95 +231,169 @@ export default function AuditLogPage() {
               </div>
             </div>
 
-            {/* Tabelle */}
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[140px]">Zeitpunkt</TableHead>
-                    <TableHead className="w-[120px]">Benutzer</TableHead>
-                    <TableHead className="w-[130px]">Aktion</TableHead>
-                    <TableHead className="w-[110px]">Bereich</TableHead>
-                    <TableHead>Objekt</TableHead>
-                    <TableHead>Details</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12">
-                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          Lade Eintraege...
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : logs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12">
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <ClipboardList className="h-8 w-8 opacity-50" />
-                          <p>Noch keine Eintraege im Audit-Log</p>
-                          {(debouncedSearch || entityFilter !== "all" || actionFilter !== "all") && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={() => {
-                                setSearchTerm("");
-                                setDebouncedSearch("");
-                                setEntityFilter("all");
-                                setActionFilter("all");
-                                setOffset(0);
-                              }}
-                            >
-                              Filter zuruecksetzen
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    logs.map((log) => {
-                      const actionStyle =
-                        ACTION_LABELS[log.action] || {
-                          label: log.action,
-                          color: "bg-gray-100 text-gray-800",
-                        };
-                      return (
-                        <TableRow key={log.id}>
-                          <TableCell
-                            className="text-sm"
+            {/* Loading / Empty State (beide Views) */}
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 text-muted-foreground py-12">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Lade Eintraege...
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 text-muted-foreground py-12">
+                <ClipboardList className="h-8 w-8 opacity-50" />
+                <p>Noch keine Eintraege im Audit-Log</p>
+                {(debouncedSearch || entityFilter !== "all" || actionFilter !== "all") && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setDebouncedSearch("");
+                      setEntityFilter("all");
+                      setActionFilter("all");
+                      setOffset(0);
+                    }}
+                  >
+                    Filter zuruecksetzen
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Mobile: Karten-Ansicht */}
+                <div className="md:hidden space-y-3">
+                  {logs.map((log) => {
+                    const actionStyle =
+                      ACTION_LABELS[log.action] || {
+                        label: log.action,
+                        color: "bg-gray-100 text-gray-800",
+                      };
+                    const details = formatChanges(log.changes);
+                    const isExpanded = expandedCards.has(log.id);
+                    return (
+                      <div
+                        key={log.id}
+                        className="rounded-lg border p-3 space-y-2"
+                      >
+                        {/* Zeile 1: Aktion-Badge + Zeitpunkt */}
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant="outline"
+                            className={actionStyle.color}
+                          >
+                            {actionStyle.label}
+                          </Badge>
+                          <span
+                            className="text-xs text-muted-foreground"
                             title={formatFullDate(log.createdAt)}
                           >
                             {relativeTime(log.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-sm">
+                          </span>
+                        </div>
+                        {/* Zeile 2: Lesbare Zusammenfassung */}
+                        <p className="text-sm">
+                          <span className="font-medium">
                             {log.userName || "System"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={actionStyle.color}
-                            >
-                              {actionStyle.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {ENTITY_LABELS[log.entity] || log.entity}
-                          </TableCell>
-                          <TableCell className="text-sm font-medium">
+                          </span>
+                          {" hat "}
+                          <span className="lowercase">
+                            {actionStyle.label}
+                          </span>
+                          {": "}
+                          <span className="font-medium">
                             {log.entityName || `#${log.entityId}`}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
-                            {formatChanges(log.changes)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                          </span>
+                          {" ("}
+                          {ENTITY_LABELS[log.entity] || log.entity}
+                          {")"}
+                        </p>
+                        {/* Zeile 3: Details (aufklappbar) */}
+                        {details && (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedCards((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(log.id)) {
+                                    next.delete(log.id);
+                                  } else {
+                                    next.add(log.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="text-xs text-muted-foreground underline underline-offset-2"
+                            >
+                              {isExpanded ? "Details ausblenden" : "Details anzeigen"}
+                            </button>
+                            {isExpanded && (
+                              <p className="text-xs text-muted-foreground mt-1 break-words">
+                                {details}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop: Tabelle */}
+                <div className="hidden md:block rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[140px]">Zeitpunkt</TableHead>
+                        <TableHead className="w-[120px]">Benutzer</TableHead>
+                        <TableHead className="w-[130px]">Aktion</TableHead>
+                        <TableHead className="w-[110px]">Bereich</TableHead>
+                        <TableHead>Objekt</TableHead>
+                        <TableHead>Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {logs.map((log) => {
+                        const actionStyle =
+                          ACTION_LABELS[log.action] || {
+                            label: log.action,
+                            color: "bg-gray-100 text-gray-800",
+                          };
+                        return (
+                          <TableRow key={log.id}>
+                            <TableCell
+                              className="text-sm"
+                              title={formatFullDate(log.createdAt)}
+                            >
+                              {relativeTime(log.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {log.userName || "System"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={actionStyle.color}
+                              >
+                                {actionStyle.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {ENTITY_LABELS[log.entity] || log.entity}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium">
+                              {log.entityName || `#${log.entityId}`}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
+                              {formatChanges(log.changes)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
 
             {/* Paginierung */}
             {totalPages > 1 && (

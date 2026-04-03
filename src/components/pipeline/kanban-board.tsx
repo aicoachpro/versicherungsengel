@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,33 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollHint, setShowScrollHint] = useState(true);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const updateScrollState = () => {
+      setCanScrollLeft(el.scrollLeft > 8);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
+    };
+
+    const handleScroll = () => {
+      updateScrollState();
+      if (showScrollHint) setShowScrollHint(false);
+    };
+
+    updateScrollState();
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [showScrollHint]);
 
   const handleDragStart = (e: React.DragEvent, leadId: number) => {
     e.dataTransfer.setData("leadId", String(leadId));
@@ -61,6 +88,20 @@ export function KanbanBoard({
 
   return (
     <>
+      <div className="relative">
+        {/* Scroll-Hint nur auf Mobile, verschwindet nach erstem Scrollen */}
+        {showScrollHint && (
+          <div className="md:hidden text-center text-xs text-muted-foreground/60 pb-2 animate-pulse">
+            &larr; Wischen zum Scrollen &rarr;
+          </div>
+        )}
+
+        {/* Scroll-Container */}
+        <div
+          ref={scrollRef}
+          className="overflow-x-auto"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
       <div className="flex gap-4 min-w-max">
         {phases.map((phase) => {
           const phaseLeads = leads.filter((l) => l.phase === phase);
@@ -189,6 +230,18 @@ export function KanbanBoard({
             </div>
           );
         })}
+      </div>
+        </div>
+
+        {/* Fade-Gradient links (Mobile only) */}
+        {canScrollLeft && (
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent md:hidden" />
+        )}
+
+        {/* Fade-Gradient rechts (Mobile only) */}
+        {canScrollRight && (
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent md:hidden" />
+        )}
       </div>
       <ConfirmDialog
         open={!!deleteTarget}

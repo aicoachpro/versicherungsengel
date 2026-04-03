@@ -6,8 +6,22 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CalendarDays, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [breakpoint]);
+
+  return isMobile;
+}
 
 interface CalendarEvent {
   id: string;
@@ -82,8 +96,13 @@ function formatTime(dateStr: string) {
   return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatDayHeader(date: Date) {
+  return date.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" });
+}
+
 export default function KalenderPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewMode>("month");
@@ -184,7 +203,15 @@ export default function KalenderPage() {
         </div>
 
         {/* Kalender */}
-        {view === "month" ? (
+        {isMobile ? (
+          /* Mobile Agenda-Ansicht */
+          <MobileAgendaView
+            days={view === "month" ? monthDays.filter((d) => d.isCurrentMonth).map((d) => d.date) : weekDays}
+            today={today}
+            getEventsForDay={getEventsForDay}
+            onEventClick={(leadId) => router.push(`/pipeline/${leadId}`)}
+          />
+        ) : view === "month" ? (
           <Card className="overflow-hidden">
             {/* Wochentage Header */}
             <div className="grid grid-cols-7 border-b">
@@ -314,6 +341,123 @@ export default function KalenderPage() {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─── Mobile Agenda-Ansicht ─── */
+
+function MobileAgendaView({
+  days,
+  today,
+  getEventsForDay,
+  onEventClick,
+}: {
+  days: Date[];
+  today: Date;
+  getEventsForDay: (date: Date) => CalendarEvent[];
+  onEventClick: (leadId: number) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {days.map((date, i) => {
+        const dayEvents = getEventsForDay(date);
+        const isToday = isSameDay(date, today);
+        return (
+          <Card key={i} className={cn("overflow-hidden", isToday && "ring-2 ring-primary/30")}>
+            {/* Tages-Header */}
+            <div
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 border-b",
+                isToday ? "bg-primary/10" : "bg-muted/30"
+              )}
+            >
+              <span
+                className={cn(
+                  "text-sm font-semibold h-7 w-7 flex items-center justify-center rounded-full",
+                  isToday && "bg-primary text-primary-foreground"
+                )}
+              >
+                {date.getDate()}
+              </span>
+              <span className="text-sm font-medium">
+                {formatDayHeader(date)}
+              </span>
+              {dayEvents.length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {dayEvents.length} {dayEvents.length === 1 ? "Termin" : "Termine"}
+                </Badge>
+              )}
+            </div>
+
+            {/* Events */}
+            <div className="divide-y">
+              {dayEvents.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-muted-foreground">Keine Termine</p>
+              ) : (
+                dayEvents.map((event) => (
+                  <button
+                    key={event.id}
+                    onClick={() => onEventClick(event.leadId)}
+                    className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/40 transition-colors active:bg-muted/60"
+                  >
+                    {/* Zeitanzeige */}
+                    <div className="flex-shrink-0 w-14 pt-0.5">
+                      {formatTime(event.date) ? (
+                        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatTime(event.date)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">--:--</span>
+                      )}
+                    </div>
+
+                    {/* Event-Details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{event.title}</p>
+                      {event.ansprechpartner && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {event.ansprechpartner}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-[10px] h-5 px-1.5",
+                            event.type === "Folgetermin"
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                              : ""
+                          )}
+                        >
+                          {event.type === "Folgetermin"
+                            ? (event.folgeterminTyp || "Nachfassen")
+                            : event.phase}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] h-5 px-1.5",
+                            event.type === "Folgetermin"
+                              ? "border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400"
+                              : "border-primary/30 text-primary"
+                          )}
+                        >
+                          {event.type}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Chevron */}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 flex-shrink-0 mt-1" />
+                  </button>
+                ))
+              )}
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
