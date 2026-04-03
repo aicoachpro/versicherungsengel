@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { db } from "@/db";
 import { leads, insurances } from "@/db/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
+import { getSetting } from "@/lib/settings";
 import { Header } from "@/components/layout/header";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
@@ -31,6 +32,26 @@ function dateFilter(range: DateRange) {
 
 // Genehmigte Reklamationen aus allen KPIs ausschließen — Kosten wurden gutgeschrieben
 const notGenehmigtReklamiert = sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`;
+
+function getLeadBudget() {
+  const budget = parseInt(getSetting("company.leadBudget") || "10", 10);
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  const result = db
+    .select({
+      total: sql<number>`count(*)`,
+      reklamiert: sql<number>`sum(CASE WHEN ${leads.reklamationStatus} = 'genehmigt' THEN 1 ELSE 0 END)`,
+    })
+    .from(leads)
+    .where(sql`strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonth}`)
+    .get();
+
+  const total = result?.total || 0;
+  const reklamiert = result?.reklamiert || 0;
+
+  return { budget, total, reklamiert, netto: total - reklamiert };
+}
 
 function getKpis(range: DateRange) {
   const filter = dateFilter(range);
@@ -255,6 +276,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const range = month && year ? getDateRange(month, year) : null;
 
   const kpis = getKpis(range);
+  const leadBudget = getLeadBudget();
   const pipelineData = getPipelineData(range);
   const revenueData = getRevenueByMonth();
   const gewerbeartData = getGewerbeartData(range);
@@ -273,6 +295,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           revenue={kpis.revenue}
           costs={kpis.costs}
           roi={kpis.roi}
+          leadBudget={leadBudget}
         />
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <RevenueChart data={revenueData} />

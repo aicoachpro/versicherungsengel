@@ -3,7 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, Target, DollarSign, BarChart3, UserPlus, RefreshCw } from "lucide-react";
+import { TrendingUp, Target, DollarSign, BarChart3, UserPlus, RefreshCw, Package } from "lucide-react";
+
+interface LeadBudget {
+  budget: number;
+  total: number;
+  reklamiert: number;
+  netto: number;
+}
 
 interface KpiCardsProps {
   newLeads: number;
@@ -12,6 +19,7 @@ interface KpiCardsProps {
   revenue: number;
   costs: number;
   roi: number;
+  leadBudget: LeadBudget;
 }
 
 const currencyFormat = new Intl.NumberFormat("de-DE", {
@@ -64,7 +72,7 @@ function FlipCard({ revenue, costs }: { revenue: number; costs: number }) {
   );
 }
 
-export function KpiCards({ newLeads, openLeads, conversionRate, revenue, costs, roi }: KpiCardsProps) {
+export function KpiCards({ newLeads, openLeads, conversionRate, revenue, costs, roi, leadBudget }: KpiCardsProps) {
   const cards = [
     {
       title: "Neue Leads",
@@ -101,7 +109,7 @@ export function KpiCards({ newLeads, openLeads, conversionRate, revenue, costs, 
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
       {cards.map((card) => (
         <Link key={card.title} href={card.href}>
           <Card className="shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
@@ -118,6 +126,26 @@ export function KpiCards({ newLeads, openLeads, conversionRate, revenue, costs, 
         </Link>
       ))}
       <FlipCard revenue={revenue} costs={costs} />
+      {/* Lead-Budget */}
+      <Card className="shadow-sm">
+        <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-6">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 bg-cyan-50 dark:bg-cyan-950/30">
+            <Package className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs text-muted-foreground sm:text-sm font-medium">Lead-Budget</p>
+            <p className="text-lg font-bold tracking-tight sm:text-2xl">
+              {leadBudget.netto}
+              <span className="text-sm font-normal text-muted-foreground"> / {leadBudget.budget}</span>
+            </p>
+            {leadBudget.reklamiert > 0 && (
+              <p className="text-[10px] text-muted-foreground sm:text-xs">
+                {leadBudget.reklamiert} reklamiert
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
