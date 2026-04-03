@@ -97,10 +97,15 @@ function getKpis(range: DateRange) {
     .where(baseFilter)
     .get();
 
+  const revenue = totalRevenue?.total || 0;
+  const costs = totalCosts?.total || 0;
+  const roi = costs > 0 ? Math.round(((revenue - costs) / costs) * 1000) / 10 : 0;
+
   return {
     openLeads: openLeads?.count || 0,
-    revenue: totalRevenue?.total || 0,
-    costs: totalCosts?.total || 0,
+    revenue,
+    costs,
+    roi,
   };
 }
 
@@ -464,6 +469,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           openLeads={kpis.openLeads}
           revenue={kpis.revenue}
           costs={kpis.costs}
+          roi={kpis.roi}
           leadBudget={leadBudget}
         />
         <SmartInsights insights={insights} />
