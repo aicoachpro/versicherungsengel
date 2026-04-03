@@ -81,6 +81,7 @@ function getKpis(range: DateRange) {
     openLeads: openLeads?.count || 0,
     conversionRate: Math.round(conversionRate * 10) / 10,
     revenue: totalRevenue?.total || 0,
+    costs: totalCosts?.total || 0,
     roi: Math.round(roi * 10) / 10,
   };
 }
@@ -270,6 +271,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           openLeads={kpis.openLeads}
           conversionRate={kpis.conversionRate}
           revenue={kpis.revenue}
+          costs={kpis.costs}
           roi={kpis.roi}
         />
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
