@@ -20,10 +20,14 @@ interface LeadBudgetMonth {
   total: number;
   reklamiert: number;
   netto: number;
+  expected: number;
+  carryOver: number;
+  outstanding: number;
 }
 
 interface LeadBudgetData {
   budget: number;
+  costPerLead: number;
   months: LeadBudgetMonth[];
 }
 
@@ -125,7 +129,9 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
   const monthData = data.months.find((m) => m.month === selectedMonth);
   const netto = monthData?.netto ?? 0;
   const reklamiert = monthData?.reklamiert ?? 0;
-  const total = monthData?.total ?? 0;
+  const expected = monthData?.expected ?? data.budget;
+  const carryOver = monthData?.carryOver ?? 0;
+  const outstanding = monthData?.outstanding ?? 0;
 
   return (
     <Card className="shadow-sm">
@@ -154,14 +160,14 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
             </button>
           </div>
           {(() => {
-            const ratio = data.budget > 0 ? netto / data.budget : 0;
+            const ratio = expected > 0 ? netto / expected : 0;
             const pct = Math.min(ratio * 100, 100);
             const barColor =
-              ratio > 0.9
-                ? "bg-red-500"
+              ratio >= 1
+                ? "bg-emerald-500"
                 : ratio > 0.7
                   ? "bg-amber-500"
-                  : "bg-emerald-500";
+                  : "bg-red-500";
             return (
               <>
                 <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
@@ -171,9 +177,19 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
                   />
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
-                  {netto} von {data.budget}
-                  {reklamiert > 0 && ` · ${reklamiert} reklamiert`}
+                  {netto} von {expected} erwartet
+                  {reklamiert > 0 && ` \u00b7 ${reklamiert} reklamiert`}
                 </p>
+                {carryOver > 0 && (
+                  <p className="text-[10px] text-muted-foreground sm:text-xs">
+                    inkl. {carryOver} Guthaben aus Vormonaten
+                  </p>
+                )}
+                {outstanding > 0 && (
+                  <p className="text-[10px] text-amber-600 sm:text-xs font-medium">
+                    {outstanding} Leads ausstehend
+                  </p>
+                )}
               </>
             );
           })()}

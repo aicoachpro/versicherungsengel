@@ -36,6 +36,10 @@ const notGenehmigtReklamiert = sql`(${leads.reklamiertAt} IS NULL OR ${leads.rek
 
 function getLeadBudget() {
   const budget = parseInt(getSetting("company.leadBudget") || "10", 10);
+  const minPerMonth = parseInt(getSetting("leadProvider.minPerMonth") || String(budget), 10);
+  const carryOverEnabled = getSetting("leadProvider.carryOver") !== "false";
+  const startMonth = getSetting("leadProvider.startMonth"); // YYYY-MM
+  const costPerLead = parseInt(getSetting("leadProvider.costPerLead") || "320", 10);
 
   const result = db
     .select({
@@ -48,7 +52,7 @@ function getLeadBudget() {
     .orderBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
     .all();
 
-  const months = result
+  const monthsRaw = result
     .filter((r) => r.month != null)
     .map((r) => ({
       month: r.month,
@@ -57,7 +61,71 @@ function getLeadBudget() {
       netto: r.total - (r.reklamiert || 0),
     }));
 
-  return { budget, months };
+  // Build lookup
+  const monthLookup = new Map(monthsRaw.map((m) => [m.month, m]));
+
+  // Generate all months from startMonth to now
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const effectiveStart = startMonth || monthsRaw[0]?.month || currentMonthKey;
+
+  const allMonthKeys: string[] = [];
+  {
+    const [sy, sm] = effectiveStart.split("-").map(Number);
+    const d = new Date(sy, sm - 1, 1);
+    while (d <= now) {
+      allMonthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      d.setMonth(d.getMonth() + 1);
+    }
+  }
+
+  // Calculate carry-over per month
+  let accumulatedCarryOver = 0;
+  const monthsWithCarryOver = allMonthKeys.map((key) => {
+    const data = monthLookup.get(key);
+    const delivered = data?.netto ?? 0;
+    const total = data?.total ?? 0;
+    const reklamiert = data?.reklamiert ?? 0;
+
+    const expected = minPerMonth + (carryOverEnabled ? accumulatedCarryOver : 0);
+    const carryOverForThisMonth = carryOverEnabled ? accumulatedCarryOver : 0;
+    const outstanding = Math.max(0, expected - delivered);
+
+    // Shortfall for this month -> rolls to next
+    const shortfall = Math.max(0, minPerMonth - delivered);
+    if (carryOverEnabled) {
+      accumulatedCarryOver = accumulatedCarryOver + shortfall;
+      // If delivered more than minPerMonth, reduce carry-over
+      if (delivered > minPerMonth) {
+        const excess = delivered - minPerMonth;
+        accumulatedCarryOver = Math.max(0, accumulatedCarryOver - excess);
+      }
+    }
+
+    return {
+      month: key,
+      total,
+      reklamiert,
+      netto: delivered,
+      expected,
+      carryOver: carryOverForThisMonth,
+      outstanding,
+    };
+  });
+
+  // Also include months from data that are before startMonth
+  const beforeStart = monthsRaw
+    .filter((m) => m.month < effectiveStart)
+    .map((m) => ({
+      ...m,
+      expected: minPerMonth,
+      carryOver: 0,
+      outstanding: Math.max(0, minPerMonth - m.netto),
+    }));
+
+  const months = [...beforeStart, ...monthsWithCarryOver];
+
+  return { budget: minPerMonth, costPerLead, months };
 }
 
 function getWonLeadsCount(range: DateRange) {

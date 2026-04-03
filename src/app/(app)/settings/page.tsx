@@ -21,18 +21,28 @@ import {
   Check,
   Loader2,
   Upload,
+  Package,
 } from "lucide-react";
 import Image from "next/image";
 
 type SettingsMap = Record<string, string>;
 
+interface SettingsField {
+  key: string;
+  label: string;
+  placeholder: string;
+  type?: string;
+  options?: { value: string; label: string }[];
+}
+
 interface SettingsSectionProps {
   icon: React.ReactNode;
   title: string;
   description: string;
-  fields: { key: string; label: string; placeholder: string; type?: string }[];
+  fields: SettingsField[];
   settings: SettingsMap;
   onSave: (values: SettingsMap) => Promise<void>;
+  footer?: React.ReactNode;
 }
 
 function isActive(fields: { key: string }[], settings: SettingsMap) {
@@ -42,7 +52,7 @@ function isActive(fields: { key: string }[], settings: SettingsMap) {
   });
 }
 
-function SettingsSection({ icon, title, description, fields, settings, onSave }: SettingsSectionProps) {
+function SettingsSection({ icon, title, description, fields, settings, onSave, footer }: SettingsSectionProps) {
   const [values, setValues] = useState<SettingsMap>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -83,27 +93,78 @@ function SettingsSection({ icon, title, description, fields, settings, onSave }:
         {fields.map((f) => (
           <div key={f.key} className="space-y-2">
             <Label>{f.label}</Label>
-            <Input
-              type={f.type || "text"}
-              placeholder={f.placeholder}
-              value={values[f.key] || ""}
-              onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
-              onFocus={(e) => {
-                // Clear masked values on focus so user can enter new value
-                const val = e.target.value;
-                if (val.includes("...") && val.length <= 10) {
-                  setValues((prev) => ({ ...prev, [f.key]: "" }));
-                }
-              }}
-            />
+            {f.options ? (
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={values[f.key] || ""}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              >
+                {f.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                type={f.type || "text"}
+                placeholder={f.placeholder}
+                value={values[f.key] || ""}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                onFocus={(e) => {
+                  // Clear masked values on focus so user can enter new value
+                  const val = e.target.value;
+                  if (val.includes("...") && val.length <= 10) {
+                    setValues((prev) => ({ ...prev, [f.key]: "" }));
+                  }
+                }}
+              />
+            )}
           </div>
         ))}
+        {footer}
         <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
           {saving ? "Speichere…" : saved ? "Gespeichert" : "Speichern"}
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function LeadProviderSection({
+  fields,
+  settings,
+  onSave,
+}: {
+  fields: SettingsField[];
+  settings: SettingsMap;
+  onSave: (values: SettingsMap) => Promise<void>;
+}) {
+  const minPerMonth = parseInt(settings["leadProvider.minPerMonth"] || "10", 10) || 0;
+  const costPerLead = parseInt(settings["leadProvider.costPerLead"] || "320", 10) || 0;
+  const monthlyCost = minPerMonth * costPerLead;
+
+  const costFormat = new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  });
+
+  return (
+    <SettingsSection
+      icon={<Package className="h-5 w-5" />}
+      title="Lead-Anbieter"
+      description="Konfiguration deines Lead-Anbieters. Nicht gelieferte Leads können als Guthaben übertragen werden."
+      fields={fields}
+      settings={settings}
+      onSave={onSave}
+      footer={
+        monthlyCost > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Monatliche Fixkosten: <span className="font-medium">{costFormat.format(monthlyCost)}</span>
+          </p>
+        ) : null
+      }
+    />
   );
 }
 
@@ -297,7 +358,33 @@ export default function SettingsPage() {
     { key: "company.color", label: "Primärfarbe (Hex)", placeholder: "#003781" },
   ];
 
-  const OBSIDIAN_FIELDS = [
+  const LEAD_PROVIDER_FIELDS: SettingsField[] = [
+    { key: "leadProvider.name", label: "Anbieter-Name", placeholder: "z.B. WVD Versicherungsdienst" },
+    { key: "leadProvider.leadType", label: "Lead-Typ", placeholder: "z.B. Gewerbe-Leads" },
+    { key: "leadProvider.minPerMonth", label: "Mindestabnahme pro Monat", placeholder: "10", type: "number" },
+    { key: "leadProvider.costPerLead", label: "Kosten pro Lead in \u20ac", placeholder: "320", type: "number" },
+    {
+      key: "leadProvider.billingModel",
+      label: "Abrechnungsmodell",
+      placeholder: "",
+      options: [
+        { value: "prepaid", label: "Vorauszahlung" },
+        { value: "per-lead", label: "Pay-per-Lead" },
+      ],
+    },
+    {
+      key: "leadProvider.carryOver",
+      label: "Guthaben-\u00dcbertrag",
+      placeholder: "",
+      options: [
+        { value: "true", label: "Ja \u2014 nicht gelieferte Leads werden \u00fcbertragen" },
+        { value: "false", label: "Nein" },
+      ],
+    },
+    { key: "leadProvider.startMonth", label: "Vertragsstart", placeholder: "", type: "month" },
+  ];
+
+  const OBSIDIAN_FIELDS: SettingsField[] = [
     { key: "obsidian.vaultPath", label: "Vault-Pfad", placeholder: "/Users/name/Obsidian/MeinVault" },
     { key: "obsidian.reportFolder", label: "Report-Ordner im Vault", placeholder: "Reports/Sales Hub" },
   ];
@@ -384,6 +471,12 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <LeadProviderSection
+              fields={LEAD_PROVIDER_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
 
             <SettingsSection
               icon={<BookOpen className="h-5 w-5" />}

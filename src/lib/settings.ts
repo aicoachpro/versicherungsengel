@@ -18,6 +18,13 @@ const ENV_FALLBACKS: Record<string, () => string> = {
   "email.resendApiKey": () => process.env.RESEND_API_KEY || "",
   "email.fromAddress": () => process.env.RESEND_FROM || "",
   "superchat.apiKey": () => process.env.SUPERCHAT_API_KEY || "",
+  "leadProvider.name": () => "",
+  "leadProvider.leadType": () => "",
+  "leadProvider.minPerMonth": () => "10",
+  "leadProvider.costPerLead": () => "320",
+  "leadProvider.billingModel": () => "prepaid",
+  "leadProvider.carryOver": () => "true",
+  "leadProvider.startMonth": () => "",
 };
 
 // Keys that contain secrets — masked on GET
