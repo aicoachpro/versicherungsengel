@@ -118,7 +118,6 @@ function getRevenueByMonth() {
     .where(notGenehmigtReklamiert)
     .groupBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .orderBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
-    .limit(12)
     .all();
 
   const monthNames: Record<string, string> = {
