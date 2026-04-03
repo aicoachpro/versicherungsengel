@@ -4,6 +4,7 @@ export interface Branding {
   companyName: string;
   subtitle: string;
   color: string;
+  logo: string;
 }
 
 export function getBranding(): Branding {
@@ -11,5 +12,6 @@ export function getBranding(): Branding {
     companyName: getSetting("company.name") || "Sales Hub",
     subtitle: getSetting("company.subtitle") || "",
     color: getSetting("company.color") || "#003781",
+    logo: getSetting("company.logo") || "/logo.png",
   };
 }

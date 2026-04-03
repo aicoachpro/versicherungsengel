@@ -6,9 +6,10 @@ interface Branding {
   companyName: string;
   subtitle: string;
   color: string;
+  logo: string;
 }
 
-const DEFAULT: Branding = { companyName: "Sales Hub", subtitle: "", color: "#003781" };
+const DEFAULT: Branding = { companyName: "Sales Hub", subtitle: "", color: "#003781", logo: "/logo.png" };
 
 let cached: Branding | null = null;
 

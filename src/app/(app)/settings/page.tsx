@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Check,
   Loader2,
+  Upload,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -245,6 +246,51 @@ export default function SettingsPage() {
     }
   };
 
+  // Logo Upload
+  const [logoPreview, setLogoPreview] = useState<string>(settings["company.logo"] || "/logo.png");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoMessage, setLogoMessage] = useState("");
+
+  useEffect(() => {
+    if (settings["company.logo"]) {
+      setLogoPreview(settings["company.logo"]);
+    }
+  }, [settings]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoUploading(true);
+    setLogoMessage("");
+
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    try {
+      const res = await fetch("/api/upload/logo", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setLogoPreview(data.logo + "?t=" + Date.now());
+        setLogoMessage("Logo gespeichert");
+        // Reload settings
+        const fresh = await fetch("/api/settings").then((r) => r.json());
+        setSettings(fresh);
+        setTimeout(() => setLogoMessage(""), 2000);
+      } else {
+        setLogoMessage(data.error || "Upload fehlgeschlagen");
+      }
+    } catch {
+      setLogoMessage("Verbindungsfehler");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   const COMPANY_FIELDS = [
     { key: "company.name", label: "Firmenname", placeholder: "z.B. Mustermann Versicherungen" },
     { key: "company.subtitle", label: "Untertitel", placeholder: "z.B. Allianz Generalvertretung" },
@@ -290,6 +336,54 @@ export default function SettingsPage() {
               settings={settings}
               onSave={saveSection}
             />
+
+            {/* Logo Upload */}
+            <Card>
+              <CardHeader>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Firmenlogo
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Logo wird in Sidebar, Login und Reports angezeigt. PNG, JPG, SVG oder WebP, max. 2 MB.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-xl border bg-muted/50 p-2">
+                    <Image
+                      src={logoPreview}
+                      alt="Firmenlogo"
+                      width={64}
+                      height={64}
+                      className="rounded-lg object-contain"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="logo-upload" className="cursor-pointer">
+                      <span className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent transition-colors">
+                        <Upload className="h-4 w-4" />
+                        {logoUploading ? "Wird hochgeladen…" : "Logo hochladen"}
+                      </span>
+                    </Label>
+                    <input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                      disabled={logoUploading}
+                    />
+                    {logoMessage && (
+                      <p className={`text-sm ${logoMessage.includes("gespeichert") ? "text-emerald-600" : "text-destructive"}`}>
+                        {logoMessage}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <SettingsSection
               icon={<BookOpen className="h-5 w-5" />}
