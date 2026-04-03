@@ -168,12 +168,12 @@ export function RevenueChart({ data }: RevenueChartProps) {
                 <Tooltip
                   formatter={(value) => currencyFormatter.format(Number(value))}
                   contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
+                    backgroundColor: "var(--color-card)",
+                    borderColor: "var(--color-border)",
                     borderRadius: "8px",
-                    color: "hsl(var(--card-foreground))",
+                    color: "var(--color-card-foreground)",
                   }}
-                  labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                  labelStyle={{ color: "var(--color-muted-foreground)" }}
                 />
                 <Legend />
                 {hasNegative && <ReferenceLine y={0} stroke="var(--border)" />}

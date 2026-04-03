@@ -42,12 +42,12 @@ export function LeadTrendChart({ data }: LeadTrendChartProps) {
                   formatter={(value) => [`${value} Leads`, "Neue Leads"]}
                   labelFormatter={(label) => `KW ab ${label}`}
                   contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
+                    backgroundColor: "var(--color-card)",
+                    borderColor: "var(--color-border)",
                     borderRadius: "8px",
-                    color: "hsl(var(--card-foreground))",
+                    color: "var(--color-card-foreground)",
                   }}
-                  labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                  labelStyle={{ color: "var(--color-muted-foreground)" }}
                 />
                 <Area
                   type="monotone"
