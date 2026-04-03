@@ -14,6 +14,7 @@ import { GewerbeartChart } from "@/components/dashboard/gewerbeart-chart";
 import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
 import { ReportButton } from "@/components/dashboard/report-button";
 import { MonthFilter } from "@/components/dashboard/month-filter";
+import { SmartInsights, type Insight } from "@/components/dashboard/smart-insights";
 
 type DateRange = { from: string; to: string } | null;
 
@@ -84,18 +85,6 @@ function getKpis(range: DateRange) {
     .where(and(sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`, baseFilter))
     .get();
 
-  const totalLeads = db
-    .select({ count: sql<number>`count(*)` })
-    .from(leads)
-    .where(baseFilter)
-    .get();
-
-  const wonLeads = db
-    .select({ count: sql<number>`count(*)` })
-    .from(leads)
-    .where(and(eq(leads.phase, "Abgeschlossen"), baseFilter))
-    .get();
-
   const totalRevenue = db
     .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
     .from(leads)
@@ -108,23 +97,10 @@ function getKpis(range: DateRange) {
     .where(baseFilter)
     .get();
 
-  const conversionRate =
-    totalLeads?.count && totalLeads.count > 0
-      ? ((wonLeads?.count || 0) / totalLeads.count) * 100
-      : 0;
-
-  const roi =
-    totalCosts?.total && totalCosts.total > 0
-      ? (((totalRevenue?.total || 0) - totalCosts.total) / totalCosts.total) * 100
-      : 0;
-
   return {
-    newLeads: totalLeads?.count || 0,
     openLeads: openLeads?.count || 0,
-    conversionRate: Math.round(conversionRate * 10) / 10,
     revenue: totalRevenue?.total || 0,
     costs: totalCosts?.total || 0,
-    roi: Math.round(roi * 10) / 10,
   };
 }
 
@@ -266,6 +242,106 @@ function getRecentActivity() {
     .all();
 }
 
+function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight[] {
+  const insights: Insight[] = [];
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Leads ohne Aktivitaet seit >7 Tagen (nicht abgeschlossen/verloren, nicht reklamiert)
+  const staleLeads = db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(
+      sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
+        AND ${leads.reklamiertAt} IS NULL
+        AND ${leads.updatedAt} < ${sevenDaysAgo}`
+    )
+    .get();
+
+  if (staleLeads && staleLeads.count > 0) {
+    insights.push({
+      type: "warning",
+      icon: "clock",
+      text: `${staleLeads.count} Lead${staleLeads.count > 1 ? "s" : ""} warten seit \u00fcber 7 Tagen auf Kontakt`,
+      href: "/pipeline",
+    });
+  }
+
+  // Ueberfaellige Folgetermine
+  const overdueFollowups = db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(
+      sql`${leads.folgetermin} IS NOT NULL
+        AND ${leads.folgetermin} < ${nowIso}
+        AND ${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
+        AND ${leads.reklamiertAt} IS NULL`
+    )
+    .get();
+
+  if (overdueFollowups && overdueFollowups.count > 0) {
+    insights.push({
+      type: "danger",
+      icon: "clipboard",
+      text: `${overdueFollowups.count} \u00fcberf\u00e4llige${overdueFollowups.count > 1 ? " Folgetermine" : "r Folgetermin"}`,
+      href: "/pipeline",
+    });
+  }
+
+  // Restliches Budget diesen Monat
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonth = leadBudget.months.find((m) => m.month === currentMonthKey);
+  const nettoThisMonth = currentMonth?.netto ?? 0;
+  const remaining = leadBudget.budget - nettoThisMonth;
+
+  if (remaining > 0) {
+    insights.push({
+      type: "info",
+      icon: "package",
+      text: `Noch ${remaining} Lead${remaining > 1 ? "s" : ""} im Budget f\u00fcr diesen Monat`,
+    });
+  }
+
+  // Umsatz-Vergleich mit Vormonat
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+
+  const revenueThisMonth = db
+    .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
+    .from(leads)
+    .where(
+      sql`${leads.phase} = 'Abgeschlossen'
+        AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonthKey}
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+    )
+    .get();
+
+  const revenuePrevMonth = db
+    .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
+    .from(leads)
+    .where(
+      sql`${leads.phase} = 'Abgeschlossen'
+        AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${prevMonthKey}
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+    )
+    .get();
+
+  const revThis = revenueThisMonth?.total || 0;
+  const revPrev = revenuePrevMonth?.total || 0;
+
+  if (revPrev > 0 && revThis > revPrev) {
+    const pct = Math.round(((revThis - revPrev) / revPrev) * 100);
+    insights.push({
+      type: "success",
+      icon: "trending",
+      text: `Umsatz ${pct}% \u00fcber Vormonat`,
+    });
+  }
+
+  return insights.slice(0, 3);
+}
+
 function getLeadTrend() {
   // Leads pro Woche der letzten 8 Wochen
   const result = db
@@ -299,6 +375,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const kpis = getKpis(range);
   const wonLeads = getWonLeadsCount(range);
   const leadBudget = getLeadBudget();
+  const insights = getSmartInsights(leadBudget);
   const pipelineData = getPipelineData(range);
   const revenueData = getRevenueByMonth();
   const gewerbeartData = getGewerbeartData(range);
@@ -313,12 +390,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <KpiCards
           wonLeads={wonLeads}
           openLeads={kpis.openLeads}
-          conversionRate={kpis.conversionRate}
           revenue={kpis.revenue}
           costs={kpis.costs}
-          roi={kpis.roi}
           leadBudget={leadBudget}
         />
+        <SmartInsights insights={insights} />
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <RevenueChart data={revenueData} />
           <PipelineFunnel data={pipelineData} />

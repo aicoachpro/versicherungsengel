@@ -4,15 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  TrendingUp,
   Target,
   DollarSign,
-  BarChart3,
   Trophy,
   RefreshCw,
   Package,
   ChevronLeft,
   ChevronRight,
+  Rocket,
 } from "lucide-react";
 
 interface LeadBudgetMonth {
@@ -30,10 +29,8 @@ interface LeadBudgetData {
 interface KpiCardsProps {
   wonLeads: number;
   openLeads: number;
-  conversionRate: number;
   revenue: number;
   costs: number;
-  roi: number;
   leadBudget: LeadBudgetData;
 }
 
@@ -155,16 +152,34 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
   );
 }
 
-export function KpiCards({ wonLeads, openLeads, conversionRate, revenue, costs, roi, leadBudget }: KpiCardsProps) {
+export function KpiCards({ wonLeads, openLeads, revenue, costs, leadBudget }: KpiCardsProps) {
+  const allZero = wonLeads === 0 && openLeads === 0 && revenue === 0 && costs === 0;
+
+  if (allZero) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Rocket className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">Willkommen im Dashboard</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Importiere deinen ersten Lead um loszulegen.
+            </p>
+          </div>
+          <Link
+            href="/pipeline"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Zur Pipeline
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const cards = [
-    {
-      title: "Abschlüsse",
-      value: wonLeads.toString(),
-      icon: Trophy,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50 dark:bg-emerald-950/30",
-      href: "/pipeline?filter=abgeschlossen&scrollToPhase=Abgeschlossen",
-    },
     {
       title: "Offene Leads",
       value: openLeads.toString(),
@@ -174,25 +189,17 @@ export function KpiCards({ wonLeads, openLeads, conversionRate, revenue, costs, 
       href: "/pipeline?filter=offen&scrollToPhase=Termin%20eingegangen",
     },
     {
-      title: "Conversion",
-      value: `${conversionRate}%`,
-      icon: TrendingUp,
-      color: "text-indigo-600",
-      bg: "bg-indigo-50 dark:bg-indigo-950/30",
+      title: "Abschlüsse",
+      value: wonLeads.toString(),
+      icon: Trophy,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50 dark:bg-emerald-950/30",
       href: "/pipeline?filter=abgeschlossen&scrollToPhase=Abgeschlossen",
-    },
-    {
-      title: "ROI",
-      value: `${roi}%`,
-      icon: BarChart3,
-      color: "text-purple-600",
-      bg: "bg-purple-50 dark:bg-purple-950/30",
-      href: "/pipeline?scrollToPhase=Abgeschlossen",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map((card) => (
         <Link key={card.title} href={card.href}>
           <Card className="shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">

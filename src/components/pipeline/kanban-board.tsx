@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Trash2, GripVertical, CalendarDays, Bell, Archive } from "lucide-react";
+import { Trash2, GripVertical, CalendarDays, Bell, Archive, Inbox } from "lucide-react";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
 interface KanbanBoardProps {
@@ -80,6 +80,12 @@ export function KanbanBoard({
                 </Badge>
               </div>
               <div className="space-y-3 min-h-[200px] rounded-xl bg-muted/40 p-2 border border-border/50">
+                {phaseLeads.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/60">
+                    <Inbox className="h-6 w-6 mb-2" />
+                    <p className="text-xs text-center">Keine Leads in dieser Phase</p>
+                  </div>
+                )}
                 {phaseLeads.map((lead) => (
                   <Card
                     key={lead.id}

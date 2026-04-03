@@ -27,6 +27,11 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
         </p>
       </CardHeader>
       <CardContent>
+        {total === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Noch keine Daten vorhanden
+          </p>
+        ) : (
         <div className="space-y-3">
           {data.map((item) => {
             const colors = phaseColors[item.phase] || { bg: "bg-primary", text: "text-primary" };
@@ -57,6 +62,7 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
             );
           })}
         </div>
+        )}
       </CardContent>
     </Card>
   );
