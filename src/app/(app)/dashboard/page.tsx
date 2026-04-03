@@ -233,7 +233,7 @@ function getLeadTrend() {
       count: sql<number>`count(*)`,
     })
     .from(leads)
-    .where(sql`${leads.createdAt} >= date('now', '-8 weeks')`)
+    .where(sql`${leads.createdAt} >= date('now', '-56 days')`)
     .groupBy(sql`strftime('%Y-W%W', ${leads.createdAt})`)
     .orderBy(sql`strftime('%Y-W%W', ${leads.createdAt})`)
     .all();
