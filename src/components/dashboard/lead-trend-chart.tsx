@@ -41,6 +41,13 @@ export function LeadTrendChart({ data }: LeadTrendChartProps) {
                 <Tooltip
                   formatter={(value) => [`${value} Leads`, "Neue Leads"]}
                   labelFormatter={(label) => `KW ab ${label}`}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    borderColor: "hsl(var(--border))",
+                    borderRadius: "8px",
+                    color: "hsl(var(--card-foreground))",
+                  }}
+                  labelStyle={{ color: "hsl(var(--muted-foreground))" }}
                 />
                 <Area
                   type="monotone"
