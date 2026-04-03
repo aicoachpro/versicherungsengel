@@ -339,7 +339,79 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     });
   }
 
-  return insights.slice(0, 3);
+  // Bester Monat (nur wenn 2+ Monate mit Umsatz vorhanden)
+  const revenueByMonth = db
+    .select({
+      month: sql<string>`strftime('%Y-%m', ${leads.eingangsdatum})`,
+      revenue: sql<number>`coalesce(sum(${leads.umsatz}), 0)`,
+    })
+    .from(leads)
+    .where(
+      sql`${leads.phase} = 'Abgeschlossen'
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+    )
+    .groupBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
+    .all()
+    .filter((r) => r.month != null && r.revenue > 0);
+
+  if (revenueByMonth.length >= 2) {
+    const best = revenueByMonth.reduce((a, b) => (b.revenue > a.revenue ? b : a));
+    const monthNames: Record<string, string> = {
+      "01": "Januar", "02": "Februar", "03": "M\u00e4rz", "04": "April",
+      "05": "Mai", "06": "Juni", "07": "Juli", "08": "August",
+      "09": "September", "10": "Oktober", "11": "November", "12": "Dezember",
+    };
+    const monthName = monthNames[best.month.split("-")[1]] || best.month;
+    insights.push({
+      type: "success",
+      icon: "trending",
+      text: `Dein bester Monat: ${monthName} mit ${best.revenue}\u20ac Umsatz`,
+    });
+  }
+
+  // Conversion Hint: Leads im Angebotsstatus
+  const angebotLeads = db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(
+      sql`${leads.phase} = 'Angebot erstellt'
+        AND ${leads.reklamiertAt} IS NULL`
+    )
+    .get();
+
+  if (angebotLeads && angebotLeads.count > 0) {
+    insights.push({
+      type: "info",
+      icon: "clipboard",
+      text: `${angebotLeads.count} Lead${angebotLeads.count > 1 ? "s" : ""} im Angebotsstatus \u2014 dranbleiben!`,
+      href: "/pipeline",
+    });
+  }
+
+  // Winning Streak: 2+ Abschl\u00fcsse diesen Monat
+  const winsThisMonth = db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(
+      sql`${leads.phase} = 'Abgeschlossen'
+        AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonthKey}
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+    )
+    .get();
+
+  if (winsThisMonth && winsThisMonth.count >= 2) {
+    insights.push({
+      type: "success",
+      icon: "trending",
+      text: `Schon ${winsThisMonth.count} Abschl\u00fcsse diesen Monat \u2014 weiter so!`,
+    });
+  }
+
+  // Priorisierung: danger > warning > success > info, max 4
+  const priorityOrder: Record<Insight["type"], number> = { danger: 0, warning: 1, success: 2, info: 3 };
+  insights.sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type]);
+
+  return insights.slice(0, 4);
 }
 
 function getLeadTrend() {

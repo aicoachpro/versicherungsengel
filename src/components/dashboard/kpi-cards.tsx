@@ -137,15 +137,30 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
               <ChevronRight className="h-3 w-3 text-muted-foreground" />
             </button>
           </div>
-          <p className="text-lg font-bold tracking-tight sm:text-2xl">
-            {netto}
-            <span className="text-sm font-normal text-muted-foreground"> / {data.budget}</span>
-          </p>
-          {reklamiert > 0 && (
-            <p className="text-[10px] text-muted-foreground sm:text-xs">
-              {total} eingeg. · {reklamiert} rekl.
-            </p>
-          )}
+          {(() => {
+            const ratio = data.budget > 0 ? netto / data.budget : 0;
+            const pct = Math.min(ratio * 100, 100);
+            const barColor =
+              ratio > 0.9
+                ? "bg-red-500"
+                : ratio > 0.7
+                  ? "bg-amber-500"
+                  : "bg-emerald-500";
+            return (
+              <>
+                <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+                  {netto} von {data.budget}
+                  {reklamiert > 0 && ` · ${reklamiert} reklamiert`}
+                </p>
+              </>
+            );
+          })()}
         </div>
       </CardContent>
     </Card>

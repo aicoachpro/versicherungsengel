@@ -48,6 +48,11 @@ import {
   MessageSquare,
   Paperclip,
   Unlink,
+  Clock,
+  PhoneCall,
+  MapPin,
+  Linkedin,
+  MoreHorizontal,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -144,6 +149,40 @@ const kontaktartIcons: Record<string, string> = {
   "LinkedIn": "💼",
   "Sonstiges": "📝",
 };
+
+const kontaktartColors: Record<string, { dot: string; bg: string; text: string; icon: typeof PhoneCall }> = {
+  "Telefon":   { dot: "bg-blue-500",   bg: "bg-blue-50",   text: "text-blue-700",   icon: PhoneCall },
+  "E-Mail":    { dot: "bg-amber-500",  bg: "bg-amber-50",  text: "text-amber-700",  icon: Mail },
+  "WhatsApp":  { dot: "bg-green-500",  bg: "bg-green-50",  text: "text-green-700",  icon: MessageSquare },
+  "Vor-Ort":   { dot: "bg-purple-500", bg: "bg-purple-50", text: "text-purple-700", icon: MapPin },
+  "LinkedIn":  { dot: "bg-sky-500",    bg: "bg-sky-50",    text: "text-sky-700",    icon: Linkedin },
+  "Sonstiges": { dot: "bg-gray-400",   bg: "bg-gray-50",   text: "text-gray-600",   icon: MoreHorizontal },
+};
+
+function relativeTime(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffD = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return "gerade eben";
+  if (diffMin < 60) return `vor ${diffMin} Min.`;
+  if (diffH < 24) return `vor ${diffH} Std.`;
+  if (diffD === 0) return "heute";
+  if (diffD === 1) return "gestern";
+  if (diffD < 7) return `vor ${diffD} Tagen`;
+  if (diffD < 30) {
+    const weeks = Math.floor(diffD / 7);
+    return `vor ${weeks} ${weeks === 1 ? "Woche" : "Wochen"}`;
+  }
+  if (diffD < 365) {
+    const months = Math.floor(diffD / 30);
+    return `vor ${months} ${months === 1 ? "Monat" : "Monaten"}`;
+  }
+  return new Date(dateStr).toLocaleDateString("de-DE");
+}
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -847,6 +886,61 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Aktivitäten-Verlauf Timeline */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-lg">Aktivitaeten-Verlauf</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {aktivitaeten.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Noch keine Aktivitaeten erfasst</p>
+              </div>
+            ) : (
+              <div className="relative pl-6">
+                {/* Vertical line */}
+                <div className="absolute left-[9px] top-1 bottom-1 w-px bg-border" />
+                <div className="space-y-4">
+                  {[...aktivitaeten]
+                    .sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
+                    .map((a) => {
+                      const cfg = kontaktartColors[a.kontaktart] || kontaktartColors["Sonstiges"];
+                      const IconComp = cfg.icon;
+                      return (
+                        <div key={a.id} className="relative flex gap-3 items-start">
+                          {/* Dot */}
+                          <div className={`absolute -left-6 top-1 h-[18px] w-[18px] rounded-full border-2 border-background ${cfg.dot} flex items-center justify-center`}>
+                            <IconComp className="h-2.5 w-2.5 text-white" />
+                          </div>
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.text}`}>
+                                {a.kontaktart}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {relativeTime(a.datum)}
+                              </span>
+                            </div>
+                            {a.notiz && (
+                              <p className="text-sm text-foreground/80 mt-1 whitespace-pre-wrap leading-relaxed">
+                                {a.notiz}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             )}
           </CardContent>
