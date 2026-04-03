@@ -118,7 +118,7 @@ function getRevenueByMonth() {
     .where(notGenehmigtReklamiert)
     .groupBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .orderBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
-    .limit(6)
+    .limit(12)
     .all();
 
   const monthNames: Record<string, string> = {
@@ -131,8 +131,10 @@ function getRevenueByMonth() {
     .filter((r) => r.month != null)
     .map((r) => ({
       month: monthNames[r.month.split("-")[1]] || r.month,
+      rawMonth: r.month,
       umsatz: r.revenue,
       kosten: r.costs,
+      ueberschuss: r.revenue - r.costs,
     }));
 }
 
