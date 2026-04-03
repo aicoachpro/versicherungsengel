@@ -80,7 +80,7 @@ function queryTopLeads(month: number, year: number, limit = 5) {
     .all();
 }
 
-const MONTH_NAMES = ["Januar", "Februar", "Maerz", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
 export async function GET(req: NextRequest) {
   const session = await auth();
