@@ -72,7 +72,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl shadow-black/[0.06]">
         <CardHeader className="space-y-4 pb-2 text-center">
           <Image
-            src="/logo.png"
+            src={branding.logo}
             alt={branding.companyName}
             width={80}
             height={80}

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr:*)",
+      "mcp__obsidian__search_notes",
+      "mcp__obsidian__patch_note",
+      "mcp__obsidian__get_frontmatter",
+      "mcp__obsidian__update_frontmatter",
+      "Read(//Users/togglodyte/claude code/Superchat/**)",
+      "Read(//Users/togglodyte/claude code/daily_crm/src/lib/**)",
+      "Read(//Users/togglodyte/claude code/daily_crm/src/**)",
+      "WebFetch(domain:developers.superchat.com)",
+      "WebSearch",
+      "Bash(npm run:*)",
+      "Read(//Users/togglodyte/claude code/daily_crm/**)",
+      "mcp__claude_ai_Linear__save_comment",
+      "Bash(pkill -f \"next dev --port 3333\")",
+      "mcp__obsidian__list_all_tags",
+      "Bash(npm test:*)",
+      "Bash(npx tsx:*)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

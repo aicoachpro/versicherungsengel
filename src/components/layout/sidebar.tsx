@@ -99,7 +99,7 @@ export function Sidebar() {
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
-        <Image src="/logo.png" alt="Logo" width={28} height={28} className="rounded" />
+        <Image src={branding.logo} alt="Logo" width={28} height={28} className="rounded" />
         <span className="text-sm font-semibold tracking-tight">{branding.companyName}</span>
       </div>
 
@@ -121,7 +121,7 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
           <Image
-            src="/logo.png"
+            src={branding.logo}
             alt={branding.companyName}
             width={36}
             height={36}

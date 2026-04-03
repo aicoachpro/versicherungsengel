@@ -7,6 +7,7 @@ const ENV_FALLBACKS: Record<string, () => string> = {
   "company.name": () => process.env.COMPANY_NAME || "Sales Hub",
   "company.subtitle": () => process.env.COMPANY_SUBTITLE || "",
   "company.color": () => process.env.COMPANY_COLOR || "#003781",
+  "company.logo": () => "",
   "obsidian.vaultPath": () => "",
   "obsidian.reportFolder": () => "",
   "pushover.userKey": () => process.env.PUSHOVER_USER_KEY || "",
