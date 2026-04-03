@@ -8,8 +8,35 @@ import { toast } from "sonner";
 
 export function ReportButton() {
   const searchParams = useSearchParams();
+  const [loadingPdf, setLoadingPdf] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [loadingMonth, setLoadingMonth] = useState(false);
+
+  const handlePdfDownload = async () => {
+    setLoadingPdf(true);
+    const month = searchParams.get("month") || new Date().getMonth() + 1;
+    const year = searchParams.get("year") || new Date().getFullYear();
+    const url = `/api/reports/pdf?month=${month}&year=${year}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("PDF-Generierung fehlgeschlagen");
+
+      const blob = await res.blob();
+      const filename = res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1]
+        || `report-${year}-${String(month).toString().padStart(2, "0")}.pdf`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast.success(`${filename} heruntergeladen`);
+    } catch {
+      toast.error("PDF-Export fehlgeschlagen");
+    } finally {
+      setLoadingPdf(false);
+    }
+  };
 
   const handleExport = async (type: "monthly" | "weekly") => {
     const setLoading = type === "weekly" ? setLoadingWeek : setLoadingMonth;
@@ -24,7 +51,6 @@ export function ReportButton() {
       const contentType = res.headers.get("content-type") || "";
 
       if (contentType.includes("application/json")) {
-        // Vault write response
         const data = await res.json();
         if (data.ok) {
           toast.success(`Report ins Vault geschrieben: ${data.filename}`);
@@ -32,7 +58,6 @@ export function ReportButton() {
           toast.error("Fehler beim Schreiben ins Vault");
         }
       } else {
-        // Download response
         const blob = await res.blob();
         const filename = res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1]
           || `report-${type}.md`;
@@ -56,9 +81,10 @@ export function ReportButton() {
         variant="outline"
         size="sm"
         className="gap-2"
-        onClick={() => window.open("/api/reports/pdf", "_blank")}
+        disabled={loadingPdf}
+        onClick={handlePdfDownload}
       >
-        <Download className="h-4 w-4" />
+        {loadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         <span className="hidden sm:inline">PDF</span>
       </Button>
       <Button

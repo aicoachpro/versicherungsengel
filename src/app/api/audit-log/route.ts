@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { auditLogs, users } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, like, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 async function requireAdmin() {
@@ -24,12 +24,35 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(Number(searchParams.get("limit") || 100), 500);
   const offset = Number(searchParams.get("offset") || 0);
   const entity = searchParams.get("entity");
+  const action = searchParams.get("action");
+  const search = searchParams.get("search");
 
-  const logs = entity
+  // Filter zusammenbauen
+  const conditions = [];
+  if (entity) {
+    conditions.push(eq(auditLogs.entity, entity as "lead" | "insurance" | "activity" | "document" | "user"));
+  }
+  if (action) {
+    conditions.push(eq(auditLogs.action, action as "create" | "update" | "delete" | "archive" | "restore"));
+  }
+  if (search) {
+    const term = `%${search}%`;
+    conditions.push(
+      or(
+        like(auditLogs.userName, term),
+        like(auditLogs.entityName, term),
+        like(auditLogs.changes, term),
+      )!,
+    );
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const logs = where
     ? db
         .select()
         .from(auditLogs)
-        .where(eq(auditLogs.entity, entity as "lead" | "insurance" | "activity" | "document" | "user"))
+        .where(where)
         .orderBy(desc(auditLogs.createdAt))
         .limit(limit)
         .offset(offset)
@@ -42,10 +65,16 @@ export async function GET(req: NextRequest) {
         .offset(offset)
         .all();
 
-  const total = db
-    .select({ count: sql<number>`count(*)` })
-    .from(auditLogs)
-    .get();
+  const totalResult = where
+    ? db
+        .select({ count: sql<number>`count(*)` })
+        .from(auditLogs)
+        .where(where)
+        .get()
+    : db
+        .select({ count: sql<number>`count(*)` })
+        .from(auditLogs)
+        .get();
 
-  return NextResponse.json({ logs, total: total?.count || 0 });
+  return NextResponse.json({ logs, total: totalResult?.count || 0 });
 }
