@@ -160,6 +160,37 @@ export const leadProviders = sqliteTable("lead_providers", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
+export const emailAccounts = sqliteTable("email_accounts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  imapHost: text("imap_host").notNull(),
+  imapPort: integer("imap_port").notNull().default(993),
+  useSsl: integer("use_ssl", { mode: "boolean" }).notNull().default(true),
+  username: text("username").notNull(),
+  password: text("password").notNull(),
+  folder: text("folder").notNull().default("INBOX"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  lastPolledAt: text("last_polled_at"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const inboundEmails = sqliteTable("inbound_emails", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  accountId: integer("account_id").notNull(),
+  messageId: text("message_id").notNull(),
+  fromAddress: text("from_address").notNull(),
+  fromName: text("from_name"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  htmlBody: text("html_body"),
+  receivedAt: text("received_at").notNull(),
+  processedAt: text("processed_at"),
+  leadId: integer("lead_id"),
+  status: text("status").notNull().default("pending"),
+  errorMessage: text("error_message"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),

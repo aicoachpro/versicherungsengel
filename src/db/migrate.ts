@@ -136,6 +136,43 @@ try {
   console.log("Added 'provider_id' column to leads table");
 }
 
+// Create email_accounts table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS email_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    name TEXT NOT NULL,
+    imap_host TEXT NOT NULL,
+    imap_port INTEGER NOT NULL DEFAULT 993,
+    use_ssl INTEGER NOT NULL DEFAULT 1,
+    username TEXT NOT NULL,
+    password TEXT NOT NULL,
+    folder TEXT NOT NULL DEFAULT 'INBOX',
+    active INTEGER NOT NULL DEFAULT 1,
+    last_polled_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
+// Create inbound_emails table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS inbound_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    account_id INTEGER NOT NULL,
+    message_id TEXT NOT NULL,
+    from_address TEXT NOT NULL,
+    from_name TEXT,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    html_body TEXT,
+    received_at TEXT NOT NULL,
+    processed_at TEXT,
+    lead_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

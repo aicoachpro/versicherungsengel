@@ -37,6 +37,7 @@ import {
   Brain,
   CircleCheck,
   CircleX,
+  Inbox,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -601,6 +602,505 @@ function LeadProviderSection() {
   );
 }
 
+interface EmailAccount {
+  id: number;
+  name: string;
+  imapHost: string;
+  imapPort: number;
+  useSsl: boolean;
+  username: string;
+  password: string;
+  folder: string;
+  active: boolean;
+  lastPolledAt: string | null;
+  createdAt: string;
+}
+
+type EmailAccountForm = {
+  name: string;
+  imapHost: string;
+  imapPort: number;
+  useSsl: string;
+  username: string;
+  password: string;
+  folder: string;
+};
+
+const EMPTY_EMAIL_FORM: EmailAccountForm = {
+  name: "",
+  imapHost: "",
+  imapPort: 993,
+  useSsl: "true",
+  username: "",
+  password: "",
+  folder: "INBOX",
+};
+
+function EmailAccountDialog({
+  open,
+  onOpenChange,
+  initialData,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialData: EmailAccountForm;
+  onSave: (data: EmailAccountForm) => Promise<void>;
+}) {
+  const [form, setForm] = useState<EmailAccountForm>(initialData);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const isEdit = initialData.name !== "";
+
+  useEffect(() => {
+    if (open) {
+      setForm(initialData);
+      setError("");
+    }
+  }, [open, initialData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      setError("Name ist erforderlich");
+      return;
+    }
+    if (!form.imapHost.trim()) {
+      setError("IMAP-Host ist erforderlich");
+      return;
+    }
+    if (!form.username.trim()) {
+      setError("Benutzername ist erforderlich");
+      return;
+    }
+    if (!isEdit && !form.password.trim()) {
+      setError("Passwort ist erforderlich");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(form);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "E-Mail-Konto bearbeiten" : "E-Mail-Konto hinzufuegen"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Aendere die IMAP-Zugangsdaten."
+              : "Konfiguriere ein neues E-Mail-Konto fuer den Lead-Import."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Anzeigename *</Label>
+            <Input
+              placeholder="z.B. Lead-Postfach"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>IMAP-Host *</Label>
+              <Input
+                placeholder="z.B. imap.gmail.com"
+                value={form.imapHost}
+                onChange={(e) => setForm((p) => ({ ...p, imapHost: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>IMAP-Port</Label>
+              <Input
+                type="number"
+                min={1}
+                max={65535}
+                value={form.imapPort}
+                onChange={(e) => setForm((p) => ({ ...p, imapPort: parseInt(e.target.value) || 993 }))}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>SSL verwenden</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={form.useSsl}
+              onChange={(e) => setForm((p) => ({ ...p, useSsl: e.target.value }))}
+            >
+              <option value="true">Ja (empfohlen)</option>
+              <option value="false">Nein</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Benutzername / E-Mail *</Label>
+            <Input
+              placeholder="leads@firma.de"
+              value={form.username}
+              onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Passwort *</Label>
+            <Input
+              type="password"
+              placeholder={isEdit ? "Leer lassen = nicht aendern" : "IMAP-Passwort"}
+              value={form.password}
+              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+              required={!isEdit}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Ordner</Label>
+            <Input
+              placeholder="INBOX"
+              value={form.folder}
+              onChange={(e) => setForm((p) => ({ ...p, folder: e.target.value }))}
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? "Speichere..." : "Speichern"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EmailAccountSection() {
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editAccount, setEditAccount] = useState<EmailAccount | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [testingId, setTestingId] = useState<number | null>(null);
+  const [testResults, setTestResults] = useState<Record<number, { ok: boolean; error?: string }>>({});
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch("/api/email-accounts");
+      if (res.ok) {
+        const data = await res.json();
+        setAccounts(data);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleAdd = async (form: EmailAccountForm) => {
+    const res = await fetch("/api/email-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.name,
+        imapHost: form.imapHost,
+        imapPort: form.imapPort,
+        useSsl: form.useSsl === "true",
+        username: form.username,
+        password: form.password,
+        folder: form.folder || "INBOX",
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Anlegen");
+    }
+    await fetchAccounts();
+    showFeedback("success", "E-Mail-Konto hinzugefuegt");
+  };
+
+  const handleEdit = async (form: EmailAccountForm) => {
+    if (!editAccount) return;
+    const payload: Record<string, unknown> = {
+      name: form.name,
+      imapHost: form.imapHost,
+      imapPort: form.imapPort,
+      useSsl: form.useSsl === "true",
+      username: form.username,
+      folder: form.folder || "INBOX",
+    };
+    // Only send password if user entered a new one
+    if (form.password && form.password !== "********") {
+      payload.password = form.password;
+    }
+    const res = await fetch(`/api/email-accounts/${editAccount.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Speichern");
+    }
+    setEditAccount(null);
+    await fetchAccounts();
+    showFeedback("success", "E-Mail-Konto aktualisiert");
+  };
+
+  const handleDelete = async () => {
+    if (deleteId === null) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/email-accounts/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showFeedback("error", data.error || "Fehler beim Loeschen");
+      } else {
+        await fetchAccounts();
+        showFeedback("success", "E-Mail-Konto geloescht");
+      }
+    } catch {
+      showFeedback("error", "Verbindungsfehler");
+    } finally {
+      setDeleting(false);
+      setDeleteId(null);
+    }
+  };
+
+  const handleTest = async (id: number) => {
+    setTestingId(id);
+    setTestResults((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/email-accounts/${id}/test`, { method: "POST" });
+      const data = await res.json();
+      setTestResults((prev) => ({ ...prev, [id]: { ok: data.ok, error: data.error } }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [id]: { ok: false, error: "Verbindungsfehler" } }));
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const editFormData: EmailAccountForm = editAccount
+    ? {
+        name: editAccount.name,
+        imapHost: editAccount.imapHost,
+        imapPort: editAccount.imapPort,
+        useSsl: editAccount.useSsl ? "true" : "false",
+        username: editAccount.username,
+        password: "",
+        folder: editAccount.folder,
+      }
+    : EMPTY_EMAIL_FORM;
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Inbox className="h-5 w-5" />
+              E-Mail-Konten
+            </h3>
+            <Badge variant={accounts.length > 0 ? "default" : "secondary"}>
+              {accounts.length > 0 ? `${accounts.length} Konto${accounts.length > 1 ? "en" : ""}` : "Nicht konfiguriert"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            IMAP-Postfaecher fuer automatischen Lead-Import aus E-Mails.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {feedback && (
+            <p className={`text-sm ${feedback.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+              {feedback.message}
+            </p>
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Lade E-Mail-Konten...
+            </div>
+          ) : accounts.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Noch kein E-Mail-Konto konfiguriert
+              </p>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Konto hinzufuegen
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {accounts.map((a) => (
+                <div
+                  key={a.id}
+                  className="rounded-lg border p-4 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{a.name}</span>
+                        <Badge variant={a.active ? "default" : "secondary"} className="text-xs">
+                          {a.active ? "Aktiv" : "Inaktiv"}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>{a.imapHost}:{a.imapPort}</span>
+                        <span>{a.username}</span>
+                        <span>{a.folder}</span>
+                        {a.useSsl && <span>SSL</span>}
+                      </div>
+                      {a.lastPolledAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Letzter Abruf: {new Date(a.lastPolledAt).toLocaleString("de-DE")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditAccount(a)}
+                        title="Bearbeiten"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteId(a.id)}
+                        title="Loeschen"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Test connection */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-xs"
+                      onClick={() => handleTest(a.id)}
+                      disabled={testingId === a.id}
+                    >
+                      {testingId === a.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : null}
+                      {testingId === a.id ? "Teste..." : "Verbindung testen"}
+                    </Button>
+                    {testResults[a.id] && (
+                      <span className={`text-xs flex items-center gap-1 ${testResults[a.id].ok ? "text-emerald-600" : "text-destructive"}`}>
+                        {testResults[a.id].ok ? (
+                          <><CircleCheck className="h-3.5 w-3.5" /> Verbindung OK</>
+                        ) : (
+                          <><CircleX className="h-3.5 w-3.5" /> {testResults[a.id].error || "Fehlgeschlagen"}</>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && accounts.length > 0 && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Konto hinzufuegen
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add dialog */}
+      <EmailAccountDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        initialData={EMPTY_EMAIL_FORM}
+        onSave={handleAdd}
+      />
+
+      {/* Edit dialog */}
+      <EmailAccountDialog
+        open={editAccount !== null}
+        onOpenChange={(open) => { if (!open) setEditAccount(null); }}
+        initialData={editFormData}
+        onSave={handleEdit}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>E-Mail-Konto loeschen</DialogTitle>
+            <DialogDescription>
+              Soll das Konto &quot;{accounts.find((a) => a.id === deleteId)?.name}&quot; wirklich geloescht werden? Diese Aktion kann nicht rueckgaengig gemacht werden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="gap-2"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? "Loesche..." : "Loeschen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function AIBackendSection({
   settings,
   onSave,
@@ -1062,6 +1562,8 @@ export default function SettingsPage() {
             </Card>
 
             <LeadProviderSection />
+
+            <EmailAccountSection />
 
             <SettingsSection
               icon={<BookOpen className="h-5 w-5" />}

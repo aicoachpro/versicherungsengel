@@ -21,6 +21,7 @@ import {
   CalendarDays,
   ClipboardList,
   Upload,
+  Mail,
   MoreHorizontal,
   Sun,
   Moon,
@@ -38,6 +39,7 @@ const mainNav = [
   { href: "/archiv", label: "Archiv", icon: Archive },
   { href: "/reklamationen", label: "Reklamationen", icon: AlertTriangle },
   { href: "/import", label: "Lead-Import", icon: Upload },
+  { href: "/email-inbox", label: "E-Mail-Eingang", icon: Mail },
 ];
 
 const adminNav = [
