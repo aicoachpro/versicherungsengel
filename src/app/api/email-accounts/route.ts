@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users, emailAccounts } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { encrypt } from "@/lib/encryption";
 
 const PASSWORD_MASK = "********";
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       imapPort: body.imapPort ?? 993,
       useSsl: body.useSsl ?? true,
       username: body.username,
-      password: body.password,
+      password: encrypt(body.password),
       folder: body.folder ?? "INBOX",
       active: body.active ?? true,
     })

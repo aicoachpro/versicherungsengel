@@ -4,11 +4,10 @@ import { leads } from "@/db/schema";
 import { and, eq, lte, gte } from "drizzle-orm";
 import { sendPushoverNotification } from "@/lib/pushover";
 import { createNotification } from "@/lib/notifications";
+import { verifyCronAuth } from "@/lib/cron-auth";
 
 export async function GET(req: NextRequest) {
-  // Einfache Absicherung per Secret-Header oder Query-Param
-  const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+  if (!verifyCronAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

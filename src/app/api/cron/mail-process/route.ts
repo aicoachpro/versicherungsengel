@@ -3,10 +3,10 @@ import { db } from "@/db";
 import { leads, inboundEmails } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { extractLeadFromText } from "@/lib/ai-client";
+import { verifyCronAuth } from "@/lib/cron-auth";
 
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+  if (!verifyCronAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

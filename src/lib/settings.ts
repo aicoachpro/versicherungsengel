@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { encrypt, decrypt, isEncrypted } from "@/lib/encryption";
 
 // .env fallbacks — used when DB has no value
 const ENV_FALLBACKS: Record<string, () => string> = {
@@ -45,7 +46,13 @@ const SECRET_KEYS = new Set([
 export function getSetting(key: string): string {
   try {
     const row = db.select().from(settings).where(eq(settings.key, key)).get();
-    if (row && row.value !== "") return row.value;
+    if (row && row.value !== "") {
+      // Decrypt secret values stored encrypted in DB
+      if (SECRET_KEYS.has(key) && isEncrypted(row.value)) {
+        return decrypt(row.value);
+      }
+      return row.value;
+    }
   } catch {
     // Table may not exist yet (e.g. during Docker build) — fall through to env fallback
   }
@@ -96,15 +103,18 @@ export function getAllSettingsMasked(): Record<string, string> {
 }
 
 export function setSetting(key: string, value: string): void {
+  // Encrypt secret values before storing
+  const storedValue = SECRET_KEYS.has(key) && value ? encrypt(value) : value;
+
   const existing = db.select().from(settings).where(eq(settings.key, key)).get();
   if (existing) {
     db.update(settings)
-      .set({ value, updatedAt: new Date().toISOString() })
+      .set({ value: storedValue, updatedAt: new Date().toISOString() })
       .where(eq(settings.key, key))
       .run();
   } else {
     db.insert(settings)
-      .values({ key, value, updatedAt: new Date().toISOString() })
+      .values({ key, value: storedValue, updatedAt: new Date().toISOString() })
       .run();
   }
 }

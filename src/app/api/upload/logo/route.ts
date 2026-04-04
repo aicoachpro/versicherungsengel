@@ -4,7 +4,7 @@ import { setSetting } from "@/lib/settings";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
 
 export async function POST(req: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json(
-      { error: "Nur PNG, JPG, SVG und WebP erlaubt" },
+      { error: "Nur PNG, JPG und WebP erlaubt" },
       { status: 400 }
     );
   }

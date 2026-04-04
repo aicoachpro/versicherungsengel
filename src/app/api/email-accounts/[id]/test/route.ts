@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users, emailAccounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { decrypt } from "@/lib/encryption";
 import { ImapFlow } from "imapflow";
 
 async function requireAdmin() {
@@ -46,7 +47,7 @@ export async function POST(
       secure: account.useSsl,
       auth: {
         user: account.username,
-        pass: account.password,
+        pass: decrypt(account.password),
       },
       logger: false,
     });

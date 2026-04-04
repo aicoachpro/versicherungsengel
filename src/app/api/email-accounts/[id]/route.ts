@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users, emailAccounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { encrypt } from "@/lib/encryption";
 
 const PASSWORD_MASK = "********";
 
@@ -50,7 +51,7 @@ export async function PATCH(
   if (body.username !== undefined) updates.username = body.username;
   // Only update password if it's not the masked value
   if (body.password !== undefined && body.password !== PASSWORD_MASK) {
-    updates.password = body.password;
+    updates.password = encrypt(body.password);
   }
   if (body.folder !== undefined) updates.folder = body.folder;
   if (body.active !== undefined) updates.active = body.active;

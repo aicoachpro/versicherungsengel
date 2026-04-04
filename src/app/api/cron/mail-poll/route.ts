@@ -3,10 +3,11 @@ import { db } from "@/db";
 import { emailAccounts, inboundEmails } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { verifyCronAuth } from "@/lib/cron-auth";
+import { decrypt } from "@/lib/encryption";
 
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET && process.env.CRON_SECRET) {
+  if (!verifyCronAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
         secure: !!account.useSsl,
         auth: {
           user: account.username,
-          pass: account.password,
+          pass: decrypt(account.password),
         },
         logger: false,
       });
