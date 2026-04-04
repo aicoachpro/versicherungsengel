@@ -34,6 +34,9 @@ import {
   Pencil,
   Trash2,
   Plus,
+  Brain,
+  CircleCheck,
+  CircleX,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -598,6 +601,188 @@ function LeadProviderSection() {
   );
 }
 
+function AIBackendSection({
+  settings,
+  onSave,
+}: {
+  settings: SettingsMap;
+  onSave: (values: SettingsMap) => Promise<void>;
+}) {
+  const [backend, setBackend] = useState(settings["ai.backend"] || "anthropic");
+  const [localaiUrl, setLocalaiUrl] = useState(settings["ai.localaiUrl"] || "http://localhost:8080");
+  const [customUrl, setCustomUrl] = useState(settings["ai.customUrl"] || "");
+  const [customApiKey, setCustomApiKey] = useState(settings["ai.customApiKey"] || "");
+  const [model, setModel] = useState(settings["ai.model"] || "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+
+  useEffect(() => {
+    setBackend(settings["ai.backend"] || "anthropic");
+    setLocalaiUrl(settings["ai.localaiUrl"] || "http://localhost:8080");
+    setCustomUrl(settings["ai.customUrl"] || "");
+    setCustomApiKey(settings["ai.customApiKey"] || "");
+    setModel(settings["ai.model"] || "");
+  }, [settings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    setTestResult(null);
+    await onSave({
+      "ai.backend": backend,
+      "ai.localaiUrl": localaiUrl,
+      "ai.customUrl": customUrl,
+      "ai.customApiKey": customApiKey,
+      "ai.model": model,
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/ai/test", { method: "POST" });
+      const data = await res.json();
+      setTestResult({ ok: data.ok, error: data.error });
+    } catch {
+      setTestResult({ ok: false, error: "Verbindungsfehler" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const active = backend !== "" && backend !== "anthropic"
+    ? true
+    : !!settings["ai.backend"];
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            KI-Backend
+          </h3>
+          <Badge variant={active ? "default" : "secondary"}>
+            {backend === "anthropic" ? "Anthropic" : backend === "localai" ? "LocalAI" : backend === "custom" ? "Benutzerdefiniert" : "Nicht konfiguriert"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          KI-Anbieter für PDF-Import und Textanalyse. Standard: Anthropic (Claude).
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Backend</Label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            value={backend}
+            onChange={(e) => { setBackend(e.target.value); setTestResult(null); }}
+          >
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="localai">LocalAI (Lokal)</option>
+            <option value="custom">Benutzerdefiniert (OpenAI-kompatibel)</option>
+          </select>
+        </div>
+
+        {backend === "anthropic" && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950 p-3">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              API Key wird aus der Umgebungsvariable <code className="font-mono text-xs bg-blue-100 dark:bg-blue-900 px-1 rounded">ANTHROPIC_API_KEY</code> gelesen.
+            </p>
+          </div>
+        )}
+
+        {backend === "localai" && (
+          <div className="space-y-2">
+            <Label>LocalAI URL</Label>
+            <Input
+              placeholder="http://localhost:8080"
+              value={localaiUrl}
+              onChange={(e) => setLocalaiUrl(e.target.value)}
+            />
+          </div>
+        )}
+
+        {backend === "custom" && (
+          <>
+            <div className="space-y-2">
+              <Label>API URL</Label>
+              <Input
+                placeholder="https://api.example.com"
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>API Key</Label>
+              <Input
+                type="password"
+                placeholder="sk-..."
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+                onFocus={(e) => {
+                  const val = e.target.value;
+                  if (val.includes("...") && val.length <= 10) {
+                    setCustomApiKey("");
+                  }
+                }}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-2">
+          <Label>Modell (optional)</Label>
+          <Input
+            placeholder="Standard-Modell verwenden"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Leer lassen für das Standard-Modell des Backends.
+          </p>
+        </div>
+
+        {testResult && (
+          <div
+            className={`rounded-lg border p-3 flex items-center gap-2 ${
+              testResult.ok
+                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950"
+                : "border-destructive/50 bg-destructive/10"
+            }`}
+          >
+            {testResult.ok ? (
+              <CircleCheck className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <CircleX className="h-5 w-5 text-destructive" />
+            )}
+            <span className={`text-sm ${testResult.ok ? "text-emerald-800 dark:text-emerald-200" : "text-destructive"}`}>
+              {testResult.ok ? "Verbindung erfolgreich!" : `Fehler: ${testResult.error || "Verbindung fehlgeschlagen"}`}
+            </span>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
+            {saving ? "Speichere..." : saved ? "Gespeichert" : "Speichern"}
+          </Button>
+          <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2">
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {testing ? "Teste..." : "Verbindung testen"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
@@ -904,6 +1089,8 @@ export default function SettingsPage() {
               settings={settings}
               onSave={saveSection}
             />
+
+            <AIBackendSection settings={settings} onSave={saveSection} />
 
             <SettingsSection
               icon={<Mail className="h-5 w-5" />}

@@ -25,6 +25,11 @@ const ENV_FALLBACKS: Record<string, () => string> = {
   "leadProvider.billingModel": () => "prepaid",
   "leadProvider.carryOver": () => "true",
   "leadProvider.startMonth": () => "",
+  "ai.backend": () => process.env.AI_BACKEND || "anthropic",
+  "ai.localaiUrl": () => process.env.AI_LOCALAI_URL || "http://localhost:8080",
+  "ai.customUrl": () => process.env.AI_CUSTOM_URL || "",
+  "ai.customApiKey": () => process.env.AI_CUSTOM_API_KEY || "",
+  "ai.model": () => process.env.AI_MODEL || "",
 };
 
 // Keys that contain secrets — masked on GET
@@ -34,6 +39,7 @@ const SECRET_KEYS = new Set([
   "telegram.botToken",
   "email.resendApiKey",
   "superchat.apiKey",
+  "ai.customApiKey",
 ]);
 
 export function getSetting(key: string): string {
