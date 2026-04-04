@@ -32,6 +32,17 @@ interface LeadProvider {
   name: string;
 }
 
+interface LeadProduct {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+interface AppUser {
+  id: number;
+  name: string;
+}
+
 const GEWERBEARTEN = ["hauptberuflich", "nebenberuflich"];
 const FOLGETERMIN_TYPEN = ["Nachfassen", "Cross-Selling", "Beratung", "Angebot nachfassen", "Sonstiges"];
 
@@ -45,6 +56,8 @@ const UMSATZKLASSEN = ["<1 Mio", "1–5 Mio", "5–20 Mio", "20–100 Mio", ">10
 
 export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps) {
   const [providers, setProviders] = useState<LeadProvider[]>([]);
+  const [products, setProducts] = useState<LeadProduct[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [form, setForm] = useState({
     name: "",
     ansprechpartner: "",
@@ -66,6 +79,8 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     naechsterSchritt: "",
     notizen: "",
     providerId: "",
+    assignedTo: "",
+    productId: "",
   });
 
   // Aktive Lead-Provider laden
@@ -74,6 +89,14 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setProviders(data))
       .catch(() => setProviders([]));
+    fetch("/api/lead-products?active=true")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setProducts(data))
+      .catch(() => setProducts([]));
+    fetch("/api/users")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setUsers(Array.isArray(data) ? data : data.users || []))
+      .catch(() => setUsers([]));
   }, [open]);
 
   useEffect(() => {
@@ -99,6 +122,8 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         naechsterSchritt: lead.naechsterSchritt || "",
         notizen: lead.notizen || "",
         providerId: lead.providerId ? String(lead.providerId) : "",
+        assignedTo: lead.assignedTo ? String(lead.assignedTo) : "",
+        productId: lead.productId ? String(lead.productId) : "",
       });
     } else {
       setForm({
@@ -110,6 +135,8 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         terminKosten: "320", umsatz: "",
         naechsterSchritt: "", notizen: "",
         providerId: "",
+        assignedTo: "",
+        productId: "",
       });
     }
   }, [lead, open]);
@@ -137,6 +164,8 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       naechsterSchritt: form.naechsterSchritt || null,
       notizen: form.notizen || null,
       providerId: form.providerId ? Number(form.providerId) : null,
+      assignedTo: form.assignedTo ? Number(form.assignedTo) : null,
+      productId: form.productId ? Number(form.productId) : null,
     });
   };
 
@@ -147,6 +176,40 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
           <DialogTitle>{lead ? "Lead bearbeiten" : "Neuer Lead"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {users.length > 0 && (
+              <div className="space-y-2">
+                <Label>Bearbeiter</Label>
+                <Select
+                  value={form.assignedTo}
+                  onValueChange={(v) => setForm({ ...form, assignedTo: v ?? "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Nicht zugewiesen" /></SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {products.length > 0 && (
+              <div className="space-y-2">
+                <Label>Lead-Produkt</Label>
+                <Select
+                  value={form.productId}
+                  onValueChange={(v) => setForm({ ...form, productId: v ?? "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Kein Produkt" /></SelectTrigger>
+                  <SelectContent>
+                    {products.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
           {providers.length > 0 && (
             <div className="space-y-2">
               <Label>Anbieter</Label>

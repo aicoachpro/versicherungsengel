@@ -6,11 +6,30 @@ import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { createNotification } from "@/lib/notifications";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const allLeads = db.select().from(leads).orderBy(sql`${leads.updatedAt} DESC`).all();
+  const userRole = (session.user as { role?: string })?.role || "user";
+  const currentUserId = session.user?.id ? parseInt(session.user.id) : null;
+  const { searchParams } = new URL(req.url);
+  const showAll = searchParams.get("showAll");
+
+  // Admin sieht standardmaessig alle; normale User nur eigene + unzugewiesene
+  const isAdmin = userRole === "admin";
+  const shouldFilter = !isAdmin || showAll === "0";
+
+  let allLeads;
+  if (shouldFilter && currentUserId !== null) {
+    allLeads = db
+      .select()
+      .from(leads)
+      .where(sql`(${leads.assignedTo} = ${currentUserId} OR ${leads.assignedTo} IS NULL)`)
+      .orderBy(sql`${leads.updatedAt} DESC`)
+      .all();
+  } else {
+    allLeads = db.select().from(leads).orderBy(sql`${leads.updatedAt} DESC`).all();
+  }
   return NextResponse.json(allLeads);
 }
 
@@ -39,6 +58,8 @@ export async function POST(req: NextRequest) {
     eingangsdatum: body.eingangsdatum || new Date().toISOString().split("T")[0],
     folgetermin: body.folgetermin || null,
     providerId: body.providerId || null,
+    assignedTo: body.assignedTo || null,
+    productId: body.productId || null,
   }).returning().get();
 
   const { userId, userName } = getAuditUser(session);

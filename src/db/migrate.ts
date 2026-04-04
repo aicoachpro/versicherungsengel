@@ -173,6 +173,67 @@ sqlite.prepare(`
   )
 `).run();
 
+// Create lead_products table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS lead_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
+// Seed lead products if empty
+const existingLeadProducts = sqlite.prepare("SELECT id FROM lead_products LIMIT 1").get();
+if (!existingLeadProducts) {
+  const leadProductSeeds = [
+    ["Beratung", 1], ["Betriebshaftpflicht", 2], ["Finanzierung", 3],
+    ["Firmenrechtsschutzversicherung", 4], ["Firmenversicherung", 5],
+    ["Flottenversicherung", 6], ["Haftpflichtversicherung", 7],
+    ["Hausratversicherung", 8], ["Hundeversicherung", 9],
+    ["KFZ-Versicherung", 10], ["Krankenzusatzversicherung", 11],
+    ["Pferdeversicherung", 12], ["Rechtsschutzversicherung", 13],
+    ["Sterbegeldversicherung", 14], ["Unfallversicherung", 15],
+    ["Vermögensschadenhaftpflicht", 16], ["Wohngebäudeversicherung", 17],
+    ["Zahnzusatzversicherung", 18], ["Private Krankenversicherung", 19],
+    ["Private Pflegeversicherung", 20],
+    ["Firmeninhaltsversicherung", 21],
+    ["Cyberschutzversicherung", 22],
+  ];
+  const insertLeadProduct = sqlite.prepare(
+    "INSERT INTO lead_products (name, sort_order) VALUES (?, ?)"
+  );
+  for (const [name, order] of leadProductSeeds) {
+    insertLeadProduct.run(name, order);
+  }
+  console.log(`Seeded ${leadProductSeeds.length} lead products`);
+}
+
+// Create provider_products junction table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS provider_products (
+    provider_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL
+  )
+`).run();
+
+// Add assigned_to column to leads if not exists
+try {
+  sqlite.prepare("SELECT assigned_to FROM leads LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE leads ADD COLUMN assigned_to INTEGER").run();
+  console.log("Added 'assigned_to' column to leads table");
+}
+
+// Add product_id column to leads if not exists
+try {
+  sqlite.prepare("SELECT product_id FROM leads LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE leads ADD COLUMN product_id INTEGER").run();
+  console.log("Added 'product_id' column to leads table");
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

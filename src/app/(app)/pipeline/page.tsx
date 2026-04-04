@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Header } from "@/components/layout/header";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { LeadDialog } from "@/components/pipeline/lead-dialog";
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, Users, User } from "lucide-react";
 import { toast } from "sonner";
 
 export interface Lead {
@@ -46,6 +47,8 @@ export interface Lead {
   reklamiertAt: string | null;
   archivedAt: string | null;
   providerId: number | null;
+  assignedTo: number | null;
+  productId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +74,9 @@ export default function PipelinePage() {
 
 function PipelineContent() {
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const [showAll, setShowAll] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -113,9 +119,10 @@ function PipelineContent() {
   }, [searchParams]);
 
   const fetchLeads = useCallback(async () => {
-    const res = await fetch("/api/leads");
+    const url = isAdmin && !showAll ? "/api/leads?showAll=0" : "/api/leads";
+    const res = await fetch(url);
     if (res.ok) setLeads(await res.json());
-  }, []);
+  }, [isAdmin, showAll]);
 
   useEffect(() => {
     fetchLeads();
@@ -211,6 +218,17 @@ function PipelineContent() {
       <Header title="Sales Pipeline" />
       <div className="flex items-center justify-between px-6 py-4 gap-4">
         <div className="flex items-center gap-4 flex-1">
+          {isAdmin && (
+            <Button
+              variant={showAll ? "outline" : "default"}
+              size="sm"
+              className="gap-1 h-9"
+              onClick={() => setShowAll((v) => !v)}
+            >
+              {showAll ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+              {showAll ? "Alle" : "Meine"}
+            </Button>
+          )}
           <p className="text-sm text-muted-foreground whitespace-nowrap">
             {activeFilter ? `${filteredLeads.length} von ${activeCount}` : `${activeCount}`} Leads aktiv
           </p>

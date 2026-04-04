@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, leadProviders } from "@/db/schema";
+import { users, leadProviders, providerProducts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
@@ -50,18 +50,45 @@ export async function PATCH(
   if (body.startMonth !== undefined) updates.startMonth = body.startMonth;
   if (body.active !== undefined) updates.active = body.active;
 
-  if (Object.keys(updates).length === 0) {
+  // Update provider-products junction if productIds provided
+  if (Array.isArray(body.productIds)) {
+    // Delete existing links
+    db.delete(providerProducts)
+      .where(eq(providerProducts.providerId, providerId))
+      .run();
+    // Insert new links
+    for (const pid of body.productIds) {
+      db.insert(providerProducts)
+        .values({ providerId, productId: pid })
+        .run();
+    }
+  }
+
+  if (Object.keys(updates).length === 0 && !Array.isArray(body.productIds)) {
     return NextResponse.json({ error: "Keine Änderungen" }, { status: 400 });
   }
 
-  const result = db
-    .update(leadProviders)
-    .set(updates)
-    .where(eq(leadProviders.id, providerId))
-    .returning()
-    .get();
+  let result = existing;
+  if (Object.keys(updates).length > 0) {
+    result = db
+      .update(leadProviders)
+      .set(updates)
+      .where(eq(leadProviders.id, providerId))
+      .returning()
+      .get();
+  }
 
-  return NextResponse.json(result);
+  // Return with productIds
+  const links = db
+    .select()
+    .from(providerProducts)
+    .where(eq(providerProducts.providerId, providerId))
+    .all();
+
+  return NextResponse.json({
+    ...result,
+    productIds: links.map((l) => l.productId),
+  });
 }
 
 export async function DELETE(

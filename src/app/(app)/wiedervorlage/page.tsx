@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ import {
   CheckCircle2,
   MessageSquare,
   ExternalLink,
+  Users,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -65,6 +68,9 @@ const KONTAKTARTEN = ["Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "S
 
 export default function WiedervorlagePage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const [showAll, setShowAll] = useState(true);
   const [items, setItems] = useState<WiedervorlageItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,8 +90,9 @@ export default function WiedervorlagePage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    const leadsUrl = isAdmin && !showAll ? "/api/leads?showAll=0" : "/api/leads";
     const [leadsRes, activitiesRes] = await Promise.all([
-      fetch("/api/leads"),
+      fetch(leadsUrl),
       fetch("/api/activities"),
     ]);
     if (!leadsRes.ok || !activitiesRes.ok) {
@@ -176,7 +183,7 @@ export default function WiedervorlagePage() {
 
     setItems(result);
     setLoading(false);
-  }, []);
+  }, [isAdmin, showAll]);
 
   useEffect(() => {
     loadData();
@@ -240,6 +247,19 @@ export default function WiedervorlagePage() {
       <Header title="Wiedervorlage" />
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4">
         {/* Stats */}
+        <div className="flex items-center gap-4 text-sm">
+          {isAdmin && (
+            <Button
+              variant={showAll ? "outline" : "default"}
+              size="sm"
+              className="gap-1"
+              onClick={() => setShowAll((v) => !v)}
+            >
+              {showAll ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+              {showAll ? "Alle" : "Meine"}
+            </Button>
+          )}
+        </div>
         {!loading && items.length > 0 && (
           <div className="flex items-center gap-4 text-sm">
             <span className="text-muted-foreground">{items.length} Leads brauchen Aufmerksamkeit</span>

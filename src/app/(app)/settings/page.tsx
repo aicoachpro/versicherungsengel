@@ -38,6 +38,7 @@ import {
   CircleCheck,
   CircleX,
   Inbox,
+  Tag,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -156,6 +157,7 @@ interface LeadProvider {
   carryOver: boolean;
   startMonth: string | null;
   active: boolean;
+  products?: { id: number; name: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -168,6 +170,7 @@ type LeadProviderForm = {
   billingModel: string;
   carryOver: string;
   startMonth: string;
+  productIds: number[];
 };
 
 const EMPTY_FORM: LeadProviderForm = {
@@ -178,7 +181,14 @@ const EMPTY_FORM: LeadProviderForm = {
   billingModel: "prepaid",
   carryOver: "true",
   startMonth: "",
+  productIds: [],
 };
+
+interface ProviderProduct {
+  id: number;
+  name: string;
+  active: boolean;
+}
 
 const currencyFormat = new Intl.NumberFormat("de-DE", {
   style: "currency",
@@ -200,14 +210,28 @@ function LeadProviderDialog({
   const [form, setForm] = useState<LeadProviderForm>(initialData);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [allProducts, setAllProducts] = useState<ProviderProduct[]>([]);
   const isEdit = initialData.name !== "";
 
   useEffect(() => {
     if (open) {
       setForm(initialData);
       setError("");
+      fetch("/api/lead-products")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setAllProducts(data))
+        .catch(() => setAllProducts([]));
     }
   }, [open, initialData]);
+
+  const toggleProduct = (productId: number) => {
+    setForm((prev) => {
+      const ids = prev.productIds.includes(productId)
+        ? prev.productIds.filter((id) => id !== productId)
+        : [...prev.productIds, productId];
+      return { ...prev, productIds: ids };
+    });
+  };
 
   const monthlyCost = (form.minPerMonth || 0) * (form.costPerLead || 0);
 
@@ -310,6 +334,27 @@ function LeadProviderDialog({
               onChange={(e) => setForm((p) => ({ ...p, startMonth: e.target.value }))}
             />
           </div>
+          {allProducts.length > 0 && (
+            <div className="space-y-2">
+              <Label>Lead-Produkte</Label>
+              <div className="rounded-md border p-3 space-y-2 max-h-40 overflow-y-auto">
+                {allProducts.filter((p) => p.active).map((product) => (
+                  <label key={product.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={form.productIds.includes(product.id)}
+                      onChange={() => toggleProduct(product.id)}
+                      className="rounded border-input"
+                    />
+                    {product.name}
+                  </label>
+                ))}
+                {allProducts.filter((p) => p.active).length === 0 && (
+                  <p className="text-xs text-muted-foreground">Keine aktiven Produkte vorhanden</p>
+                )}
+              </div>
+            </div>
+          )}
           {monthlyCost > 0 && (
             <p className="text-sm text-muted-foreground">
               Monatliche Fixkosten: <span className="font-medium">{currencyFormat.format(monthlyCost)}</span>
@@ -377,6 +422,7 @@ function LeadProviderSection() {
         billingModel: form.billingModel,
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
+        productIds: form.productIds,
       }),
     });
     if (!res.ok) {
@@ -384,7 +430,7 @@ function LeadProviderSection() {
       throw new Error(data.error || "Fehler beim Anlegen");
     }
     await fetchProviders();
-    showFeedback("success", "Anbieter hinzugefügt");
+    showFeedback("success", "Anbieter hinzugefuegt");
   };
 
   const handleEdit = async (form: LeadProviderForm) => {
@@ -400,6 +446,7 @@ function LeadProviderSection() {
         billingModel: form.billingModel,
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
+        productIds: form.productIds,
       }),
     });
     if (!res.ok) {
@@ -444,6 +491,7 @@ function LeadProviderSection() {
         billingModel: editProvider.billingModel,
         carryOver: editProvider.carryOver ? "true" : "false",
         startMonth: editProvider.startMonth || "",
+        productIds: editProvider.products?.map((p) => p.id) || [],
       }
     : EMPTY_FORM;
 
@@ -511,6 +559,15 @@ function LeadProviderSection() {
                       <span>{p.billingModel === "prepaid" ? "Vorauszahlung" : "Pay-per-Lead"}</span>
                       {p.carryOver && <span>Guthaben-Übertrag</span>}
                     </div>
+                    {p.products && p.products.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {p.products.map((prod) => (
+                          <Badge key={prod.id} variant="outline" className="text-xs py-0 px-1.5">
+                            {prod.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                     {p.minPerMonth > 0 && p.costPerLead > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Fixkosten: {currencyFormat.format(p.minPerMonth * p.costPerLead)}/Monat
@@ -594,6 +651,339 @@ function LeadProviderSection() {
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               {deleting ? "Lösche…" : "Löschen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ── Lead-Produkte Section ──────────────────────────────────────────────
+
+interface LeadProduct {
+  id: number;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string;
+}
+
+function LeadProductDialog({
+  open,
+  onOpenChange,
+  initialName,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialName: string;
+  onSave: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState(initialName);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const isEdit = initialName !== "";
+
+  useEffect(() => {
+    if (open) {
+      setName(initialName);
+      setError("");
+    }
+  }, [open, initialName]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("Produktname ist erforderlich");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(name.trim());
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Produkt umbenennen" : "Produkt hinzufuegen"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? "Aendere den Produktnamen." : "Erstelle ein neues Lead-Produkt."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Produktname *</Label>
+            <Input
+              placeholder="z.B. Gewerbeversicherung"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? "Speichere..." : "Speichern"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LeadProductSection() {
+  const [products, setProducts] = useState<LeadProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<LeadProduct | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/lead-products");
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleAdd = async (name: string) => {
+    const res = await fetch("/api/lead-products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Anlegen");
+    }
+    await fetchProducts();
+    showFeedback("success", "Produkt hinzugefuegt");
+  };
+
+  const handleEdit = async (name: string) => {
+    if (!editProduct) return;
+    const res = await fetch(`/api/lead-products/${editProduct.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Speichern");
+    }
+    setEditProduct(null);
+    await fetchProducts();
+    showFeedback("success", "Produkt aktualisiert");
+  };
+
+  const handleDelete = async () => {
+    if (deleteId === null) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/lead-products/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showFeedback("error", data.error || "Fehler beim Loeschen");
+      } else {
+        await fetchProducts();
+        showFeedback("success", "Produkt geloescht");
+      }
+    } catch {
+      showFeedback("error", "Verbindungsfehler");
+    } finally {
+      setDeleting(false);
+      setDeleteId(null);
+    }
+  };
+
+  const handleToggleActive = async (product: LeadProduct) => {
+    try {
+      const res = await fetch(`/api/lead-products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !product.active }),
+      });
+      if (res.ok) {
+        await fetchProducts();
+        showFeedback("success", product.active ? "Produkt deaktiviert" : "Produkt aktiviert");
+      }
+    } catch {
+      showFeedback("error", "Verbindungsfehler");
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Lead-Produkte
+            </h3>
+            <Badge variant={products.length > 0 ? "default" : "secondary"}>
+              {products.length > 0 ? `${products.length} Produkt${products.length > 1 ? "e" : ""}` : "Nicht konfiguriert"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Produkte, die deine Lead-Anbieter liefern. Koennen Leads und Anbietern zugeordnet werden.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {feedback && (
+            <p className={`text-sm ${feedback.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+              {feedback.message}
+            </p>
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Lade Produkte...
+            </div>
+          ) : products.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Noch kein Lead-Produkt konfiguriert
+              </p>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Produkt hinzufuegen
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {products.map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-sm truncate">{p.name}</span>
+                    <Badge
+                      variant={p.active ? "default" : "secondary"}
+                      className="text-xs cursor-pointer"
+                      onClick={() => handleToggleActive(p)}
+                      title={p.active ? "Klicken zum Deaktivieren" : "Klicken zum Aktivieren"}
+                    >
+                      {p.active ? "Aktiv" : "Inaktiv"}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setEditProduct(p)}
+                      title="Umbenennen"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(p.id)}
+                      title="Loeschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && products.length > 0 && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Produkt hinzufuegen
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add dialog */}
+      <LeadProductDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        initialName=""
+        onSave={handleAdd}
+      />
+
+      {/* Edit dialog */}
+      <LeadProductDialog
+        open={editProduct !== null}
+        onOpenChange={(open) => { if (!open) setEditProduct(null); }}
+        initialName={editProduct?.name || ""}
+        onSave={handleEdit}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Produkt loeschen</DialogTitle>
+            <DialogDescription>
+              Soll das Produkt &quot;{products.find((p) => p.id === deleteId)?.name}&quot; wirklich geloescht werden?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="gap-2"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? "Loesche..." : "Loeschen"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1562,6 +1952,8 @@ export default function SettingsPage() {
             </Card>
 
             <LeadProviderSection />
+
+            <LeadProductSection />
 
             <EmailAccountSection />
 

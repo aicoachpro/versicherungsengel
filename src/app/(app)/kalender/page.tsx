@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CalendarDays, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CalendarDays, Clock, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function useIsMobile(breakpoint = 768) {
@@ -103,16 +104,20 @@ function formatDayHeader(date: Date) {
 export default function KalenderPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const [showAll, setShowAll] = useState(true);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewMode>("month");
 
   useEffect(() => {
-    fetch("/api/calendar")
+    const url = isAdmin && !showAll ? "/api/calendar?showAll=0" : "/api/calendar";
+    fetch(url)
       .then((r) => r.json())
       .then(setEvents)
       .catch(() => {});
-  }, []);
+  }, [isAdmin, showAll]);
 
   const today = new Date();
 
@@ -161,6 +166,17 @@ export default function KalenderPage() {
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant={showAll ? "outline" : "default"}
+                size="sm"
+                className="gap-1"
+                onClick={() => setShowAll((v) => !v)}
+              >
+                {showAll ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                {showAll ? "Alle" : "Meine"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>

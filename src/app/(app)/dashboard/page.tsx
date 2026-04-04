@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { leads, insurances, leadProviders } from "@/db/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
 import { getSetting } from "@/lib/settings";
+import { auth } from "@/lib/auth";
 
 // Lead-Provider aus DB lesen (graceful fallback wenn Tabelle noch nicht existiert)
 function getActiveProviders() {
@@ -28,6 +29,7 @@ import { GewerbeartChart } from "@/components/dashboard/gewerbeart-chart";
 import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
 import { ReportButton } from "@/components/dashboard/report-button";
 import { MonthFilter } from "@/components/dashboard/month-filter";
+import { UserFilter } from "@/components/dashboard/user-filter";
 import { SmartInsights, type Insight } from "@/components/dashboard/smart-insights";
 
 type DateRange = { from: string; to: string } | null;
@@ -43,6 +45,12 @@ function getDateRange(month?: number, year?: number): DateRange {
 function dateFilter(range: DateRange) {
   if (!range) return undefined;
   return and(gte(leads.eingangsdatum, range.from), lte(leads.eingangsdatum, range.to));
+}
+
+function assignedFilter(userId: number | null) {
+  if (userId === null) return undefined;
+  // NULL assignedTo = unassigned = visible to everyone
+  return sql`(${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`;
 }
 
 // Genehmigte Reklamationen aus allen KPIs ausschließen — Kosten wurden gutgeschrieben
@@ -168,11 +176,14 @@ function getLeadBudget() {
   return { budget: minPerMonth, costPerLead, months };
 }
 
-function getWonLeadsCount(range: DateRange) {
+function getWonLeadsCount(range: DateRange, userId: number | null = null) {
   const filter = dateFilter(range);
-  const baseFilter = filter
-    ? and(sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`, filter)
-    : sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`;
+  const uFilter = assignedFilter(userId);
+  const baseFilter = and(
+    sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`,
+    filter ?? undefined,
+    uFilter ?? undefined,
+  );
 
   const result = db
     .select({ count: sql<number>`count(*)` })
@@ -183,9 +194,10 @@ function getWonLeadsCount(range: DateRange) {
   return result?.count || 0;
 }
 
-function getKpis(range: DateRange) {
+function getKpis(range: DateRange, userId: number | null = null) {
   const filter = dateFilter(range);
-  const baseFilter = filter ? and(notGenehmigtReklamiert, filter) : notGenehmigtReklamiert;
+  const uFilter = assignedFilter(userId);
+  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined);
 
   const openLeads = db
     .select({ count: sql<number>`count(*)` })
@@ -217,7 +229,7 @@ function getKpis(range: DateRange) {
   };
 }
 
-function getPipelineData(range: DateRange) {
+function getPipelineData(range: DateRange, userId: number | null = null) {
   const phases = [
     "Termin eingegangen",
     "Termin stattgefunden",
@@ -227,7 +239,8 @@ function getPipelineData(range: DateRange) {
     "Verloren",
   ] as const;
   const filter = dateFilter(range);
-  const baseFilter = filter ? and(notGenehmigtReklamiert, filter) : notGenehmigtReklamiert;
+  const uFilter = assignedFilter(userId);
+  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined);
 
   return phases.map((phase) => {
     const result = db
@@ -239,7 +252,9 @@ function getPipelineData(range: DateRange) {
   });
 }
 
-function getRevenueByMonth() {
+function getRevenueByMonth(userId: number | null = null) {
+  const uFilter = assignedFilter(userId);
+  const baseFilter = and(notGenehmigtReklamiert, uFilter ?? undefined);
   const result = db
     .select({
       month: sql<string>`strftime('%Y-%m', ${leads.createdAt})`,
@@ -247,7 +262,7 @@ function getRevenueByMonth() {
       costs: sql<number>`coalesce(sum(${leads.terminKosten}), 0)`,
     })
     .from(leads)
-    .where(notGenehmigtReklamiert)
+    .where(baseFilter)
     .groupBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .orderBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .all();
@@ -269,9 +284,10 @@ function getRevenueByMonth() {
     }));
 }
 
-function getGewerbeartData(range: DateRange) {
+function getGewerbeartData(range: DateRange, userId: number | null = null) {
   const filter = dateFilter(range);
-  const baseFilter = filter ? and(notGenehmigtReklamiert, filter) : notGenehmigtReklamiert;
+  const uFilter = assignedFilter(userId);
+  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined);
   const result = db
     .select({
       gewerbeart: sql<string>`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`,
@@ -297,13 +313,14 @@ function getGewerbeartData(range: DateRange) {
   }));
 }
 
-function getUpcomingAppointments() {
+function getUpcomingAppointments(userId: number | null = null) {
   const now = new Date().toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM für exakten Zeitvergleich
   const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split("T")[0] + "T23:59";
 
   const notReklamiert = sql`${leads.reklamiertAt} IS NULL`;
+  const uFilter = assignedFilter(userId);
 
   // Ersttermine
   const termine = db
@@ -315,7 +332,7 @@ function getUpcomingAppointments() {
       phase: leads.phase,
     })
     .from(leads)
-    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater), notReklamiert))
+    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater), notReklamiert, uFilter ?? undefined))
     .all()
     .map((t) => ({ ...t, typ: "Termin" as const }));
 
@@ -330,7 +347,7 @@ function getUpcomingAppointments() {
       folgeterminTyp: leads.folgeterminTyp,
     })
     .from(leads)
-    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater), notReklamiert))
+    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater), notReklamiert, uFilter ?? undefined))
     .all()
     .map((t) => ({ ...t, typ: "Folgetermin" as const }));
 
@@ -339,7 +356,8 @@ function getUpcomingAppointments() {
     .slice(0, 5);
 }
 
-function getRecentActivity() {
+function getRecentActivity(userId: number | null) {
+  const uFilter = assignedFilter(userId);
   return db
     .select({
       id: leads.id,
@@ -349,17 +367,21 @@ function getRecentActivity() {
       reklamiertAt: leads.reklamiertAt,
     })
     .from(leads)
-    .where(sql`${leads.reklamiertAt} IS NULL`)
+    .where(and(sql`${leads.reklamiertAt} IS NULL`, uFilter ?? undefined))
     .orderBy(sql`${leads.updatedAt} DESC`)
     .limit(8)
     .all();
 }
 
-function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight[] {
+function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: number | null): Insight[] {
   const insights: Insight[] = [];
   const now = new Date();
   const nowIso = now.toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const uFilter = assignedFilter(userId);
+  const uSql = userId !== null
+    ? sql`AND (${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`
+    : sql``;
 
   // Leads ohne Aktivitaet seit >7 Tagen (nicht abgeschlossen/verloren, nicht reklamiert)
   const staleLeads = db
@@ -368,7 +390,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     .where(
       sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
         AND ${leads.reklamiertAt} IS NULL
-        AND ${leads.updatedAt} < ${sevenDaysAgo}`
+        AND ${leads.updatedAt} < ${sevenDaysAgo}
+        ${uSql}`
     )
     .get();
 
@@ -389,7 +412,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
       sql`${leads.folgetermin} IS NOT NULL
         AND ${leads.folgetermin} < ${nowIso}
         AND ${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
-        AND ${leads.reklamiertAt} IS NULL`
+        AND ${leads.reklamiertAt} IS NULL
+        ${uSql}`
     )
     .get();
 
@@ -426,7 +450,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     .where(
       sql`${leads.phase} = 'Abgeschlossen'
         AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonthKey}
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
+        ${uSql}`
     )
     .get();
 
@@ -436,7 +461,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     .where(
       sql`${leads.phase} = 'Abgeschlossen'
         AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${prevMonthKey}
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
+        ${uSql}`
     )
     .get();
 
@@ -461,7 +487,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     .from(leads)
     .where(
       sql`${leads.phase} = 'Abgeschlossen'
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
+        ${uSql}`
     )
     .groupBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
     .all()
@@ -488,7 +515,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     .from(leads)
     .where(
       sql`${leads.phase} = 'Angebot erstellt'
-        AND ${leads.reklamiertAt} IS NULL`
+        AND ${leads.reklamiertAt} IS NULL
+        ${uSql}`
     )
     .get();
 
@@ -508,7 +536,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
     .where(
       sql`${leads.phase} = 'Abgeschlossen'
         AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonthKey}
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`
+        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
+        ${uSql}`
     )
     .get();
 
@@ -527,8 +556,11 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>): Insight
   return insights.slice(0, 4);
 }
 
-function getLeadTrend() {
+function getLeadTrend(userId: number | null) {
   // Leads pro Woche der letzten 8 Wochen
+  const uSql = userId !== null
+    ? sql`AND (${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`
+    : sql``;
   const result = db
     .select({
       week: sql<string>`strftime('%Y-W%W', ${leads.createdAt})`,
@@ -536,7 +568,7 @@ function getLeadTrend() {
       count: sql<number>`count(*)`,
     })
     .from(leads)
-    .where(sql`${leads.createdAt} >= date('now', '-56 days')`)
+    .where(sql`${leads.createdAt} >= date('now', '-56 days') ${uSql}`)
     .groupBy(sql`strftime('%Y-W%W', ${leads.createdAt})`)
     .orderBy(sql`strftime('%Y-W%W', ${leads.createdAt})`)
     .all();
@@ -548,29 +580,39 @@ function getLeadTrend() {
   });
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; all?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; all?: string; showAll?: string }> }) {
   const params = await searchParams;
+  const session = await auth();
+  const userRole = (session?.user as { role?: string })?.role || "user";
+  const currentUserId = session?.user?.id ? parseInt(session.user.id) : null;
+  const isAdmin = userRole === "admin";
+
+  // Admin sieht standardmaessig alle, kann auf "Meine" umschalten
+  // Normale User sehen immer nur ihre eigenen Leads
+  const showAll = isAdmin && params.showAll !== "0";
+  const filterUserId = showAll ? null : currentUserId;
+
   const now = new Date();
   const hasFilter = params.month && params.year;
-  const isAll = !hasFilter || params.all === "1";
-  const month = isAll ? undefined : parseInt(params.month!);
-  const year = isAll ? undefined : parseInt(params.year!);
+  const isAllMonths = !hasFilter || params.all === "1";
+  const month = isAllMonths ? undefined : parseInt(params.month!);
+  const year = isAllMonths ? undefined : parseInt(params.year!);
   const range = month && year ? getDateRange(month, year) : null;
 
-  const kpis = getKpis(range);
-  const wonLeads = getWonLeadsCount(range);
+  const kpis = getKpis(range, filterUserId);
+  const wonLeads = getWonLeadsCount(range, filterUserId);
   const leadBudget = getLeadBudget();
-  const insights = getSmartInsights(leadBudget);
-  const pipelineData = getPipelineData(range);
-  const revenueData = getRevenueByMonth();
-  const gewerbeartData = getGewerbeartData(range);
-  const leadTrend = getLeadTrend();
-  const appointments = getUpcomingAppointments();
-  const recentActivity = getRecentActivity();
+  const insights = getSmartInsights(leadBudget, filterUserId);
+  const pipelineData = getPipelineData(range, filterUserId);
+  const revenueData = getRevenueByMonth(filterUserId);
+  const gewerbeartData = getGewerbeartData(range, filterUserId);
+  const leadTrend = getLeadTrend(filterUserId);
+  const appointments = getUpcomingAppointments(filterUserId);
+  const recentActivity = getRecentActivity(filterUserId);
 
   return (
     <div className="flex flex-col overflow-x-hidden">
-      <Header title="Dashboard" actions={<div className="flex items-center gap-2"><MonthFilter /><ReportButton /></div>} />
+      <Header title="Dashboard" actions={<div className="flex items-center gap-2"><UserFilter isAdmin={isAdmin} showAll={showAll} /><MonthFilter /><ReportButton /></div>} />
       <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6 overflow-x-hidden">
         <KpiCards
           wonLeads={wonLeads}

@@ -1,12 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
-import { or, isNotNull } from "drizzle-orm";
+import { or, isNotNull, and, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const userRole = (session.user as { role?: string })?.role || "user";
+  const currentUserId = session.user?.id ? parseInt(session.user.id) : null;
+  const { searchParams } = new URL(req.url);
+  const showAll = searchParams.get("showAll");
+
+  const isAdmin = userRole === "admin";
+  const shouldFilter = !isAdmin || showAll === "0";
+
+  const hasTermin = or(isNotNull(leads.termin), isNotNull(leads.folgetermin));
+  const userFilter = shouldFilter && currentUserId !== null
+    ? sql`(${leads.assignedTo} = ${currentUserId} OR ${leads.assignedTo} IS NULL)`
+    : undefined;
 
   const result = db
     .select({
@@ -19,7 +32,7 @@ export async function GET() {
       folgeterminTyp: leads.folgeterminTyp,
     })
     .from(leads)
-    .where(or(isNotNull(leads.termin), isNotNull(leads.folgetermin)))
+    .where(and(hasTermin, userFilter))
     .all();
 
   const events = result.flatMap((lead) => {

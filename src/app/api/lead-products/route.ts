@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, leadProviders, providerProducts } from "@/db/schema";
+import { users, leadProducts } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+
+async function requireAuth() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return session;
+}
 
 async function requireAdmin() {
   const session = await auth();
@@ -17,25 +23,16 @@ async function requireAdmin() {
 }
 
 export async function GET() {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const session = await requireAuth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const all = db
     .select()
-    .from(leadProviders)
-    .orderBy(sql`${leadProviders.createdAt} DESC`)
+    .from(leadProducts)
+    .orderBy(sql`${leadProducts.sortOrder} ASC`)
     .all();
 
-  // Attach linked productIds for each provider
-  const allLinks = db.select().from(providerProducts).all();
-  const result = all.map((p) => ({
-    ...p,
-    productIds: allLinks
-      .filter((l) => l.providerId === p.id)
-      .map((l) => l.productId),
-  }));
-
-  return NextResponse.json(result);
+  return NextResponse.json(all);
 }
 
 export async function POST(req: NextRequest) {
@@ -48,16 +45,11 @@ export async function POST(req: NextRequest) {
   }
 
   const result = db
-    .insert(leadProviders)
+    .insert(leadProducts)
     .values({
       name: body.name,
-      leadType: body.leadType ?? "",
-      minPerMonth: body.minPerMonth ?? 10,
-      costPerLead: body.costPerLead ?? 320,
-      billingModel: body.billingModel ?? "prepaid",
-      carryOver: body.carryOver ?? true,
-      startMonth: body.startMonth ?? "",
       active: body.active ?? true,
+      sortOrder: body.sortOrder ?? 0,
     })
     .returning()
     .get();

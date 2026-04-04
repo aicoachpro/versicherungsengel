@@ -77,7 +77,7 @@ export async function extractLeadFromText(text: string): Promise<string> {
       {
         role: "system",
         content:
-          'Du bist ein Datenextraktions-Assistent für Versicherungsvermittler. Extrahiere alle relevanten Lead-Daten aus dem folgenden Text und gib sie als JSON zurück mit den Feldern: name, ansprechpartner, email, telefon, website, branche, strasse, plz, ort, unternehmensgroesse, notizen. Wenn ein Feld nicht gefunden wird, setze es auf "".',
+          'Du bist ein Datenextraktions-Assistent fuer Versicherungsvermittler. Extrahiere alle relevanten Lead-Daten aus dem folgenden Text und gib sie als JSON zurueck mit den Feldern: name, ansprechpartner, email, telefon, website, branche, strasse, plz, ort, unternehmensgroesse, notizen, produkt. Wenn ein Feld nicht gefunden wird, setze es auf "". Bestimme auch das passende Lead-Produkt aus dieser Liste: Beratung, Betriebshaftpflicht, Finanzierung, Firmenrechtsschutzversicherung, Firmenversicherung, Flottenversicherung, Haftpflichtversicherung, Hausratversicherung, Hundeversicherung, KFZ-Versicherung, Krankenzusatzversicherung, Pferdeversicherung, Rechtsschutzversicherung, Sterbegeldversicherung, Unfallversicherung, Vermögensschadenhaftpflicht, Wohngebäudeversicherung, Zahnzusatzversicherung, Private Krankenversicherung, Private Pflegeversicherung. Gib das Feld "produkt" mit dem exakten Namen zurueck.',
       },
       { role: "user", content: text },
     ])

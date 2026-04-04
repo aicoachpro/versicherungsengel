@@ -57,6 +57,8 @@ export const leads = sqliteTable("leads", {
   }),
   reklamationNotiz: text("reklamation_notiz"),
   providerId: integer("provider_id"),
+  assignedTo: integer("assigned_to"),
+  productId: integer("product_id"),
   archivedAt: text("archived_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
@@ -189,6 +191,19 @@ export const inboundEmails = sqliteTable("inbound_emails", {
   status: text("status").notNull().default("pending"),
   errorMessage: text("error_message"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const leadProducts = sqliteTable("lead_products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const providerProducts = sqliteTable("provider_products", {
+  providerId: integer("provider_id").notNull(),
+  productId: integer("product_id").notNull(),
 });
 
 export const auditLogs = sqliteTable("audit_logs", {

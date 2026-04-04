@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, inboundEmails } from "@/db/schema";
+import { leads, inboundEmails, leadProducts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { extractLeadFromText } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
@@ -70,6 +70,21 @@ export async function GET(req: NextRequest) {
         ? email.receivedAt.split("T")[0]
         : new Date().toISOString().split("T")[0];
 
+      // Produkt-ID aus lead_products-Tabelle ermitteln
+      let productId: number | null = null;
+      if (leadData.produkt) {
+        try {
+          const product = db
+            .select({ id: leadProducts.id })
+            .from(leadProducts)
+            .where(eq(leadProducts.name, leadData.produkt))
+            .get();
+          if (product) productId = product.id;
+        } catch {
+          // lead_products Tabelle existiert evtl. noch nicht
+        }
+      }
+
       const newLead = db
         .insert(leads)
         .values({
@@ -82,6 +97,7 @@ export async function GET(req: NextRequest) {
           notizen: notizText,
           eingangsdatum: eingangsDatum,
           terminKosten: 320,
+          productId: productId,
         })
         .returning()
         .get();
