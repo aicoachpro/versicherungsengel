@@ -9,6 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
   Shield,
   Key,
   Smartphone,
@@ -22,6 +31,9 @@ import {
   Loader2,
   Upload,
   Package,
+  Pencil,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -130,41 +142,459 @@ function SettingsSection({ icon, title, description, fields, settings, onSave, f
   );
 }
 
-function LeadProviderSection({
-  fields,
-  settings,
+interface LeadProvider {
+  id: number;
+  name: string;
+  leadType: string | null;
+  minPerMonth: number;
+  costPerLead: number;
+  billingModel: string;
+  carryOver: boolean;
+  startMonth: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type LeadProviderForm = {
+  name: string;
+  leadType: string;
+  minPerMonth: number;
+  costPerLead: number;
+  billingModel: string;
+  carryOver: string;
+  startMonth: string;
+};
+
+const EMPTY_FORM: LeadProviderForm = {
+  name: "",
+  leadType: "",
+  minPerMonth: 10,
+  costPerLead: 320,
+  billingModel: "prepaid",
+  carryOver: "true",
+  startMonth: "",
+};
+
+const currencyFormat = new Intl.NumberFormat("de-DE", {
+  style: "currency",
+  currency: "EUR",
+  maximumFractionDigits: 0,
+});
+
+function LeadProviderDialog({
+  open,
+  onOpenChange,
+  initialData,
   onSave,
 }: {
-  fields: SettingsField[];
-  settings: SettingsMap;
-  onSave: (values: SettingsMap) => Promise<void>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialData: LeadProviderForm;
+  onSave: (data: LeadProviderForm) => Promise<void>;
 }) {
-  const minPerMonth = parseInt(settings["leadProvider.minPerMonth"] || "10", 10) || 0;
-  const costPerLead = parseInt(settings["leadProvider.costPerLead"] || "320", 10) || 0;
-  const monthlyCost = minPerMonth * costPerLead;
+  const [form, setForm] = useState<LeadProviderForm>(initialData);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const isEdit = initialData.name !== "";
 
-  const costFormat = new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  });
+  useEffect(() => {
+    if (open) {
+      setForm(initialData);
+      setError("");
+    }
+  }, [open, initialData]);
+
+  const monthlyCost = (form.minPerMonth || 0) * (form.costPerLead || 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      setError("Anbieter-Name ist erforderlich");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(form);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <SettingsSection
-      icon={<Package className="h-5 w-5" />}
-      title="Lead-Anbieter"
-      description="Konfiguration deines Lead-Anbieters. Nicht gelieferte Leads können als Guthaben übertragen werden."
-      fields={fields}
-      settings={settings}
-      onSave={onSave}
-      footer={
-        monthlyCost > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Monatliche Fixkosten: <span className="font-medium">{costFormat.format(monthlyCost)}</span>
-          </p>
-        ) : null
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Anbieter bearbeiten" : "Anbieter hinzufügen"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Ändere die Daten des Lead-Anbieters."
+              : "Konfiguriere einen neuen Lead-Anbieter."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Anbieter-Name *</Label>
+            <Input
+              placeholder="z.B. WVD Versicherungsdienst"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Lead-Typ</Label>
+            <Input
+              placeholder="z.B. Gewerbe-Leads"
+              value={form.leadType}
+              onChange={(e) => setForm((p) => ({ ...p, leadType: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Mindestabnahme / Monat</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.minPerMonth}
+                onChange={(e) => setForm((p) => ({ ...p, minPerMonth: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Kosten pro Lead in EUR</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.costPerLead}
+                onChange={(e) => setForm((p) => ({ ...p, costPerLead: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Abrechnungsmodell</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.billingModel}
+                onChange={(e) => setForm((p) => ({ ...p, billingModel: e.target.value }))}
+              >
+                <option value="prepaid">Vorauszahlung</option>
+                <option value="per-lead">Pay-per-Lead</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Guthaben-Übertrag</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.carryOver}
+                onChange={(e) => setForm((p) => ({ ...p, carryOver: e.target.value }))}
+              >
+                <option value="true">Ja</option>
+                <option value="false">Nein</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Vertragsstart</Label>
+            <Input
+              type="month"
+              value={form.startMonth}
+              onChange={(e) => setForm((p) => ({ ...p, startMonth: e.target.value }))}
+            />
+          </div>
+          {monthlyCost > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Monatliche Fixkosten: <span className="font-medium">{currencyFormat.format(monthlyCost)}</span>
+            </p>
+          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? "Speichere…" : "Speichern"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LeadProviderSection() {
+  const [providers, setProviders] = useState<LeadProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProvider, setEditProvider] = useState<LeadProvider | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchProviders = async () => {
+    try {
+      const res = await fetch("/api/lead-providers");
+      if (res.ok) {
+        const data = await res.json();
+        setProviders(data);
       }
-    />
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviders();
+  }, []);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleAdd = async (form: LeadProviderForm) => {
+    const res = await fetch("/api/lead-providers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.name,
+        leadType: form.leadType || null,
+        minPerMonth: form.minPerMonth,
+        costPerLead: form.costPerLead,
+        billingModel: form.billingModel,
+        carryOver: form.carryOver === "true",
+        startMonth: form.startMonth || null,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Anlegen");
+    }
+    await fetchProviders();
+    showFeedback("success", "Anbieter hinzugefügt");
+  };
+
+  const handleEdit = async (form: LeadProviderForm) => {
+    if (!editProvider) return;
+    const res = await fetch(`/api/lead-providers/${editProvider.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.name,
+        leadType: form.leadType || null,
+        minPerMonth: form.minPerMonth,
+        costPerLead: form.costPerLead,
+        billingModel: form.billingModel,
+        carryOver: form.carryOver === "true",
+        startMonth: form.startMonth || null,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Speichern");
+    }
+    setEditProvider(null);
+    await fetchProviders();
+    showFeedback("success", "Anbieter aktualisiert");
+  };
+
+  const handleDelete = async () => {
+    if (deleteId === null) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/lead-providers/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showFeedback("error", data.error || "Fehler beim Löschen");
+      } else {
+        await fetchProviders();
+        showFeedback("success", "Anbieter gelöscht");
+      }
+    } catch {
+      showFeedback("error", "Verbindungsfehler");
+    } finally {
+      setDeleting(false);
+      setDeleteId(null);
+    }
+  };
+
+  const openEdit = (p: LeadProvider) => {
+    setEditProvider(p);
+  };
+
+  const editFormData: LeadProviderForm = editProvider
+    ? {
+        name: editProvider.name,
+        leadType: editProvider.leadType || "",
+        minPerMonth: editProvider.minPerMonth,
+        costPerLead: editProvider.costPerLead,
+        billingModel: editProvider.billingModel,
+        carryOver: editProvider.carryOver ? "true" : "false",
+        startMonth: editProvider.startMonth || "",
+      }
+    : EMPTY_FORM;
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Lead-Anbieter
+            </h3>
+            <Badge variant={providers.length > 0 ? "default" : "secondary"}>
+              {providers.length > 0 ? `${providers.length} Anbieter` : "Nicht konfiguriert"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Verwalte deine Lead-Anbieter. Nicht gelieferte Leads können als Guthaben übertragen werden.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {feedback && (
+            <p className={`text-sm ${feedback.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+              {feedback.message}
+            </p>
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Lade Anbieter…
+            </div>
+          ) : providers.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Noch kein Lead-Anbieter konfiguriert
+              </p>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Anbieter hinzufügen
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {providers.map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border p-4 flex items-start justify-between gap-4"
+                >
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{p.name}</span>
+                      <Badge variant={p.active ? "default" : "secondary"} className="text-xs">
+                        {p.active ? "Aktiv" : "Inaktiv"}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {p.leadType && <span>{p.leadType}</span>}
+                      <span>{p.minPerMonth} Leads/Monat</span>
+                      <span>{currencyFormat.format(p.costPerLead)}/Lead</span>
+                      <span>{p.billingModel === "prepaid" ? "Vorauszahlung" : "Pay-per-Lead"}</span>
+                      {p.carryOver && <span>Guthaben-Übertrag</span>}
+                    </div>
+                    {p.minPerMonth > 0 && p.costPerLead > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Fixkosten: {currencyFormat.format(p.minPerMonth * p.costPerLead)}/Monat
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEdit(p)}
+                      title="Bearbeiten"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(p.id)}
+                      title="Löschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && providers.length > 0 && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Anbieter hinzufügen
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add dialog */}
+      <LeadProviderDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        initialData={EMPTY_FORM}
+        onSave={handleAdd}
+      />
+
+      {/* Edit dialog */}
+      <LeadProviderDialog
+        open={editProvider !== null}
+        onOpenChange={(open) => { if (!open) setEditProvider(null); }}
+        initialData={editFormData}
+        onSave={handleEdit}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Anbieter löschen</DialogTitle>
+            <DialogDescription>
+              Soll der Anbieter &quot;{providers.find((p) => p.id === deleteId)?.name}&quot; wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="gap-2"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? "Lösche…" : "Löschen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -358,32 +788,6 @@ export default function SettingsPage() {
     { key: "company.color", label: "Primärfarbe (Hex)", placeholder: "#003781" },
   ];
 
-  const LEAD_PROVIDER_FIELDS: SettingsField[] = [
-    { key: "leadProvider.name", label: "Anbieter-Name", placeholder: "z.B. WVD Versicherungsdienst" },
-    { key: "leadProvider.leadType", label: "Lead-Typ", placeholder: "z.B. Gewerbe-Leads" },
-    { key: "leadProvider.minPerMonth", label: "Mindestabnahme pro Monat", placeholder: "10", type: "number" },
-    { key: "leadProvider.costPerLead", label: "Kosten pro Lead in \u20ac", placeholder: "320", type: "number" },
-    {
-      key: "leadProvider.billingModel",
-      label: "Abrechnungsmodell",
-      placeholder: "",
-      options: [
-        { value: "prepaid", label: "Vorauszahlung" },
-        { value: "per-lead", label: "Pay-per-Lead" },
-      ],
-    },
-    {
-      key: "leadProvider.carryOver",
-      label: "Guthaben-\u00dcbertrag",
-      placeholder: "",
-      options: [
-        { value: "true", label: "Ja \u2014 nicht gelieferte Leads werden \u00fcbertragen" },
-        { value: "false", label: "Nein" },
-      ],
-    },
-    { key: "leadProvider.startMonth", label: "Vertragsstart", placeholder: "", type: "month" },
-  ];
-
   const OBSIDIAN_FIELDS: SettingsField[] = [
     { key: "obsidian.vaultPath", label: "Vault-Pfad", placeholder: "/Users/name/Obsidian/MeinVault" },
     { key: "obsidian.reportFolder", label: "Report-Ordner im Vault", placeholder: "Reports/Sales Hub" },
@@ -472,11 +876,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <LeadProviderSection
-              fields={LEAD_PROVIDER_FIELDS}
-              settings={settings}
-              onSave={saveSection}
-            />
+            <LeadProviderSection />
 
             <SettingsSection
               icon={<BookOpen className="h-5 w-5" />}

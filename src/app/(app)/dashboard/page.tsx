@@ -1,9 +1,23 @@
 export const dynamic = "force-dynamic";
 
 import { db } from "@/db";
-import { leads, insurances } from "@/db/schema";
+import { leads, insurances, leadProviders } from "@/db/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
 import { getSetting } from "@/lib/settings";
+
+// Lead-Provider aus DB lesen (graceful fallback wenn Tabelle noch nicht existiert)
+function getActiveProviders() {
+  try {
+    return db
+      .select()
+      .from(leadProviders)
+      .where(eq(leadProviders.active, true))
+      .all();
+  } catch {
+    // Tabelle existiert noch nicht — Fallback auf Settings
+    return [];
+  }
+}
 import { Header } from "@/components/layout/header";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
@@ -35,11 +49,33 @@ function dateFilter(range: DateRange) {
 const notGenehmigtReklamiert = sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`;
 
 function getLeadBudget() {
-  const budget = parseInt(getSetting("company.leadBudget") || "10", 10);
-  const minPerMonth = parseInt(getSetting("leadProvider.minPerMonth") || String(budget), 10);
-  const carryOverEnabled = getSetting("leadProvider.carryOver") !== "false";
-  const startMonth = getSetting("leadProvider.startMonth"); // YYYY-MM
-  const costPerLead = parseInt(getSetting("leadProvider.costPerLead") || "320", 10);
+  // Versuch 1: Aus lead_providers-Tabelle aggregieren
+  const providers = getActiveProviders();
+
+  let minPerMonth: number;
+  let costPerLead: number;
+  let carryOverEnabled: boolean;
+  let startMonth: string;
+
+  if (providers.length > 0) {
+    // Aggregation ueber alle aktiven Provider
+    minPerMonth = providers.reduce((sum, p) => sum + (p.minPerMonth || 0), 0);
+    // Gewichteter Durchschnitt der Kosten pro Lead (nach minPerMonth gewichtet)
+    const totalWeightedCost = providers.reduce((sum, p) => sum + (p.costPerLead || 0) * (p.minPerMonth || 0), 0);
+    costPerLead = minPerMonth > 0 ? Math.round(totalWeightedCost / minPerMonth) : 0;
+    // carryOver = true wenn IRGENDEIN Provider es aktiviert hat
+    carryOverEnabled = providers.some((p) => p.carryOver);
+    // Fruehestes startMonth aller Provider
+    const startMonths = providers.map((p) => p.startMonth).filter(Boolean) as string[];
+    startMonth = startMonths.length > 0 ? startMonths.sort()[0] : "";
+  } else {
+    // Fallback: alte Settings-basierte Logik
+    const budget = parseInt(getSetting("company.leadBudget") || "10", 10);
+    minPerMonth = parseInt(getSetting("leadProvider.minPerMonth") || String(budget), 10);
+    carryOverEnabled = getSetting("leadProvider.carryOver") !== "false";
+    startMonth = getSetting("leadProvider.startMonth"); // YYYY-MM
+    costPerLead = parseInt(getSetting("leadProvider.costPerLead") || "320", 10);
+  }
 
   const result = db
     .select({

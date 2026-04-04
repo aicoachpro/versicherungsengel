@@ -45,6 +45,7 @@ export interface Lead {
   folgeterminNotified: number;
   reklamiertAt: string | null;
   archivedAt: string | null;
+  providerId: number | null;
   createdAt: string;
   updatedAt: string;
 }

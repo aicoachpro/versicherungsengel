@@ -27,6 +27,11 @@ interface LeadDialogProps {
   onSave: (data: Partial<Lead>) => void;
 }
 
+interface LeadProvider {
+  id: number;
+  name: string;
+}
+
 const GEWERBEARTEN = ["hauptberuflich", "nebenberuflich"];
 const FOLGETERMIN_TYPEN = ["Nachfassen", "Cross-Selling", "Beratung", "Angebot nachfassen", "Sonstiges"];
 
@@ -39,6 +44,7 @@ const UNTERNEHMENSGROESSEN = ["1–9", "10–49", "50–199", "200–999", "1000
 const UMSATZKLASSEN = ["<1 Mio", "1–5 Mio", "5–20 Mio", "20–100 Mio", ">100 Mio"];
 
 export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps) {
+  const [providers, setProviders] = useState<LeadProvider[]>([]);
   const [form, setForm] = useState({
     name: "",
     ansprechpartner: "",
@@ -59,7 +65,16 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     umsatz: "",
     naechsterSchritt: "",
     notizen: "",
+    providerId: "",
   });
+
+  // Aktive Lead-Provider laden
+  useEffect(() => {
+    fetch("/api/lead-providers/active")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setProviders(data))
+      .catch(() => setProviders([]));
+  }, [open]);
 
   useEffect(() => {
     if (lead) {
@@ -83,6 +98,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         umsatz: lead.umsatz ? String(lead.umsatz) : "",
         naechsterSchritt: lead.naechsterSchritt || "",
         notizen: lead.notizen || "",
+        providerId: lead.providerId ? String(lead.providerId) : "",
       });
     } else {
       setForm({
@@ -93,6 +109,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         eingangsdatum: new Date().toISOString().split("T")[0],
         terminKosten: "320", umsatz: "",
         naechsterSchritt: "", notizen: "",
+        providerId: "",
       });
     }
   }, [lead, open]);
@@ -119,6 +136,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       umsatz: form.umsatz ? Number(form.umsatz) : null,
       naechsterSchritt: form.naechsterSchritt || null,
       notizen: form.notizen || null,
+      providerId: form.providerId ? Number(form.providerId) : null,
     });
   };
 
@@ -129,6 +147,22 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
           <DialogTitle>{lead ? "Lead bearbeiten" : "Neuer Lead"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {providers.length > 0 && (
+            <div className="space-y-2">
+              <Label>Anbieter</Label>
+              <Select
+                value={form.providerId}
+                onValueChange={(v) => setForm({ ...form, providerId: v ?? "" })}
+              >
+                <SelectTrigger><SelectValue placeholder="Kein Anbieter" /></SelectTrigger>
+                <SelectContent>
+                  {providers.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Firma / Name *</Label>

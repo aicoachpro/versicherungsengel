@@ -56,6 +56,7 @@ export const leads = sqliteTable("leads", {
     enum: ["offen", "genehmigt", "abgelehnt"],
   }),
   reklamationNotiz: text("reklamation_notiz"),
+  providerId: integer("provider_id"),
   archivedAt: text("archived_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
@@ -144,6 +145,19 @@ export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull().default(""),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const leadProviders = sqliteTable("lead_providers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  leadType: text("lead_type").notNull().default(""),
+  minPerMonth: integer("min_per_month").notNull().default(10),
+  costPerLead: real("cost_per_lead").notNull().default(320),
+  billingModel: text("billing_model").notNull().default("prepaid"),
+  carryOver: integer("carry_over", { mode: "boolean" }).notNull().default(true),
+  startMonth: text("start_month").notNull().default(""),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
 export const auditLogs = sqliteTable("audit_logs", {

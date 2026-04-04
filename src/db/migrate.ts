@@ -112,6 +112,30 @@ sqlite.prepare(`
   )
 `).run();
 
+// Create lead_providers table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS lead_providers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    name TEXT NOT NULL,
+    lead_type TEXT NOT NULL DEFAULT '',
+    min_per_month INTEGER NOT NULL DEFAULT 10,
+    cost_per_lead REAL NOT NULL DEFAULT 320,
+    billing_model TEXT NOT NULL DEFAULT 'prepaid',
+    carry_over INTEGER NOT NULL DEFAULT 1,
+    start_month TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
+// Add provider_id column to leads if not exists
+try {
+  sqlite.prepare("SELECT provider_id FROM leads LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE leads ADD COLUMN provider_id INTEGER").run();
+  console.log("Added 'provider_id' column to leads table");
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     notizen: body.notizen || null,
     eingangsdatum: body.eingangsdatum || new Date().toISOString().split("T")[0],
     folgetermin: body.folgetermin || null,
+    providerId: body.providerId || null,
   }).returning().get();
 
   const { userId, userName } = getAuditUser(session);
