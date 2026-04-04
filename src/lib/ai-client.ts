@@ -90,8 +90,26 @@ export async function extractLeadFromPDF(pdfText: string): Promise<string> {
     await chat([
       {
         role: "system",
-        content:
-          'Du bist ein Datenextraktions-Assistent für Versicherungsvermittler. Analysiere den folgenden PDF-Inhalt und extrahiere alle Lead-Daten. Gib sie als JSON zurück mit den Feldern: name, ansprechpartner, email, telefon, website, branche, strasse, plz, ort, unternehmensgroesse, umsatzklasse, gewerbeart, notizen. Wenn ein Feld nicht gefunden wird, setze es auf "".',
+        content: `Du bist ein Datenextraktions-Assistent fuer Versicherungsvermittler.
+Analysiere den folgenden PDF-Inhalt und extrahiere alle Lead-Daten.
+Gib ein JSON-Array zurueck. Jeder Lead ist ein Objekt mit diesen Feldern:
+- name (Firmenname, PFLICHT)
+- ansprechpartner
+- email
+- telefon
+- website
+- branche (Bau, Handwerk, Dienstleistung, Produktion, IT, Gesundheit, Logistik, Handel, Gastronomie, Immobilien, Sonstiges)
+- strasse
+- plz
+- ort
+- unternehmensgroesse (1-9, 10-49, 50-199, 200-999, 1000+)
+- umsatzklasse (<1 Mio, 1-5 Mio, 5-20 Mio, 20-100 Mio, >100 Mio)
+- gewerbeart (hauptberuflich/nebenberuflich)
+- notizen (zusaetzliche relevante Infos)
+- confidence (0-1, wie sicher du bei der Extraktion bist. Unter 0.5 = sehr unsicher)
+
+Setze leere Felder auf "". Antworte NUR mit dem JSON-Array.
+Falls keine Lead-Daten erkennbar sind, antworte mit [].`,
       },
       { role: "user", content: pdfText },
     ])

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, FileText, CheckCircle2, XCircle, ArrowRight, RotateCcw, Loader2 } from "lucide-react";
+import { Upload, FileSpreadsheet, FileText, CheckCircle2, XCircle, ArrowRight, RotateCcw, Loader2, AlertTriangle, Check, X, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
 const LEAD_FIELDS = [
-  { key: "", label: "— Nicht importieren —" },
+  { key: "", label: "\u2014 Nicht importieren \u2014" },
   { key: "name", label: "Firma / Name *" },
   { key: "ansprechpartner", label: "Ansprechpartner" },
   { key: "email", label: "E-Mail" },
@@ -37,12 +37,29 @@ const LEAD_FIELDS = [
   { key: "website", label: "Website" },
   { key: "gewerbeart", label: "Gewerbeart" },
   { key: "branche", label: "Branche" },
-  { key: "unternehmensgroesse", label: "Unternehmensgröße" },
+  { key: "unternehmensgroesse", label: "Unternehmensgr\u00f6\u00dfe" },
   { key: "umsatzklasse", label: "Umsatzklasse" },
   { key: "termin", label: "Termin" },
   { key: "eingangsdatum", label: "Eingangsdatum" },
-  { key: "terminKosten", label: "Termin-Kosten (€)" },
-  { key: "umsatz", label: "Umsatz (€)" },
+  { key: "terminKosten", label: "Termin-Kosten (\u20ac)" },
+  { key: "umsatz", label: "Umsatz (\u20ac)" },
+  { key: "notizen", label: "Notizen" },
+];
+
+// Alle editierbaren Lead-Felder fuer PDF-Preview
+const PDF_LEAD_FIELDS = [
+  { key: "name", label: "Firma *" },
+  { key: "ansprechpartner", label: "Ansprechpartner" },
+  { key: "email", label: "E-Mail" },
+  { key: "telefon", label: "Telefon" },
+  { key: "website", label: "Website" },
+  { key: "strasse", label: "Stra\u00dfe" },
+  { key: "plz", label: "PLZ" },
+  { key: "ort", label: "Ort" },
+  { key: "branche", label: "Branche" },
+  { key: "unternehmensgroesse", label: "Unternehmensgr\u00f6\u00dfe" },
+  { key: "umsatzklasse", label: "Umsatzklasse" },
+  { key: "gewerbeart", label: "Gewerbeart" },
   { key: "notizen", label: "Notizen" },
 ];
 
@@ -66,6 +83,12 @@ function autoMap(header: string): string {
   return map[h] || "";
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 type Step = "upload" | "mapping" | "preview" | "result";
 
 interface ImportResult {
@@ -79,7 +102,23 @@ type ImportMode = "csv" | "pdf";
 
 interface PdfLead {
   name?: string;
-  [key: string]: string | number | null | undefined;
+  confidence?: number;
+  _filename?: string;
+  _saved?: boolean;
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+interface PdfFileResult {
+  filename: string;
+  extracted: PdfLead[];
+  confidence: number;
+  rawText: string;
+  error?: string;
+}
+
+interface LeadProvider {
+  id: number;
+  name: string;
 }
 
 export default function ImportPage() {
@@ -97,8 +136,24 @@ export default function ImportPage() {
   const [result, setResult] = useState<ImportResult | null>(null);
 
   // PDF-spezifisch
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [pdfLeads, setPdfLeads] = useState<PdfLead[]>([]);
   const [pdfExtracting, setPdfExtracting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Provider
+  const [providers, setProviders] = useState<LeadProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
+
+  // Provider laden
+  useEffect(() => {
+    fetch("/api/lead-providers/active")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => {
+        if (Array.isArray(data)) setProviders(data);
+      })
+      .catch(() => {});
+  }, []);
 
   function parseFile(file: File) {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -111,7 +166,7 @@ export default function ImportPage() {
         complete: (res) => {
           const data = res.data as string[][];
           if (data.length < 2) {
-            toast.error("Datei enthält keine Daten");
+            toast.error("Datei enth\u00e4lt keine Daten");
             return;
           }
           setHeaders(data[0]);
@@ -133,7 +188,7 @@ export default function ImportPage() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
         if (data.length < 2) {
-          toast.error("Datei enthält keine Daten");
+          toast.error("Datei enth\u00e4lt keine Daten");
           return;
         }
         setHeaders(data[0].map(String));
@@ -149,7 +204,7 @@ export default function ImportPage() {
       };
       reader.readAsArrayBuffer(file);
     } else {
-      toast.error("Nur CSV und Excel (XLSX) Dateien werden unterstützt");
+      toast.error("Nur CSV und Excel (XLSX) Dateien werden unterst\u00fctzt");
     }
   }
 
@@ -196,25 +251,160 @@ export default function ImportPage() {
     setImporting(false);
   }
 
-  async function handlePdfUpload(file: File) {
+  // Drag & Drop Handler fuer PDF
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+      (f) => f.name.toLowerCase().endsWith(".pdf")
+    );
+    if (droppedFiles.length === 0) {
+      toast.error("Bitte nur PDF-Dateien ablegen");
+      return;
+    }
+    if (droppedFiles.length > 10) {
+      toast.error("Maximal 10 Dateien gleichzeitig");
+      return;
+    }
+    setPdfFiles((prev) => {
+      const names = new Set(prev.map((f) => f.name));
+      const newFiles = droppedFiles.filter((f) => !names.has(f.name));
+      return [...prev, ...newFiles];
+    });
+  }, []);
+
+  function handlePdfFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files || []).filter(
+      (f) => f.name.toLowerCase().endsWith(".pdf")
+    );
+    if (selected.length === 0) return;
+    setPdfFiles((prev) => {
+      const names = new Set(prev.map((f) => f.name));
+      const newFiles = selected.filter((f) => !names.has(f.name));
+      return [...prev, ...newFiles];
+    });
+    if (pdfInputRef.current) pdfInputRef.current.value = "";
+  }
+
+  function removePdfFile(index: number) {
+    setPdfFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handlePdfExtract() {
+    if (pdfFiles.length === 0) return;
     setPdfExtracting(true);
-    setFileName(file.name);
+
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      pdfFiles.forEach((f) => formData.append("files", f));
+
       const res = await fetch("/api/leads/import/pdf", { method: "POST", body: formData });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error); setPdfExtracting(false); return; }
-      setPdfLeads(data.leads);
+      if (!res.ok) {
+        toast.error(data.error || "PDF-Analyse fehlgeschlagen");
+        setPdfExtracting(false);
+        return;
+      }
+
+      // Leads aus allen PDFs flach zusammenfuehren
+      const allLeads: PdfLead[] = [];
+      let totalLeadCount = 0;
+      let errorCount = 0;
+
+      for (const fileResult of data.leads as PdfFileResult[]) {
+        if (fileResult.error) {
+          errorCount++;
+          toast.error(`${fileResult.filename}: ${fileResult.error}`);
+          continue;
+        }
+        for (const lead of fileResult.extracted) {
+          allLeads.push({ ...lead, _filename: fileResult.filename });
+          totalLeadCount++;
+        }
+      }
+
+      setPdfLeads(allLeads);
+      setFileName(pdfFiles.length === 1 ? pdfFiles[0].name : `${pdfFiles.length} PDFs`);
       setStep("preview");
-      toast.success(`${data.leads.length} Lead(s) aus PDF erkannt`);
-    } catch { toast.error("PDF-Upload fehlgeschlagen"); }
+
+      if (totalLeadCount > 0) {
+        toast.success(`${totalLeadCount} Lead(s) aus ${pdfFiles.length - errorCount} PDF(s) erkannt`);
+      }
+      if (totalLeadCount === 0 && errorCount === 0) {
+        toast.warning("Keine Leads in den PDFs erkannt");
+      }
+    } catch {
+      toast.error("PDF-Upload fehlgeschlagen");
+    }
     setPdfExtracting(false);
   }
 
-  async function handlePdfImport() {
+  async function handlePdfSaveSingle(index: number) {
+    const lead = pdfLeads[index];
+    if (!lead.name) {
+      toast.error("Firmenname ist Pflicht");
+      return;
+    }
     setImporting(true);
-    const validLeads = pdfLeads.filter((l) => l.name);
+    try {
+      // Provider-ID mitsenden falls ausgewaehlt
+      const leadData = { ...lead };
+      delete leadData._filename;
+      delete leadData._saved;
+      delete leadData.confidence;
+      if (selectedProvider) leadData.providerId = Number(selectedProvider);
+
+      const res = await fetch("/api/leads/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: [leadData] }),
+      });
+      const data = await res.json();
+      if (data.imported > 0) {
+        toast.success(`"${lead.name}" gespeichert`);
+        setPdfLeads((prev) => prev.map((l, i) => i === index ? { ...l, _saved: true } : l));
+      } else {
+        toast.error(`Fehler beim Speichern von "${lead.name}"`);
+      }
+    } catch {
+      toast.error("Speichern fehlgeschlagen");
+    }
+    setImporting(false);
+  }
+
+  async function handlePdfImportAll() {
+    setImporting(true);
+    const validLeads = pdfLeads
+      .filter((l) => l.name && !l._saved)
+      .map((l) => {
+        const leadData = { ...l };
+        delete leadData._filename;
+        delete leadData._saved;
+        delete leadData.confidence;
+        if (selectedProvider) leadData.providerId = Number(selectedProvider);
+        return leadData;
+      });
+
+    if (validLeads.length === 0) {
+      toast.warning("Keine ungespeicherten Leads vorhanden");
+      setImporting(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/leads/import", {
         method: "POST",
@@ -226,7 +416,9 @@ export default function ImportPage() {
       setStep("result");
       if (data.imported > 0) toast.success(`${data.imported} Leads importiert`);
       if (data.failed > 0) toast.error(`${data.failed} fehlgeschlagen`);
-    } catch { toast.error("Import fehlgeschlagen"); }
+    } catch {
+      toast.error("Import fehlgeschlagen");
+    }
     setImporting(false);
   }
 
@@ -246,8 +438,26 @@ export default function ImportPage() {
     setMapping({});
     setResult(null);
     setPdfLeads([]);
+    setPdfFiles([]);
+    setSelectedProvider("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (pdfInputRef.current) pdfInputRef.current.value = "";
+  }
+
+  // Confidence Badge Farbe
+  function confidenceBadge(confidence: number | undefined) {
+    const c = typeof confidence === "number" ? confidence : 0.5;
+    if (c >= 0.8) return <Badge variant="default" className="bg-emerald-500 text-white text-xs">{Math.round(c * 100)}%</Badge>;
+    if (c >= 0.5) return <Badge variant="secondary" className="border-amber-400 bg-amber-50 text-amber-700 text-xs">{Math.round(c * 100)}%</Badge>;
+    return <Badge variant="destructive" className="text-xs">{Math.round(c * 100)}%</Badge>;
+  }
+
+  // Ist ein Feld unsicher? (Confidence < 0.5 und Feld leer/kurz)
+  function isFieldUncertain(lead: PdfLead, fieldKey: string): boolean {
+    const confidence = typeof lead.confidence === "number" ? lead.confidence : 0.5;
+    if (confidence >= 0.5) return false;
+    const val = String(lead[fieldKey] || "");
+    return val.length === 0 || val.length < 2;
   }
 
   return (
@@ -296,7 +506,7 @@ export default function ImportPage() {
             <CardHeader>
               <CardTitle>CSV oder Excel hochladen</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Die erste Zeile wird als Spaltenüberschrift verwendet
+                Die erste Zeile wird als Spalten\u00fcberschrift verwendet
               </p>
             </CardHeader>
             <CardContent>
@@ -306,7 +516,7 @@ export default function ImportPage() {
               >
                 <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-sm font-medium">Datei hier ablegen oder klicken</p>
-                <p className="text-xs text-muted-foreground mt-1">CSV, XLSX unterstützt</p>
+                <p className="text-xs text-muted-foreground mt-1">CSV, XLSX unterst\u00fctzt</p>
               </div>
               <input
                 ref={fileInputRef}
@@ -322,88 +532,175 @@ export default function ImportPage() {
           </Card>
         )}
 
-        {/* PDF Upload */}
+        {/* PDF Upload — Multi-File mit Drag & Drop */}
         {step === "upload" && mode === "pdf" && (
           <Card>
             <CardHeader>
-              <CardTitle>PDF mit KI analysieren</CardTitle>
+              <CardTitle>PDFs mit KI analysieren</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Claude liest das PDF und extrahiert automatisch Lead-Daten. Du kannst vor dem Import alles prüfen und korrigieren.
+                Claude liest die PDFs und extrahiert automatisch Lead-Daten. Du kannst vor dem Import alles pr\u00fcfen und korrigieren.
               </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Drop Zone */}
               <div
-                className="border-2 border-dashed rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
+                  dragOver
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
                 onClick={() => !pdfExtracting && pdfInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
-                {pdfExtracting ? (
-                  <>
-                    <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
-                    <p className="text-sm font-medium">KI analysiert PDF...</p>
-                    <p className="text-xs text-muted-foreground mt-1">Das kann einige Sekunden dauern</p>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">PDF hier ablegen oder klicken</p>
-                    <p className="text-xs text-muted-foreground mt-1">Max. 10 MB, Lead-Daten werden per KI extrahiert</p>
-                  </>
-                )}
+                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-sm font-medium">PDFs hierher ziehen oder klicken</p>
+                <p className="text-xs text-muted-foreground mt-1">Max. 10 MB pro Datei, mehrere PDFs m\u00f6glich</p>
               </div>
               <input
                 ref={pdfInputRef}
                 type="file"
                 accept=".pdf"
+                multiple
                 className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handlePdfUpload(file);
-                }}
+                onChange={handlePdfFileSelect}
               />
+
+              {/* Dateiliste */}
+              {pdfFiles.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{pdfFiles.length} Datei(en) ausgew\u00e4hlt:</p>
+                  {pdfFiles.map((f, i) => (
+                    <div key={`${f.name}-${i}`} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm truncate">{f.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">{formatFileSize(f.size)}</span>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => removePdfFile(i)} className="flex-shrink-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  {/* KI-Analyse starten */}
+                  <Button
+                    onClick={handlePdfExtract}
+                    disabled={pdfExtracting || pdfFiles.length === 0}
+                    className="w-full mt-2"
+                  >
+                    {pdfExtracting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        KI analysiert {pdfFiles.length} PDF{pdfFiles.length > 1 ? "s" : ""}...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        KI-Analyse starten
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* PDF Preview */}
+        {/* PDF Preview — editierbare Karten mit Confidence */}
         {step === "preview" && mode === "pdf" && (
           <Card>
             <CardHeader>
-              <CardTitle>Erkannte Leads prüfen</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {fileName} — {pdfLeads.length} Lead(s) erkannt. Prüfe und korrigiere die Daten vor dem Import.
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Erkannte Leads pr\u00fcfen</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {fileName} \u2014 {pdfLeads.length} Lead(s) erkannt. Pr\u00fcfe und korrigiere die Daten vor dem Import.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="text-xs text-muted-foreground">Gelbe Felder = KI unsicher</span>
+                </div>
+              </div>
+
+              {/* Provider Auswahl (optional) */}
+              {providers.length > 0 && (
+                <div className="flex items-center gap-3 mt-3">
+                  <Label className="text-sm whitespace-nowrap">Lead-Provider:</Label>
+                  <Select value={selectedProvider} onValueChange={(v) => setSelectedProvider(v || "")}>
+                    <SelectTrigger className="w-56">
+                      <SelectValue placeholder="Kein Provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Kein Provider</SelectItem>
+                      {providers.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               {pdfLeads.map((lead, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-3">
+                <div
+                  key={i}
+                  className={`rounded-lg border p-4 space-y-3 transition-colors ${
+                    lead._saved ? "bg-emerald-50 border-emerald-200 opacity-75" : ""
+                  }`}
+                >
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">Lead {i + 1}: {lead.name || "—"}</p>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => removePdfLead(i)}>
-                      <XCircle className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">
+                        {lead._saved && <Check className="h-4 w-4 text-emerald-600 inline mr-1" />}
+                        Lead {i + 1}: {lead.name || "\u2014"}
+                      </p>
+                      {confidenceBadge(lead.confidence)}
+                      {lead._filename && (
+                        <span className="text-xs text-muted-foreground">({lead._filename})</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!lead._saved && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePdfSaveSingle(i)}
+                          disabled={importing || !lead.name}
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Speichern
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => removePdfLead(i)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {[
-                      { key: "name", label: "Firma *" },
-                      { key: "ansprechpartner", label: "Ansprechpartner" },
-                      { key: "email", label: "E-Mail" },
-                      { key: "telefon", label: "Telefon" },
-                      { key: "strasse", label: "Straße" },
-                      { key: "plz", label: "PLZ" },
-                      { key: "ort", label: "Ort" },
-                      { key: "branche", label: "Branche" },
-                      { key: "notizen", label: "Notizen" },
-                    ].map(({ key, label }) => (
-                      <div key={key} className="space-y-1">
-                        <Label className="text-xs">{label}</Label>
-                        <Input
-                          value={String(lead[key] || "")}
-                          onChange={(e) => updatePdfLead(i, key, e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  {!lead._saved && (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {PDF_LEAD_FIELDS.map(({ key, label }) => (
+                        <div key={key} className="space-y-1">
+                          <Label className="text-xs">{label}</Label>
+                          <Input
+                            value={String(lead[key] || "")}
+                            onChange={(e) => updatePdfLead(i, key, e.target.value)}
+                            className={`h-8 text-sm ${
+                              isFieldUncertain(lead, key) ? "border-amber-400 bg-amber-50" : ""
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {pdfLeads.length === 0 && (
@@ -411,9 +708,14 @@ export default function ImportPage() {
               )}
               <div className="flex items-center justify-between pt-4">
                 <Button variant="outline" onClick={reset}>Abbrechen</Button>
-                <Button onClick={handlePdfImport} disabled={importing || pdfLeads.filter(l => l.name).length === 0}>
+                <Button
+                  onClick={handlePdfImportAll}
+                  disabled={importing || pdfLeads.filter(l => l.name && !l._saved).length === 0}
+                >
                   <Upload className="h-4 w-4 mr-2" />
-                  {importing ? "Importiere..." : `${pdfLeads.filter(l => l.name).length} Leads importieren`}
+                  {importing
+                    ? "Importiere..."
+                    : `${pdfLeads.filter(l => l.name && !l._saved).length} Leads importieren`}
                 </Button>
               </div>
             </CardContent>
