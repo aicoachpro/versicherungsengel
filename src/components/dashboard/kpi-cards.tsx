@@ -263,7 +263,7 @@ export function KpiCards({ wonLeads, openLeads, revenue, costs, roi, leadBudget 
         </Link>
       ))}
       <CycleCard revenue={revenue} costs={costs} roi={roi} />
-      <LeadBudgetCard data={leadBudget} />
+      {leadBudget.budget > 0 && <LeadBudgetCard data={leadBudget} />}
     </div>
   );
 }

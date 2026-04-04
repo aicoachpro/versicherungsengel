@@ -69,12 +69,16 @@ function getLeadBudget() {
     const startMonths = providers.map((p) => p.startMonth).filter(Boolean) as string[];
     startMonth = startMonths.length > 0 ? startMonths.sort()[0] : "";
   } else {
-    // Fallback: alte Settings-basierte Logik
-    const budget = parseInt(getSetting("company.leadBudget") || "10", 10);
-    minPerMonth = parseInt(getSetting("leadProvider.minPerMonth") || String(budget), 10);
-    carryOverEnabled = getSetting("leadProvider.carryOver") !== "false";
-    startMonth = getSetting("leadProvider.startMonth"); // YYYY-MM
-    costPerLead = parseInt(getSetting("leadProvider.costPerLead") || "320", 10);
+    // Fallback: alte Settings-basierte Logik (nur wenn konfiguriert)
+    const budgetStr = getSetting("company.leadBudget") || getSetting("leadProvider.minPerMonth");
+    if (!budgetStr) {
+      // Nichts konfiguriert — leeres Budget zurückgeben
+      return { budget: 0, costPerLead: 0, months: [] };
+    }
+    minPerMonth = parseInt(budgetStr, 10) || 0;
+    carryOverEnabled = getSetting("leadProvider.carryOver") === "true";
+    startMonth = getSetting("leadProvider.startMonth");
+    costPerLead = parseInt(getSetting("leadProvider.costPerLead") || "0", 10);
   }
 
   const result = db
