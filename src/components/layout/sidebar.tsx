@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Upload,
   Mail,
+  Coins,
   MoreHorizontal,
   Sun,
   Moon,
@@ -38,6 +39,7 @@ const mainNav = [
   { href: "/versicherungen", label: "Versicherungen", icon: FileText },
   { href: "/archiv", label: "Archiv", icon: Archive },
   { href: "/reklamationen", label: "Reklamationen", icon: AlertTriangle },
+  { href: "/provisionen", label: "Provisionen", icon: Coins },
   { href: "/import", label: "Lead-Import", icon: Upload },
   { href: "/email-inbox", label: "E-Mail-Eingang", icon: Mail },
 ];

@@ -206,6 +206,37 @@ export const providerProducts = sqliteTable("provider_products", {
   productId: integer("product_id").notNull(),
 });
 
+export const provisionImports = sqliteTable("provision_imports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  filename: text("filename").notNull(),
+  importDate: text("import_date").notNull(),
+  totalRows: integer("total_rows").notNull().default(0),
+  totalBetrag: real("total_betrag").notNull().default(0),
+  matchedRows: integer("matched_rows").notNull().default(0),
+  unmatchedRows: integer("unmatched_rows").notNull().default(0),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const provisions = sqliteTable("provisions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  importId: integer("import_id").notNull(),
+  buchungsDatum: text("buchungs_datum").notNull(),
+  versNehmer: text("vers_nehmer").notNull(),
+  bsz: text("bsz"),
+  versNummer: text("vers_nummer"),
+  datevKonto: text("datev_konto"),
+  kontoName: text("konto_name"),
+  buchungstext: text("buchungstext"),
+  erfolgsDatum: text("erfolgs_datum"),
+  vtnr: text("vtnr"),
+  provBasis: real("prov_basis").notNull().default(0),
+  provSatz: real("prov_satz").notNull().default(0),
+  betrag: real("betrag").notNull().default(0),
+  leadId: integer("lead_id"),
+  matchConfidence: real("match_confidence"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),

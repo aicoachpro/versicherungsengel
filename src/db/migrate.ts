@@ -234,6 +234,43 @@ try {
   console.log("Added 'product_id' column to leads table");
 }
 
+// Create provision_imports table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS provision_imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    filename TEXT NOT NULL,
+    import_date TEXT NOT NULL,
+    total_rows INTEGER NOT NULL DEFAULT 0,
+    total_betrag REAL NOT NULL DEFAULT 0,
+    matched_rows INTEGER NOT NULL DEFAULT 0,
+    unmatched_rows INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
+// Create provisions table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS provisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    import_id INTEGER NOT NULL,
+    buchungs_datum TEXT NOT NULL,
+    vers_nehmer TEXT NOT NULL,
+    bsz TEXT,
+    vers_nummer TEXT,
+    datev_konto TEXT,
+    konto_name TEXT,
+    buchungstext TEXT,
+    erfolgs_datum TEXT,
+    vtnr TEXT,
+    prov_basis REAL NOT NULL DEFAULT 0,
+    prov_satz REAL NOT NULL DEFAULT 0,
+    betrag REAL NOT NULL DEFAULT 0,
+    lead_id INTEGER,
+    match_confidence REAL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {
