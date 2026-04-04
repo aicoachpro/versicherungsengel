@@ -47,6 +47,25 @@ export async function GET(req: NextRequest) {
       const lock = await client.getMailboxLock(folder);
 
       try {
+        // Erster Durchlauf: nur als gelesen markieren, nicht importieren
+        const isFirstPoll = !account.lastPolledAt;
+        if (isFirstPoll) {
+          // Alle bestehenden ungelesenen Mails als gelesen markieren
+          try {
+            await client.messageFlagsAdd("1:*", ["\\Seen"]);
+          } catch {
+            // Keine Nachrichten vorhanden — OK
+          }
+          lock.release();
+          db.update(emailAccounts)
+            .set({ lastPolledAt: new Date().toISOString() })
+            .where(eq(emailAccounts.id, account.id))
+            .run();
+          await client.logout();
+          totalPolled++;
+          continue;
+        }
+
         // UNSEEN Nachrichten suchen
         const messages = client.fetch({ seen: false }, {
           uid: true,
