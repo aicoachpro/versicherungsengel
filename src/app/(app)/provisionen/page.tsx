@@ -603,7 +603,7 @@ export default function ProvisionenPage() {
                 </Badge>
                 {importResult.skipped > 0 && (
                   <Badge variant="outline" className="border-slate-400 text-slate-600">
-                    {importResult.skipped} Duplikate uebersprungen
+                    {importResult.skipped} Duplikate übersprungen
                   </Badge>
                 )}
               </div>
@@ -653,6 +653,44 @@ export default function ProvisionenPage() {
           </div>
         )}
 
+        {/* Anleitung / Legende */}
+        {provisions.length > 0 && checkedIds.size > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <HelpCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-2 text-sm">
+                  <p className="font-medium text-amber-900 dark:text-amber-200">So funktioniert der Provisions-Import:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-amber-800 dark:text-amber-300">
+                    <li>Prüfe die <span className="font-medium">amber markierten Vorschläge</span> — sind die Zuordnungen korrekt?</li>
+                    <li>Entferne das Häkchen bei falschen Zuordnungen</li>
+                    <li>Klicke <span className="font-medium">&quot;Ausgewählte bestätigen&quot;</span> — nur bestätigte Provisionen werden gespeichert</li>
+                    <li>Alle nicht bestätigten Einträge werden automatisch gelöscht</li>
+                  </ol>
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-3 w-3 rounded-full bg-amber-400" />
+                      <span className="text-xs text-muted-foreground">Vorschlag — prüfen</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-muted-foreground">Bestätigt</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-3 w-3 rounded-full bg-slate-300" />
+                      <span className="text-xs text-muted-foreground">Kein Lead gefunden</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3 text-orange-500" />
+                      <span className="text-xs text-muted-foreground">Abweichung — Betrag prüfen</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Provisions-Tabelle */}
         <Card>
           <CardHeader className="pb-4">
@@ -673,7 +711,7 @@ export default function ProvisionenPage() {
                   ) : (
                     <Check className="h-4 w-4 mr-1" />
                   )}
-                  {checkedIds.size} ausgewaehlte bestaetigen
+                  {checkedIds.size} ausgewählte bestätigen
                 </Button>
               )}
             </div>
