@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
+import { seedDemoData } from "./demo-seed";
 
 const dataDir = path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
@@ -295,6 +296,11 @@ if (!existingKey) {
     .prepare(`INSERT INTO api_keys (key, name) VALUES (?, ?)`)
     .run(apiKey, "n8n-webhook");
   console.log(`n8n API Key created: ${apiKey}`);
+}
+
+// Demo-Modus: Fake-Daten einfügen wenn DEMO_MODE=true und DB leer
+if (process.env.DEMO_MODE === "true") {
+  seedDemoData(sqlite);
 }
 
 console.log("Migration complete!");

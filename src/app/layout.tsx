@@ -26,6 +26,11 @@ export default function RootLayout({
   return (
     <html lang="de" suppressHydrationWarning>
       <body className="antialiased">
+        {process.env.DEMO_MODE === "true" && (
+          <div className="bg-amber-500 text-white text-center text-xs py-1 font-medium fixed top-0 left-0 right-0 z-[9999]">
+            Demo-Modus — keine echten Daten
+          </div>
+        )}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SessionProvider>
             <TooltipProvider>{children}</TooltipProvider>

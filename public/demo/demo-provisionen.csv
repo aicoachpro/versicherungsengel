@@ -1,0 +1,53 @@
+Buchungen |   | Buchungen;;;;;;;;;;;;
+;;;;;;;;;;;;
+B.Dat.;Vers. Nehmer;BSZ;Vers. Nummer;DATEV Konto;;Buchungstext;Erfolgswirks. B.Dat.;VTNR; ;Prov.Basis;Prov.Satz;Betrag
+Total;;;;;;;;;; ; ;15.234,56
+01.02.2026;Müller, Hans;AS;AS-9397100001;8051;;Firmenversicherung;01.02.2026;93971; ;4.800,00;15,0%;720,00
+01.03.2026;Müller, Hans;F;AS-9397100001;8052;;Firmenversicherung;01.03.2026;93971; ;4.800,00;5,0%;240,00
+01.03.2026;Bergmann, Petra;AS;KF-4521700002;8041;;Flottenversicherung;01.03.2026;45217; ;8.500,00;12,0%;1.020,00
+01.04.2026;Bergmann, Petra;F;KF-4521700002;8042;;Flottenversicherung;01.04.2026;45217; ;8.500,00;4,0%;340,00
+01.03.2026;Krause, Stefan;AS;CY-7783200003;8061;;Cyberschutzversicherung;01.03.2026;77832; ;3.200,00;20,0%;640,00
+01.04.2026;Krause, Stefan;F;CY-7783200003;8062;;Cyberschutzversicherung;01.04.2026;77832; ;3.200,00;8,0%;256,00
+15.03.2026;Hoffmann, Werner;AS;BH-6654300004;8051;;Betriebshaftpflicht;15.03.2026;66543; ;1.800,00;18,0%;324,00
+15.03.2026;Hoffmann, Werner;AS;IN-6654300005;8062;;Inhaltsversicherung;15.03.2026;66543; ;1.100,00;15,0%;165,00
+01.04.2026;Hoffmann, Werner;F;BH-6654300004;8052;;Betriebshaftpflicht;01.04.2026;66543; ;1.800,00;6,0%;108,00
+01.01.2026;Wagner, Michael;AS;LV-1122300010;8051;;Risikolebensversicherung;01.01.2026;11223; ;25.000,00;3,5%;875,00
+01.02.2026;Wagner, Michael;F;LV-1122300010;8052;;Risikolebensversicherung;01.02.2026;11223; ;25.000,00;1,0%;250,00
+15.01.2026;Koch, Christine;AS;KV-3344500011;8061;;Krankenversicherung;15.01.2026;33445; ;6.200,00;10,0%;620,00
+01.03.2026;Koch, Christine;F;KV-3344500011;8062;;Krankenversicherung;01.03.2026;33445; ;6.200,00;3,0%;186,00
+01.02.2026;Richter, Alexander;AS;RS-5566700012;8051;;Rechtsschutzversicherung;01.02.2026;55667; ;1.500,00;22,0%;330,00
+01.03.2026;Richter, Alexander;F;RS-5566700012;8052;;Rechtsschutzversicherung;01.03.2026;55667; ;1.500,00;8,0%;120,00
+15.02.2026;Bauer, Monika;AS;UF-7788900013;8061;;Unfallversicherung;15.02.2026;77889; ;900,00;25,0%;225,00
+01.01.2026;Schwarz, Dieter;AS;WG-9900100014;8051;;Wohngebäudeversicherung;01.01.2026;99001; ;2.800,00;14,0%;392,00
+01.04.2026;Schwarz, Dieter;F;WG-9900100014;8052;;Wohngebäudeversicherung;01.04.2026;99001; ;2.800,00;5,0%;140,00
+01.02.2026;Zimmermann, Helga;AS;HR-2233400015;8061;;Hausratversicherung;01.02.2026;22334; ;480,00;28,0%;134,40
+15.03.2026;Lehmann, Bernd;AS;CY-4455600016;8061;;Cyberschutzversicherung;15.03.2026;44556; ;5.600,00;18,0%;1.008,00
+01.04.2026;Lehmann, Bernd;F;CY-4455600016;8062;;Cyberschutzversicherung;01.04.2026;44556; ;5.600,00;6,0%;336,00
+01.03.2026;Schubert, Renate;AS;BH-6677800017;8051;;Betriebshaftpflicht;01.03.2026;66778; ;3.400,00;16,0%;544,00
+01.04.2026;Schubert, Renate;F;BH-6677800017;8052;;Betriebshaftpflicht;01.04.2026;66778; ;3.400,00;5,0%;170,00
+15.01.2026;Frank, Uwe;AS;FL-8899000018;8041;;Flottenversicherung;15.01.2026;88990; ;12.000,00;10,0%;1.200,00
+01.03.2026;Frank, Uwe;F;FL-8899000018;8042;;Flottenversicherung;01.03.2026;88990; ;12.000,00;3,5%;420,00
+01.02.2026;Albrecht, Sabine;AS;DO-1100200019;8061;;D&O-Versicherung;01.02.2026;11002; ;4.500,00;12,0%;540,00
+01.04.2026;Albrecht, Sabine;F;DO-1100200019;8062;;D&O-Versicherung;01.04.2026;11002; ;4.500,00;4,0%;180,00
+15.02.2026;Hartmann, Peter;AS;BV-3322100020;8051;;bAV Direktversicherung;15.02.2026;33221; ;18.000,00;2,5%;450,00
+01.01.2026;Vogt, Ingrid;AS;KF-5544300021;8041;;KFZ-Versicherung;01.01.2026;55443; ;1.800,00;18,0%;324,00
+01.04.2026;Vogt, Ingrid;F;KF-5544300021;8042;;KFZ-Versicherung;01.04.2026;55443; ;1.800,00;6,0%;108,00
+01.03.2026;Seidel, Jörg;AS;PK-7766500022;8061;;Private Krankenversicherung;01.03.2026;77665; ;7.200,00;8,0%;576,00
+15.03.2026;Brandt, Claudia;AS;ZZ-9988700023;8061;;Zahnzusatzversicherung;15.03.2026;99887; ;360,00;35,0%;126,00
+01.02.2026;Schreiber, Norbert;AS;BU-1199800024;8061;;Berufsunfähigkeit;01.02.2026;11998; ;3.600,00;15,0%;540,00
+01.04.2026;Schreiber, Norbert;F;BU-1199800024;8062;;Berufsunfähigkeit;01.04.2026;11998; ;3.600,00;5,0%;180,00
+15.01.2026;Winkler, Gisela;AS;SG-3377900025;8061;;Sterbegeldversicherung;15.01.2026;33779; ;600,00;30,0%;180,00
+01.03.2026;Lorenz, Thomas;AS;PF-5566100026;8061;;Pflegeversicherung;01.03.2026;55661; ;2.400,00;12,0%;288,00
+01.04.2026;Lorenz, Thomas;F;PF-5566100026;8062;;Pflegeversicherung;01.04.2026;55661; ;2.400,00;4,0%;96,00
+15.02.2026;Baumann, Erika;AS;FI-7744300027;8051;;Firmeninhaltsversicherung;15.02.2026;77443; ;2.200,00;16,0%;352,00
+01.04.2026;Baumann, Erika;F;FI-7744300027;8052;;Firmeninhaltsversicherung;01.04.2026;77443; ;2.200,00;5,0%;110,00
+01.01.2026;Engel, Friedrich;AS;VS-9933500028;8051;;Vermögensschadenhaftpflicht;01.01.2026;99335; ;4.000,00;14,0%;560,00
+01.03.2026;Engel, Friedrich;F;VS-9933500028;8052;;Vermögensschadenhaftpflicht;01.03.2026;99335; ;4.000,00;4,5%;180,00
+01.02.2026;Haas, Martina;AS;HP-1155700029;8051;;Haftpflichtversicherung;01.02.2026;11557; ;320,00;30,0%;96,00
+15.03.2026;Keller, Wolfgang;AS;HU-3366900030;8061;;Hundeversicherung;15.03.2026;33669; ;180,00;35,0%;63,00
+01.03.2026;Pohl, Andrea;AS;PV-5577100031;8061;;Pferdeversicherung;01.03.2026;55771; ;2.400,00;10,0%;240,00
+01.04.2026;Pohl, Andrea;F;PV-5577100031;8062;;Pferdeversicherung;01.04.2026;55771; ;2.400,00;3,0%;72,00
+15.01.2026;Dietrich, Manfred;AS;RV-7788300032;8061;;Reiseversicherung;15.01.2026;77883; ;120,00;40,0%;48,00
+01.02.2026;Marx, Karin;AS;GH-9999500033;8051;;Gewerbe-Haftpflicht;01.02.2026;99995; ;2.600,00;17,0%;442,00
+01.04.2026;Marx, Karin;F;GH-9999500033;8052;;Gewerbe-Haftpflicht;01.04.2026;99995; ;2.600,00;5,5%;143,00
+01.03.2026;Jäger, Helmut;AS;FN-1234500034;8051;;Finanzierung;01.03.2026;12345; ;50.000,00;1,2%;600,00
