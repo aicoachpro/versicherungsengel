@@ -1891,6 +1891,7 @@ export default function SettingsPage() {
     <div className="flex flex-col">
       <Header title="Einstellungen" />
       <div className="flex-1 p-6 space-y-6 max-w-2xl">
+        <p className="text-sm text-muted-foreground -mt-2">Konfiguration und Integrationen für deine Instanz.</p>
         {/* Admin-only sections */}
         {isAdmin && (
           <>

@@ -57,7 +57,7 @@ const mobileBottomNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/kalender", label: "Kalender", icon: CalendarDays },
-  { href: "/wiedervorlage", label: "Aufgaben", icon: CalendarClock },
+  { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
 ];
 
 export function Sidebar() {

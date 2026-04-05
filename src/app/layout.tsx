@@ -11,6 +11,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `${b.companyName}${b.subtitle ? " | " + b.subtitle : ""}`,
     description: b.subtitle ? `${b.subtitle} – ${b.companyName}` : b.companyName,
+    icons: {
+      icon: "/logo.png",
+      apple: "/logo.png",
+    },
   };
 }
 
