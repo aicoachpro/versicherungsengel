@@ -45,6 +45,19 @@ function fixMojibake(text: string): string {
 }
 
 /**
+ * Konvertiert deutsches Datum "01.04.2026" → ISO "2026-04-01"
+ */
+function parseGermanDate(dateStr: string): string {
+  if (!dateStr || !dateStr.trim()) return "";
+  const trimmed = dateStr.trim();
+  const parts = trimmed.split(".");
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+  }
+  return trimmed;
+}
+
+/**
  * Parst eine deutsche Zahl: "1.500,00" → 1500.00, "-320,00" → -320.00
  * Auch Prozent: "12,0%" → 12.0
  */
@@ -87,6 +100,9 @@ export function parseProvisionCSV(csvText: string): ParsedProvision[] {
     if (!versNehmer && !buchungsDatum) continue;
     if (!versNehmer) continue;
 
+    // Zeilen ohne echten Kundennamen überspringen (Aggregate/Header-Zeilen)
+    if (/^\s*;?0{4}/.test(versNehmer) || versNehmer.length < 2) continue;
+
     // "Total"-Zeile überspringen (falls weitere Total-Zeilen existieren)
     if (versNehmer.toLowerCase() === "total" || buchungsDatum.toLowerCase() === "total") continue;
 
@@ -95,14 +111,14 @@ export function parseProvisionCSV(csvText: string): ParsedProvision[] {
     const kontoName = cols[5]?.trim() || null;
 
     results.push({
-      buchungsDatum,
+      buchungsDatum: parseGermanDate(buchungsDatum),
       versNehmer,
       bsz: cols[2]?.trim() || null,
       versNummer: cols[3]?.trim() || null,
       datevKonto,
       kontoName,
       buchungstext: cols[6]?.trim() || null,
-      erfolgsDatum: cols[7]?.trim() || null,
+      erfolgsDatum: cols[7]?.trim() ? parseGermanDate(cols[7].trim()) : null,
       vtnr: cols[8]?.trim() || null,
       // Spalte 9 ist ein Leerzeichen/Separator
       provBasis: parseGermanNumber(cols[10] || ""),
