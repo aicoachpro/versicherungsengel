@@ -40,7 +40,6 @@ import {
   Link2,
   Check,
   X,
-  AlertTriangle,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -108,6 +107,12 @@ function generateMonthOptions(): { value: string; label: string }[] {
     options.push({ value, label });
   }
   return options;
+}
+
+/** Entfernt das "[ABWEICHUNG] " Prefix aus kontoName */
+function cleanKontoName(kontoName: string | null): string | null {
+  if (!kontoName) return kontoName;
+  return kontoName.replace(/^\[ABWEICHUNG\]\s*/, "");
 }
 
 // --- Komponenten ---
@@ -202,7 +207,7 @@ function LeadAssignDropdown({
   );
 }
 
-// Lead-Badge (ohne Buttons — die kommen in die Aktion-Spalte)
+// Lead-Badge (ohne Abweichung-Badge)
 function LeadBadge({
   provision,
   onNavigate,
@@ -212,43 +217,26 @@ function LeadBadge({
 }) {
   if (!provision.leadId) return null;
 
-  const isAbweichung = provision.kontoName?.startsWith("[ABWEICHUNG]");
-
   if (provision.confirmed) {
     return (
-      <div className="flex items-center gap-1">
-        <Badge
-          variant="default"
-          className="bg-emerald-500 cursor-pointer text-xs"
-          onClick={() => onNavigate(provision.leadId!)}
-        >
-          {provision.leadName || `Lead #${provision.leadId}`}
-        </Badge>
-        {isAbweichung && (
-          <Badge variant="outline" className="border-orange-400 text-orange-700 text-xs">
-            <AlertTriangle className="h-3 w-3 mr-0.5" />
-            Abweichung
-          </Badge>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1">
       <Badge
-        variant="outline"
-        className="border-amber-400 bg-amber-50 text-amber-700 text-xs cursor-pointer"
+        variant="default"
+        className="bg-emerald-500 cursor-pointer text-xs"
         onClick={() => onNavigate(provision.leadId!)}
       >
         {provision.leadName || `Lead #${provision.leadId}`}
       </Badge>
-      {isAbweichung && (
-        <Badge variant="outline" className="border-orange-400 text-orange-700 text-xs">
-          <AlertTriangle className="h-3 w-3 mr-0.5" />
-        </Badge>
-      )}
-    </div>
+    );
+  }
+
+  return (
+    <Badge
+      variant="outline"
+      className="border-amber-400 bg-amber-50 text-amber-700 text-xs cursor-pointer"
+      onClick={() => onNavigate(provision.leadId!)}
+    >
+      {provision.leadName || `Lead #${provision.leadId}`}
+    </Badge>
   );
 }
 
@@ -277,6 +265,7 @@ export default function ProvisionenPage() {
   const [provisions, setProvisions] = useState<Provision[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   // Checkbox-State fuer Batch-Bestaetigung
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
@@ -289,10 +278,13 @@ export default function ProvisionenPage() {
 
   const monthOptions = generateMonthOptions();
 
-  // Unbestätigte Vorschläge zählen
+  // Unbestaetigte Vorschlaege zaehlen
   const unconfirmedCount = provisions.filter(
     (p) => p.leadId && !p.confirmed
   ).length;
+
+  // Gibt es unbestaetigte Matches? (fuer Legende)
+  const hasUnconfirmedMatches = unconfirmedCount > 0;
 
   // Debounce Suche
   useEffect(() => {
@@ -343,7 +335,7 @@ export default function ProvisionenPage() {
     fetchProvisions();
   }, [fetchProvisions]);
 
-  // Nach Laden: alle unbestaetigten Matches vorauswählen
+  // Nach Laden: alle unbestaetigten Matches vorauswaehlen
   useEffect(() => {
     const unconfirmedIds = new Set(
       provisions
@@ -417,58 +409,82 @@ export default function ProvisionenPage() {
       }
     }
 
-    // 2. Cleanup: alle nicht-bestaetigten Provisionen des Imports loeschen
-    if (selectedImportId) {
+    // 2. Cleanup: alle nicht-bestaetigten Provisionen loeschen
+    const importIds = selectedImportId
+      ? [selectedImportId]
+      : [...new Set(provisions.map((p) => p.importId))];
+
+    let totalDeleted = 0;
+    for (const impId of importIds) {
       try {
         const res = await fetch("/api/provisions/cleanup", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ importId: selectedImportId }),
+          body: JSON.stringify({ importId: impId }),
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.deleted > 0) {
-            toast.success(
-              `${confirmed} bestaetigt, ${data.deleted} nicht bestaetigte Eintraege entfernt`
-            );
-          } else {
-            toast.success(`${confirmed} Vorschlaege bestaetigt`);
-          }
+          totalDeleted += data.deleted;
         }
       } catch {
-        toast.success(`${confirmed} Vorschlaege bestaetigt`);
+        // weiter
       }
+    }
+
+    if (totalDeleted > 0) {
+      toast.success(
+        `${confirmed} bestaetigt, ${totalDeleted} nicht bestaetigte Eintraege entfernt`
+      );
     } else {
-      // Ohne ausgewaehlten Import: alle sichtbaren Import-IDs cleanen
-      const importIds = [...new Set(provisions.map((p) => p.importId))];
-      let totalDeleted = 0;
-      for (const impId of importIds) {
-        try {
-          const res = await fetch("/api/provisions/cleanup", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ importId: impId }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            totalDeleted += data.deleted;
-          }
-        } catch {
-          // weiter
-        }
-      }
-      if (totalDeleted > 0) {
-        toast.success(
-          `${confirmed} bestaetigt, ${totalDeleted} nicht bestaetigte Eintraege entfernt`
-        );
-      } else {
-        toast.success(`${confirmed} Vorschlaege bestaetigt`);
-      }
+      toast.success(`${confirmed} Vorschlaege bestaetigt`);
     }
 
     fetchProvisions();
     fetchImports();
     setConfirming(false);
+  }
+
+  // Abbrechen: Alle Provisionen des Imports loeschen + Import-Datensatz
+  async function handleCancelImport(importId: number) {
+    setCancelling(true);
+    try {
+      const res = await fetch("/api/provisions/cancel", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Import geloescht (${data.deleted} Provisionen entfernt)`);
+        setSelectedImportId(null);
+        fetchImports();
+        fetchProvisions();
+      } else {
+        toast.error("Loeschen fehlgeschlagen");
+      }
+    } catch {
+      toast.error("Fehler beim Loeschen");
+    }
+    setCancelling(false);
+  }
+
+  // Abbrechen mit Confirm-Dialog
+  function handleCancelWithConfirm() {
+    const importIds = selectedImportId
+      ? [selectedImportId]
+      : [...new Set(provisions.map((p) => p.importId))];
+
+    if (importIds.length === 0) return;
+
+    const confirmed = window.confirm(
+      "Wirklich abbrechen? Alle importierten Provisionen werden geloescht."
+    );
+    if (!confirmed) return;
+
+    // Alle betroffenen Imports loeschen
+    for (const impId of importIds) {
+      handleCancelImport(impId);
+    }
   }
 
   // CSV Upload
@@ -603,7 +619,7 @@ export default function ProvisionenPage() {
                 </Badge>
                 {importResult.skipped > 0 && (
                   <Badge variant="outline" className="border-slate-400 text-slate-600">
-                    {importResult.skipped} Duplikate übersprungen
+                    {importResult.skipped} Duplikate uebersprungen
                   </Badge>
                 )}
               </div>
@@ -619,42 +635,60 @@ export default function ProvisionenPage() {
             </h2>
             <div className="flex flex-wrap gap-3">
               {imports.map((imp) => (
-                <button
+                <div
                   key={imp.id}
-                  onClick={() =>
-                    setSelectedImportId(selectedImportId === imp.id ? null : imp.id)
-                  }
-                  className={`rounded-lg border p-3 text-left text-sm transition-colors hover:bg-accent ${
+                  className={`relative rounded-lg border p-3 text-left text-sm transition-colors hover:bg-accent ${
                     selectedImportId === imp.id
                       ? "border-primary bg-primary/5 ring-1 ring-primary"
                       : ""
                   }`}
                 >
-                  <p className="font-medium truncate max-w-[200px]">{imp.filename}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatDate(imp.importedAt)} -- {imp.rowCount} Zeilen -- {formatCurrency(imp.totalAmount)}
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge variant="default" className="bg-emerald-500 text-xs">
-                      {imp.matchedCount}
-                    </Badge>
-                    <Badge variant="outline" className="border-amber-400 text-amber-700 text-xs">
-                      {imp.unmatchedCount}
-                    </Badge>
-                    {imp.skippedCount != null && imp.skippedCount > 0 && (
-                      <Badge variant="outline" className="border-slate-400 text-slate-600 text-xs">
-                        {imp.skippedCount} dup.
+                  <button
+                    onClick={() =>
+                      setSelectedImportId(selectedImportId === imp.id ? null : imp.id)
+                    }
+                    className="text-left w-full"
+                  >
+                    <p className="font-medium truncate max-w-[200px] pr-6">{imp.filename}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatDate(imp.importedAt)} -- {imp.rowCount} Zeilen -- {formatCurrency(imp.totalAmount)}
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Badge variant="default" className="bg-emerald-500 text-xs">
+                        {imp.matchedCount}
                       </Badge>
-                    )}
-                  </div>
-                </button>
+                      <Badge variant="outline" className="border-amber-400 text-amber-700 text-xs">
+                        {imp.unmatchedCount}
+                      </Badge>
+                      {imp.skippedCount != null && imp.skippedCount > 0 && (
+                        <Badge variant="outline" className="border-slate-400 text-slate-600 text-xs">
+                          {imp.skippedCount} dup.
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                  {/* Loeschen-Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const confirmed = window.confirm(
+                        `Import "${imp.filename}" und alle zugehoerigen Provisionen loeschen?`
+                      );
+                      if (confirmed) handleCancelImport(imp.id);
+                    }}
+                    className="absolute top-2 right-2 inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Import loeschen"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Anleitung / Legende */}
-        {provisions.length > 0 && checkedIds.size > 0 && (
+        {/* Anleitung / Legende — sichtbar wenn unbestaetigte Matches existieren */}
+        {provisions.length > 0 && hasUnconfirmedMatches && (
           <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">
@@ -662,27 +696,23 @@ export default function ProvisionenPage() {
                 <div className="space-y-2 text-sm">
                   <p className="font-medium text-amber-900 dark:text-amber-200">So funktioniert der Provisions-Import:</p>
                   <ol className="list-decimal list-inside space-y-1 text-amber-800 dark:text-amber-300">
-                    <li>Prüfe die <span className="font-medium">amber markierten Vorschläge</span> — sind die Zuordnungen korrekt?</li>
-                    <li>Entferne das Häkchen bei falschen Zuordnungen</li>
-                    <li>Klicke <span className="font-medium">&quot;Ausgewählte bestätigen&quot;</span> — nur bestätigte Provisionen werden gespeichert</li>
-                    <li>Alle nicht bestätigten Einträge werden automatisch gelöscht</li>
+                    <li>Pruefe die <span className="font-medium">amber markierten Vorschlaege</span> — sind die Zuordnungen korrekt?</li>
+                    <li>Entferne das Haekchen bei falschen Zuordnungen</li>
+                    <li>Klicke <span className="font-medium">&quot;Fertig&quot;</span> — nur bestaetigte Provisionen werden gespeichert</li>
+                    <li>Oder klicke <span className="font-medium">&quot;Abbrechen&quot;</span> — alle importierten Daten werden geloescht</li>
                   </ol>
                   <div className="flex flex-wrap gap-3 pt-1">
                     <div className="flex items-center gap-1.5">
                       <div className="h-3 w-3 rounded-full bg-amber-400" />
-                      <span className="text-xs text-muted-foreground">Vorschlag — prüfen</span>
+                      <span className="text-xs text-muted-foreground">Vorschlag — pruefen</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                      <span className="text-xs text-muted-foreground">Bestätigt</span>
+                      <span className="text-xs text-muted-foreground">Bestaetigt</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <div className="h-3 w-3 rounded-full bg-slate-300" />
                       <span className="text-xs text-muted-foreground">Kein Lead gefunden</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="h-3 w-3 text-orange-500" />
-                      <span className="text-xs text-muted-foreground">Abweichung — Betrag prüfen</span>
                     </div>
                   </div>
                 </div>
@@ -694,25 +724,41 @@ export default function ProvisionenPage() {
         {/* Provisions-Tabelle */}
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="flex items-center gap-2">
                 Provisionen
                 <Badge variant="secondary">{provisions.length}</Badge>
               </CardTitle>
-              {checkedIds.size > 0 && (
-                <Button
-                  size="sm"
-                  onClick={handleConfirmChecked}
-                  disabled={confirming}
-                  className="bg-amber-500 hover:bg-amber-600 text-white"
-                >
-                  {confirming ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-1" />
-                  )}
-                  {checkedIds.size} ausgewählte bestätigen
-                </Button>
+              {hasUnconfirmedMatches && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelWithConfirm}
+                    disabled={cancelling}
+                    className="border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    {cancelling ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4 mr-1" />
+                    )}
+                    Abbrechen
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleConfirmChecked}
+                    disabled={confirming || checkedIds.size === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {confirming ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-1" />
+                    )}
+                    Fertig ({checkedIds.size})
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>
@@ -736,11 +782,10 @@ export default function ProvisionenPage() {
                   }}
                 >
                   <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Alle Monate" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Alle Monate</SelectItem>
-
                     {monthOptions.map((m) => (
                       <SelectItem key={m.value} value={m.value}>
                         {m.label}
@@ -755,7 +800,7 @@ export default function ProvisionenPage() {
                   }}
                 >
                   <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Alle" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Alle</SelectItem>
@@ -806,9 +851,9 @@ export default function ProvisionenPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium truncate">{p.versNehmer}</span>
+                        <span className="text-xs font-medium truncate">{p.versNehmer}</span>
                         <span
-                          className={`text-sm font-bold ${
+                          className={`text-xs font-bold ${
                             p.betrag >= 0 ? "text-emerald-600" : "text-red-600"
                           }`}
                         >
@@ -817,11 +862,10 @@ export default function ProvisionenPage() {
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{formatDate(p.datum)}</span>
-                        <span>{p.versNr}</span>
+                        <span className="truncate max-w-[120px]">{p.versNr}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{p.buchungstext}</span>
-                        <span>{p.datevKonto}</span>
+                        <span className="truncate max-w-[150px]">{p.buchungstext}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">
@@ -878,7 +922,7 @@ export default function ProvisionenPage() {
                     <TableHeader>
                       <TableRow>
                         {unconfirmedCount > 0 && (
-                          <TableHead className="w-10">
+                          <TableHead className="w-10 px-2 py-1.5 text-xs">
                             <Checkbox
                               checked={
                                 checkedIds.size > 0 &&
@@ -889,16 +933,15 @@ export default function ProvisionenPage() {
                             />
                           </TableHead>
                         )}
-                        <TableHead>Datum</TableHead>
-                        <TableHead>Vers. Nehmer</TableHead>
-                        <TableHead>Vers. Nr.</TableHead>
-                        <TableHead>DATEV-Konto</TableHead>
-                        <TableHead>Buchungstext</TableHead>
-                        <TableHead className="text-right">Prov.Basis</TableHead>
-                        <TableHead className="text-right">Satz</TableHead>
-                        <TableHead className="text-right">Betrag</TableHead>
-                        <TableHead>Lead</TableHead>
-                        <TableHead className="text-center">Aktion</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs">Datum</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs">Vers. Nehmer</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs">Vers. Nr.</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs">Buchungstext</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs text-right">Prov.Basis</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs text-right">Satz</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs text-right">Betrag</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs">Lead</TableHead>
+                        <TableHead className="px-2 py-1.5 text-xs text-right w-16">Aktion</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -910,7 +953,7 @@ export default function ProvisionenPage() {
                             className={isUnconfirmedMatch ? "bg-amber-50/50" : ""}
                           >
                             {unconfirmedCount > 0 && (
-                              <TableCell className="w-10">
+                              <TableCell className="w-10 px-2 py-1.5">
                                 {isUnconfirmedMatch ? (
                                   <Checkbox
                                     checked={checkedIds.has(p.id)}
@@ -919,25 +962,24 @@ export default function ProvisionenPage() {
                                 ) : null}
                               </TableCell>
                             )}
-                            <TableCell className="text-sm">{formatDate(p.datum)}</TableCell>
-                            <TableCell className="text-sm font-medium">{p.versNehmer}</TableCell>
-                            <TableCell className="text-sm">{p.versNr}</TableCell>
-                            <TableCell className="text-sm">{p.datevKonto}</TableCell>
-                            <TableCell className="text-sm max-w-[200px] truncate">
+                            <TableCell className="text-xs px-2 py-1.5 whitespace-nowrap">{formatDate(p.datum)}</TableCell>
+                            <TableCell className="text-xs px-2 py-1.5 font-medium">{p.versNehmer}</TableCell>
+                            <TableCell className="text-xs px-2 py-1.5 max-w-[120px] truncate">{p.versNr}</TableCell>
+                            <TableCell className="text-xs px-2 py-1.5 max-w-[150px] truncate">
                               {p.buchungstext}
                             </TableCell>
-                            <TableCell className="text-sm text-right">
+                            <TableCell className="text-xs px-2 py-1.5 text-right whitespace-nowrap">
                               {formatCurrency(p.provBasis)}
                             </TableCell>
-                            <TableCell className="text-sm text-right">{p.satz}%</TableCell>
+                            <TableCell className="text-xs px-2 py-1.5 text-right">{p.satz}%</TableCell>
                             <TableCell
-                              className={`text-sm text-right font-medium ${
+                              className={`text-xs px-2 py-1.5 text-right font-medium whitespace-nowrap ${
                                 p.betrag >= 0 ? "text-emerald-600" : "text-red-600"
                               }`}
                             >
                               {formatCurrency(p.betrag)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-2 py-1.5">
                               {p.leadId ? (
                                 <LeadBadge
                                   provision={p}
@@ -950,11 +992,11 @@ export default function ProvisionenPage() {
                                 />
                               )}
                             </TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="px-2 py-1.5 text-right w-16">
                               {isUnconfirmedMatch && (
                                 <button
                                   onClick={() => handleReject(p.id)}
-                                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors ml-auto"
                                   title="Vorschlag ablehnen"
                                 >
                                   <X className="h-3.5 w-3.5" />
@@ -968,20 +1010,20 @@ export default function ProvisionenPage() {
                     <TableFooter>
                       <TableRow>
                         <TableCell
-                          colSpan={unconfirmedCount > 0 ? 8 : 7}
-                          className="text-sm font-semibold"
+                          colSpan={unconfirmedCount > 0 ? 7 : 6}
+                          className="text-xs px-2 py-1.5 font-semibold"
                         >
                           Gesamt
                         </TableCell>
                         <TableCell
-                          className={`text-sm text-right font-bold ${
+                          className={`text-xs px-2 py-1.5 text-right font-bold ${
                             totalBetrag >= 0 ? "text-emerald-600" : "text-red-600"
                           }`}
                         >
                           {formatCurrency(totalBetrag)}
                         </TableCell>
-                        <TableCell />
-                        <TableCell />
+                        <TableCell className="px-2 py-1.5" />
+                        <TableCell className="px-2 py-1.5" />
                       </TableRow>
                     </TableFooter>
                   </Table>
