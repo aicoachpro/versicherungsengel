@@ -41,8 +41,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Keine Provisionszeilen in der Datei gefunden" }, { status: 400 });
   }
 
-  // Alle Leads laden für Matching
-  const allLeads = db.select({ id: leads.id, name: leads.name }).from(leads).all();
+  // Alle Leads laden für Matching (Name + Ansprechpartner)
+  const allLeads = db.select({
+    id: leads.id,
+    name: leads.name,
+    ansprechpartner: leads.ansprechpartner,
+  }).from(leads).all();
 
   // Import-Datensatz anlegen
   const totalBetrag = parsed.reduce((sum, p) => sum + p.betrag, 0);
@@ -66,18 +70,50 @@ export async function POST(req: NextRequest) {
 
     for (const lead of allLeads) {
       const leadNameLower = lead.name.toLowerCase();
+      const ansprechpartnerLower = (lead.ansprechpartner || "").toLowerCase();
+
+      // 1. Exakt-Match auf Lead-Name
       if (leadNameLower === versNehmerLower) {
         matchedLeadId = lead.id;
         confidence = 1.0;
         break;
       }
+
+      // 2. Exakt-Match auf Ansprechpartner
+      if (ansprechpartnerLower && ansprechpartnerLower === versNehmerLower) {
+        matchedLeadId = lead.id;
+        confidence = 0.95;
+        break;
+      }
+
+      // 3. Ansprechpartner "Vorname Nachname" → auch "Nachname Vorname" prüfen
+      if (ansprechpartnerLower) {
+        const parts = versNehmerLower.split(/\s+/);
+        if (parts.length >= 2) {
+          const reversed = parts.slice(1).join(" ") + " " + parts[0];
+          if (ansprechpartnerLower === reversed || reversed === ansprechpartnerLower) {
+            matchedLeadId = lead.id;
+            confidence = 0.9;
+            break;
+          }
+        }
+      }
+
+      // 4. Contains-Match auf Name oder Ansprechpartner
       if (leadNameLower.includes(versNehmerLower) || versNehmerLower.includes(leadNameLower)) {
         matchedLeadId = lead.id;
-        // Kürzerer Name im längeren → Confidence basiert auf Längenverhältnis
         const shorter = Math.min(leadNameLower.length, versNehmerLower.length);
         const longer = Math.max(leadNameLower.length, versNehmerLower.length);
         confidence = shorter / longer;
-        // Weitersuchen, falls exakter Match kommt
+      }
+      if (ansprechpartnerLower && (ansprechpartnerLower.includes(versNehmerLower) || versNehmerLower.includes(ansprechpartnerLower))) {
+        const shorter = Math.min(ansprechpartnerLower.length, versNehmerLower.length);
+        const longer = Math.max(ansprechpartnerLower.length, versNehmerLower.length);
+        const conf = shorter / longer;
+        if (!matchedLeadId || conf > (confidence || 0)) {
+          matchedLeadId = lead.id;
+          confidence = conf;
+        }
       }
     }
 
