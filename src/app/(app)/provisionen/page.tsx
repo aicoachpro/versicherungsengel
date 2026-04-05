@@ -31,13 +31,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Coins,
-  Upload,
   Loader2,
   Search,
   FileSpreadsheet,
   CheckCircle2,
   HelpCircle,
   Link2,
+  Check,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +53,7 @@ interface ProvisionImport {
   totalAmount: number;
   matchedCount: number;
   unmatchedCount: number;
+  skippedCount?: number;
 }
 
 interface Provision {
@@ -59,6 +62,7 @@ interface Provision {
   datum: string;
   versNehmer: string;
   versNr: string;
+  kontoName: string | null;
   datevKonto: string;
   buchungstext: string;
   provBasis: number;
@@ -66,6 +70,7 @@ interface Provision {
   betrag: number;
   leadId: number | null;
   leadName: string | null;
+  confirmed: boolean;
 }
 
 interface LeadSearchResult {
@@ -83,7 +88,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return "—";
+  if (!iso) return "\u2014";
   return new Date(iso).toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "2-digit",
@@ -195,6 +200,76 @@ function LeadAssignDropdown({
   );
 }
 
+// Lead-Badge mit Bestätigungs-Buttons
+function LeadBadgeWithConfirmation({
+  provision,
+  onConfirm,
+  onReject,
+  onNavigate,
+}: {
+  provision: Provision;
+  onConfirm: (id: number, leadId: number) => void;
+  onReject: (id: number) => void;
+  onNavigate: (leadId: number) => void;
+}) {
+  if (!provision.leadId) return null;
+
+  const isAbweichung = provision.kontoName?.startsWith("[ABWEICHUNG]");
+
+  // Bestätigt — normaler grüner Badge
+  if (provision.confirmed) {
+    return (
+      <div className="flex items-center gap-1">
+        <Badge
+          variant="default"
+          className="bg-emerald-500 cursor-pointer text-xs"
+          onClick={() => onNavigate(provision.leadId!)}
+        >
+          {provision.leadName || `Lead #${provision.leadId}`}
+        </Badge>
+        {isAbweichung && (
+          <Badge variant="outline" className="border-orange-400 text-orange-700 text-xs">
+            <AlertTriangle className="h-3 w-3 mr-0.5" />
+            Abweichung
+          </Badge>
+        )}
+      </div>
+    );
+  }
+
+  // Unbestätigt — Amber Badge + Bestätigen/Ablehnen Buttons
+  return (
+    <div className="flex items-center gap-1">
+      <Badge
+        variant="outline"
+        className="border-amber-400 bg-amber-50 text-amber-700 text-xs cursor-pointer"
+        onClick={() => onNavigate(provision.leadId!)}
+      >
+        {provision.leadName || `Lead #${provision.leadId}`}
+      </Badge>
+      {isAbweichung && (
+        <Badge variant="outline" className="border-orange-400 text-orange-700 text-xs">
+          <AlertTriangle className="h-3 w-3 mr-0.5" />
+        </Badge>
+      )}
+      <button
+        onClick={() => onConfirm(provision.id, provision.leadId!)}
+        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+        title="Vorschlag bestaetigen"
+      >
+        <Check className="h-3 w-3" />
+      </button>
+      <button
+        onClick={() => onReject(provision.id)}
+        className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+        title="Vorschlag ablehnen"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 // --- Hauptseite ---
 
 export default function ProvisionenPage() {
@@ -209,6 +284,7 @@ export default function ProvisionenPage() {
     total: number;
     matched: number;
     unmatched: number;
+    skipped: number;
   } | null>(null);
 
   // Import-History
@@ -218,6 +294,7 @@ export default function ProvisionenPage() {
   // Provisionen
   const [provisions, setProvisions] = useState<Provision[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(false);
 
   // Filter
   const [monthFilter, setMonthFilter] = useState<string>("all");
@@ -226,6 +303,11 @@ export default function ProvisionenPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const monthOptions = generateMonthOptions();
+
+  // Unbestätigte Vorschläge zählen
+  const unconfirmedCount = provisions.filter(
+    (p) => p.leadId && !p.confirmed
+  ).length;
 
   // Debounce Suche
   useEffect(() => {
@@ -276,6 +358,92 @@ export default function ProvisionenPage() {
     fetchProvisions();
   }, [fetchProvisions]);
 
+  // Einzelne Provision bestätigen
+  async function handleConfirm(provisionId: number, leadId: number) {
+    try {
+      const res = await fetch(`/api/provisions/${provisionId}/confirm`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId }),
+      });
+      if (res.ok) {
+        toast.success("Zuordnung bestaetigt");
+        fetchProvisions();
+      } else {
+        toast.error("Bestaetigung fehlgeschlagen");
+      }
+    } catch {
+      toast.error("Fehler bei der Bestaetigung");
+    }
+  }
+
+  // Einzelne Provision ablehnen
+  async function handleReject(provisionId: number) {
+    try {
+      const res = await fetch(`/api/provisions/${provisionId}/confirm`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: null }),
+      });
+      if (res.ok) {
+        toast.success("Vorschlag abgelehnt");
+        fetchProvisions();
+      } else {
+        toast.error("Ablehnung fehlgeschlagen");
+      }
+    } catch {
+      toast.error("Fehler bei der Ablehnung");
+    }
+  }
+
+  // Alle unbestätigten bestätigen
+  async function handleConfirmAll() {
+    if (!selectedImportId && provisions.length === 0) return;
+
+    setConfirming(true);
+
+    // Wenn ein Import ausgewählt ist, confirm-all für diesen Import
+    // Sonst alle einzeln bestätigen
+    if (selectedImportId) {
+      try {
+        const res = await fetch("/api/provisions/confirm-all", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ importId: selectedImportId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          toast.success(`${data.confirmed} Vorschlaege bestaetigt`);
+          fetchProvisions();
+        } else {
+          toast.error("Bestaetigung fehlgeschlagen");
+        }
+      } catch {
+        toast.error("Fehler bei der Bestaetigung");
+      }
+    } else {
+      // Alle unbestätigten einzeln bestätigen
+      const unconfirmed = provisions.filter((p) => p.leadId && !p.confirmed);
+      let confirmed = 0;
+      for (const p of unconfirmed) {
+        try {
+          const res = await fetch(`/api/provisions/${p.id}/confirm`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leadId: p.leadId }),
+          });
+          if (res.ok) confirmed++;
+        } catch {
+          // weiter
+        }
+      }
+      toast.success(`${confirmed} Vorschlaege bestaetigt`);
+      fetchProvisions();
+    }
+
+    setConfirming(false);
+  }
+
   // CSV Upload
   async function handleFileUpload(file: File) {
     if (!file.name.toLowerCase().endsWith(".csv")) {
@@ -300,12 +468,13 @@ export default function ProvisionenPage() {
         return;
       }
       setImportResult({
-        rows: data.rows ?? 0,
-        total: data.totalAmount ?? 0,
+        rows: data.totalRows ?? 0,
+        total: data.totalBetrag ?? 0,
         matched: data.matched ?? 0,
         unmatched: data.unmatched ?? 0,
+        skipped: data.skipped ?? 0,
       });
-      toast.success(`${data.rows ?? 0} Provisionen importiert`);
+      toast.success(`${data.totalRows ?? 0} Provisionen importiert`);
       fetchImports();
       fetchProvisions();
     } catch {
@@ -405,6 +574,11 @@ export default function ProvisionenPage() {
                 <Badge variant="outline" className="border-amber-400 text-amber-700">
                   {importResult.unmatched} Unmatched
                 </Badge>
+                {importResult.skipped > 0 && (
+                  <Badge variant="outline" className="border-slate-400 text-slate-600">
+                    {importResult.skipped} Duplikate uebersprungen
+                  </Badge>
+                )}
               </div>
             )}
           </CardContent>
@@ -431,7 +605,7 @@ export default function ProvisionenPage() {
                 >
                   <p className="font-medium truncate max-w-[200px]">{imp.filename}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {formatDate(imp.importedAt)} — {imp.rowCount} Zeilen — {formatCurrency(imp.totalAmount)}
+                    {formatDate(imp.importedAt)} -- {imp.rowCount} Zeilen -- {formatCurrency(imp.totalAmount)}
                   </p>
                   <div className="flex gap-2 mt-2">
                     <Badge variant="default" className="bg-emerald-500 text-xs">
@@ -440,6 +614,11 @@ export default function ProvisionenPage() {
                     <Badge variant="outline" className="border-amber-400 text-amber-700 text-xs">
                       {imp.unmatchedCount}
                     </Badge>
+                    {imp.skippedCount != null && imp.skippedCount > 0 && (
+                      <Badge variant="outline" className="border-slate-400 text-slate-600 text-xs">
+                        {imp.skippedCount} dup.
+                      </Badge>
+                    )}
                   </div>
                 </button>
               ))}
@@ -450,10 +629,27 @@ export default function ProvisionenPage() {
         {/* Provisions-Tabelle */}
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2">
-              Provisionen
-              <Badge variant="secondary">{provisions.length}</Badge>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                Provisionen
+                <Badge variant="secondary">{provisions.length}</Badge>
+              </CardTitle>
+              {unconfirmedCount > 0 && (
+                <Button
+                  size="sm"
+                  onClick={handleConfirmAll}
+                  disabled={confirming}
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                >
+                  {confirming ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-1" />
+                  )}
+                  {unconfirmedCount} Vorschlaege bestaetigen
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Filter */}
@@ -535,7 +731,14 @@ export default function ProvisionenPage() {
                 {/* Mobile: Karten */}
                 <div className="md:hidden space-y-3">
                   {provisions.map((p) => (
-                    <div key={p.id} className="rounded-lg border p-3 space-y-2">
+                    <div
+                      key={p.id}
+                      className={`rounded-lg border p-3 space-y-2 ${
+                        p.leadId && !p.confirmed
+                          ? "border-amber-300 bg-amber-50/50"
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium truncate">{p.versNehmer}</span>
                         <span
@@ -559,13 +762,12 @@ export default function ProvisionenPage() {
                           Basis: {formatCurrency(p.provBasis)} / Satz: {p.satz}%
                         </span>
                         {p.leadId ? (
-                          <Badge
-                            variant="default"
-                            className="bg-emerald-500 cursor-pointer text-xs"
-                            onClick={() => router.push(`/pipeline/${p.leadId}`)}
-                          >
-                            {p.leadName || `Lead #${p.leadId}`}
-                          </Badge>
+                          <LeadBadgeWithConfirmation
+                            provision={p}
+                            onConfirm={handleConfirm}
+                            onReject={handleReject}
+                            onNavigate={(leadId) => router.push(`/pipeline/${leadId}`)}
+                          />
                         ) : (
                           <LeadAssignDropdown
                             provisionId={p.id}
@@ -606,7 +808,14 @@ export default function ProvisionenPage() {
                     </TableHeader>
                     <TableBody>
                       {provisions.map((p) => (
-                        <TableRow key={p.id}>
+                        <TableRow
+                          key={p.id}
+                          className={
+                            p.leadId && !p.confirmed
+                              ? "bg-amber-50/50"
+                              : ""
+                          }
+                        >
                           <TableCell className="text-sm">{formatDate(p.datum)}</TableCell>
                           <TableCell className="text-sm font-medium">{p.versNehmer}</TableCell>
                           <TableCell className="text-sm">{p.versNr}</TableCell>
@@ -627,13 +836,12 @@ export default function ProvisionenPage() {
                           </TableCell>
                           <TableCell>
                             {p.leadId ? (
-                              <Badge
-                                variant="default"
-                                className="bg-emerald-500 cursor-pointer text-xs"
-                                onClick={() => router.push(`/pipeline/${p.leadId}`)}
-                              >
-                                {p.leadName || `Lead #${p.leadId}`}
-                              </Badge>
+                              <LeadBadgeWithConfirmation
+                                provision={p}
+                                onConfirm={handleConfirm}
+                                onReject={handleReject}
+                                onNavigate={(leadId) => router.push(`/pipeline/${leadId}`)}
+                              />
                             ) : (
                               <LeadAssignDropdown
                                 provisionId={p.id}

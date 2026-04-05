@@ -16,7 +16,19 @@ export async function GET() {
       .limit(50)
       .all();
 
-    return NextResponse.json(imports);
+    // Felder auf UI-Interface mappen
+    const mapped = imports.map((imp) => ({
+      id: imp.id,
+      filename: imp.filename,
+      importedAt: imp.importDate,
+      rowCount: imp.totalRows,
+      totalAmount: imp.totalBetrag,
+      matchedCount: imp.matchedRows,
+      unmatchedCount: imp.unmatchedRows,
+      skippedCount: imp.skippedRows ?? 0,
+    }));
+
+    return NextResponse.json(mapped);
   } catch {
     return NextResponse.json([]);
   }

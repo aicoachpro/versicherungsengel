@@ -271,6 +271,22 @@ sqlite.prepare(`
   )
 `).run();
 
+// Add confirmed column to provisions if not exists
+try {
+  sqlite.prepare("SELECT confirmed FROM provisions LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE provisions ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0").run();
+  console.log("Added 'confirmed' column to provisions table");
+}
+
+// Add skipped_rows column to provision_imports if not exists
+try {
+  sqlite.prepare("SELECT skipped_rows FROM provision_imports LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE provision_imports ADD COLUMN skipped_rows INTEGER NOT NULL DEFAULT 0").run();
+  console.log("Added 'skipped_rows' column to provision_imports table");
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

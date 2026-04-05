@@ -53,6 +53,7 @@ import {
   MapPin,
   Linkedin,
   MoreHorizontal,
+  Coins,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -121,6 +122,38 @@ interface Document {
   createdAt: string;
 }
 
+interface Provision {
+  id: number;
+  importId: number;
+  buchungsDatum: string;
+  versNehmer: string;
+  bsz: string | null;
+  versNummer: string | null;
+  datevKonto: string | null;
+  kontoName: string | null;
+  buchungstext: string | null;
+  erfolgsDatum: string | null;
+  vtnr: string | null;
+  provBasis: number;
+  provSatz: number;
+  betrag: number;
+  leadId: number | null;
+  matchConfidence: number | null;
+  confirmed: boolean;
+  createdAt: string;
+}
+
+// DATEV-Konto Klassifizierung
+const ABSCHLUSS_KONTEN = ["8011", "8021", "8031", "8041", "8051", "8061", "8091"];
+const FOLGE_KONTEN = ["8012", "8022", "8032", "8042", "8052", "8062", "8072", "8092"];
+
+function getProvTyp(datevKonto: string | null): "abschluss" | "folge" | "sonstige" {
+  if (!datevKonto) return "sonstige";
+  if (ABSCHLUSS_KONTEN.includes(datevKonto)) return "abschluss";
+  if (FOLGE_KONTEN.includes(datevKonto)) return "folge";
+  return "sonstige";
+}
+
 const SPARTEN = [
   "Haftpflicht", "Inhalt", "Cyber", "D&O", "Flotte",
   "Rechtsschutz", "bAV", "KV", "Sonstiges",
@@ -184,6 +217,146 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("de-DE");
 }
 
+const euroFormat = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
+const pctFormat = new Intl.NumberFormat("de-DE", { style: "percent", minimumFractionDigits: 2 });
+
+function ProvisionenCard({ provisionen }: { provisionen: Provision[] }) {
+  // Gruppierung nach Vertragsnummer
+  const grouped = provisionen.reduce<Record<string, Provision[]>>((acc, p) => {
+    const key = p.versNummer || "Ohne Vertragsnummer";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(p);
+    return acc;
+  }, {});
+
+  const contracts = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+
+  // Zusammenfassung
+  const totalBetrag = provisionen.reduce((s, p) => s + p.betrag, 0);
+  const abschlussBetrag = provisionen
+    .filter((p) => getProvTyp(p.datevKonto) === "abschluss")
+    .reduce((s, p) => s + p.betrag, 0);
+  const folgeBetrag = provisionen
+    .filter((p) => getProvTyp(p.datevKonto) === "folge")
+    .reduce((s, p) => s + p.betrag, 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Coins className="h-5 w-5 text-muted-foreground" />
+          <CardTitle className="text-lg">Provisionen</CardTitle>
+          {provisionen.length > 0 && (
+            <Badge variant="secondary" className="text-xs">{provisionen.length}</Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {provisionen.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Coins className="h-10 w-10 mx-auto mb-2 opacity-50" />
+            <p>Keine Provisionen zugeordnet</p>
+            <p className="text-xs mt-1">Provisionen werden ueber den CSV-Import zugewiesen</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Zusammenfassung */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Gesamt-Provision</p>
+                <p className={`text-lg font-bold ${totalBetrag >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {euroFormat.format(totalBetrag)}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Vertraege</p>
+                <p className="text-lg font-bold">{contracts.length}</p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Abschlussprovisionen</p>
+                <p className={`text-lg font-bold ${abschlussBetrag >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {euroFormat.format(abschlussBetrag)}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Folgeprovisionen</p>
+                <p className={`text-lg font-bold ${folgeBetrag >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {euroFormat.format(folgeBetrag)}
+                </p>
+              </div>
+            </div>
+
+            {/* Vertraege */}
+            <div className="space-y-3">
+              {contracts.map(([versNr, items]) => {
+                const subtotal = items.reduce((s, p) => s + p.betrag, 0);
+                const kontoName = items[0]?.kontoName || "";
+                return (
+                  <div key={versNr} className="rounded-lg border">
+                    {/* Vertrags-Header */}
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-muted/40 border-b">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{versNr}</span>
+                        {kontoName && (
+                          <Badge variant="outline" className="text-xs">{kontoName}</Badge>
+                        )}
+                      </div>
+                      <span className={`font-bold text-sm ${subtotal >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {euroFormat.format(subtotal)}
+                      </span>
+                    </div>
+                    {/* Buchungszeilen */}
+                    <div className="divide-y">
+                      {items.map((p) => {
+                        const typ = getProvTyp(p.datevKonto);
+                        return (
+                          <div key={p.id} className="flex items-center gap-3 px-4 py-2 text-sm">
+                            <span className="text-muted-foreground w-20 flex-shrink-0">{p.buchungsDatum}</span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] flex-shrink-0 ${
+                                typ === "abschluss" ? "border-blue-300 text-blue-700 bg-blue-50" :
+                                typ === "folge" ? "border-amber-300 text-amber-700 bg-amber-50" :
+                                ""
+                              }`}
+                            >
+                              {p.datevKonto || "–"}
+                            </Badge>
+                            <span className="flex-1 min-w-0 truncate text-muted-foreground">
+                              {p.buchungstext || "–"}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex-shrink-0 w-20 text-right">
+                              {euroFormat.format(p.provBasis)}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex-shrink-0 w-14 text-right">
+                              {pctFormat.format(p.provSatz / 100)}
+                            </span>
+                            <span className={`font-medium flex-shrink-0 w-20 text-right ${p.betrag >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              {euroFormat.format(p.betrag)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Gesamtsumme */}
+            <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/60 border">
+              <span className="font-semibold text-sm">Gesamtsumme</span>
+              <span className={`text-lg font-bold ${totalBetrag >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                {euroFormat.format(totalBetrag)}
+              </span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -194,6 +367,7 @@ export default function LeadDetailPage() {
   const [vertraege, setVertraege] = useState<Fremdvertrag[]>([]);
   const [aktivitaeten, setAktivitaeten] = useState<Activity[]>([]);
   const [dokumente, setDokumente] = useState<Document[]>([]);
+  const [provisionen, setProvisionen] = useState<Provision[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVertrag, setEditingVertrag] = useState<Fremdvertrag | null>(null);
@@ -241,13 +415,14 @@ export default function LeadDetailPage() {
 
   async function loadData() {
     setLoading(true);
-    const [leadRes, vertragRes, produktRes, crossSellingRes, activityRes, docRes] = await Promise.all([
+    const [leadRes, vertragRes, produktRes, crossSellingRes, activityRes, docRes, provRes] = await Promise.all([
       fetch("/api/leads"),
       fetch(`/api/insurances?leadId=${leadId}`),
       fetch("/api/produkte?kategorie=fremdvertrag"),
       fetch("/api/produkte?kategorie=cross_selling"),
       fetch(`/api/activities?leadId=${leadId}`),
       fetch(`/api/documents?leadId=${leadId}`),
+      fetch(`/api/provisions?leadId=${leadId}&confirmed=true`),
     ]);
     const allLeads = await leadRes.json();
     const foundLead = allLeads.find((l: Lead) => l.id === leadId);
@@ -255,6 +430,7 @@ export default function LeadDetailPage() {
     setVertraege(await vertragRes.json());
     setAktivitaeten(await activityRes.json());
     setDokumente(await docRes.json());
+    setProvisionen(await provRes.json());
 
     const produktList = await produktRes.json();
     setProduktOptionen(produktList.map((p: { name: string }) => p.name));
@@ -945,6 +1121,9 @@ export default function LeadDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Provisionen Card */}
+        <ProvisionenCard provisionen={provisionen} />
       </div>
 
       {/* Dialog for creating/editing Fremdvertrag */}

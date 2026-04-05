@@ -15,15 +15,24 @@ export async function PATCH(
   const body = await req.json();
   const { leadId } = body;
 
-  if (!leadId) {
+  if (leadId === undefined) {
     return NextResponse.json({ error: "leadId required" }, { status: 400 });
   }
 
   try {
-    db.update(provisions)
-      .set({ leadId, matchConfidence: 1.0, confirmed: true })
-      .where(eq(provisions.id, parseInt(id)))
-      .run();
+    if (leadId === null) {
+      // Ablehnung: leadId auf null setzen, aber confirmed=true (manuell abgelehnt)
+      db.update(provisions)
+        .set({ leadId: null, matchConfidence: null, confirmed: true })
+        .where(eq(provisions.id, parseInt(id)))
+        .run();
+    } else {
+      // Bestätigung: leadId setzen/beibehalten + confirmed=true
+      db.update(provisions)
+        .set({ leadId, matchConfidence: 1.0, confirmed: true })
+        .where(eq(provisions.id, parseInt(id)))
+        .run();
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

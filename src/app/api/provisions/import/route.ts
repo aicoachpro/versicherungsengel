@@ -57,12 +57,37 @@ export async function POST(req: NextRequest) {
     totalBetrag,
     matchedRows: 0,
     unmatchedRows: 0,
+    skippedRows: 0,
   }).returning().get();
 
   let matched = 0;
   let unmatched = 0;
+  let skipped = 0;
 
   for (const row of parsed) {
+    // Duplikaterkennung: gleiche versNummer + gleicher Betrag = skip
+    if (row.versNummer) {
+      const existing = db.select({ id: provisions.id, betrag: provisions.betrag })
+        .from(provisions)
+        .where(eq(provisions.versNummer, row.versNummer))
+        .all();
+
+      const exactDuplicate = existing.find(
+        (e) => Math.abs(e.betrag - row.betrag) < 0.01
+      );
+
+      if (exactDuplicate) {
+        // Exaktes Duplikat (gleiche versNummer + gleicher Betrag) — überspringen
+        skipped++;
+        continue;
+      }
+
+      // Gleiche versNummer aber anderer Betrag — mit Abweichungs-Hinweis importieren
+      if (existing.length > 0) {
+        row.kontoName = `[ABWEICHUNG] ${row.kontoName || ""}`;
+      }
+    }
+
     // Fuzzy-Matching: Lead-Name enthält versNehmer oder umgekehrt
     const versNehmerLower = row.versNehmer.toLowerCase();
     let matchedLeadId: number | null = null;
@@ -139,12 +164,13 @@ export async function POST(req: NextRequest) {
       betrag: row.betrag,
       leadId: matchedLeadId,
       matchConfidence: confidence,
+      confirmed: false, // Matches müssen manuell bestätigt werden
     }).run();
   }
 
   // Import-Datensatz aktualisieren
   db.update(provisionImports)
-    .set({ matchedRows: matched, unmatchedRows: unmatched })
+    .set({ matchedRows: matched, unmatchedRows: unmatched, skippedRows: skipped })
     .where(eq(provisionImports.id, importRecord.id))
     .run();
 
@@ -153,6 +179,7 @@ export async function POST(req: NextRequest) {
     totalRows: parsed.length,
     matched,
     unmatched,
+    skipped,
     totalBetrag: Math.round(totalBetrag * 100) / 100,
   }, { status: 201 });
 }

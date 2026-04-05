@@ -214,6 +214,7 @@ export const provisionImports = sqliteTable("provision_imports", {
   totalBetrag: real("total_betrag").notNull().default(0),
   matchedRows: integer("matched_rows").notNull().default(0),
   unmatchedRows: integer("unmatched_rows").notNull().default(0),
+  skippedRows: integer("skipped_rows").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
@@ -234,6 +235,7 @@ export const provisions = sqliteTable("provisions", {
   betrag: real("betrag").notNull().default(0),
   leadId: integer("lead_id"),
   matchConfidence: real("match_confidence"),
+  confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
