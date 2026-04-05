@@ -75,7 +75,6 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     folgeterminTyp: "",
     eingangsdatum: new Date().toISOString().split("T")[0],
     terminKosten: "320",
-    umsatz: "",
     naechsterSchritt: "",
     notizen: "",
     providerId: "",
@@ -118,7 +117,6 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         folgeterminTyp: lead.folgeterminTyp || "",
         eingangsdatum: lead.eingangsdatum ? lead.eingangsdatum.split("T")[0] : "",
         terminKosten: String(lead.terminKosten ?? 320),
-        umsatz: lead.umsatz ? String(lead.umsatz) : "",
         naechsterSchritt: lead.naechsterSchritt || "",
         notizen: lead.notizen || "",
         providerId: lead.providerId ? String(lead.providerId) : "",
@@ -132,7 +130,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         gewerbeart: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
         termin: "", folgetermin: "", folgeterminTyp: "",
         eingangsdatum: new Date().toISOString().split("T")[0],
-        terminKosten: "320", umsatz: "",
+        terminKosten: "320",
         naechsterSchritt: "", notizen: "",
         providerId: "",
         assignedTo: "",
@@ -160,7 +158,6 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       folgeterminTyp: form.folgeterminTyp || null,
       eingangsdatum: form.eingangsdatum || null,
       terminKosten: form.terminKosten ? Number(form.terminKosten) : 320,
-      umsatz: form.umsatz ? Number(form.umsatz) : null,
       naechsterSchritt: form.naechsterSchritt || null,
       notizen: form.notizen || null,
       providerId: form.providerId ? Number(form.providerId) : null,
@@ -379,14 +376,6 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
                 type="number"
                 value={form.terminKosten}
                 onChange={(e) => setForm({ ...form, terminKosten: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Umsatz (€)</Label>
-              <Input
-                type="number"
-                value={form.umsatz}
-                onChange={(e) => setForm({ ...form, umsatz: e.target.value })}
               />
             </div>
           </div>

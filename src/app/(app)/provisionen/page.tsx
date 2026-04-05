@@ -31,6 +31,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Coins,
   Loader2,
   Search,
@@ -41,6 +51,7 @@ import {
   Check,
   X,
   Trash2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -240,11 +251,279 @@ function LeadBadge({
   );
 }
 
+// --- Manuelle Provision Dialog ---
+
+function ManualProvisionDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: () => void;
+}) {
+  const [allLeads, setAllLeads] = useState<{ id: number; name: string }[]>([]);
+  const [leadSearch, setLeadSearch] = useState("");
+  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [selectedLeadName, setSelectedLeadName] = useState("");
+  const [showLeadDropdown, setShowLeadDropdown] = useState(false);
+  const [typ, setTyp] = useState("tippgeber");
+  const [betrag, setBetrag] = useState("");
+  const [versNummer, setVersNummer] = useState("");
+  const [datum, setDatum] = useState(() => new Date().toISOString().split("T")[0]);
+  const [notiz, setNotiz] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const leadDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Leads laden wenn Dialog oeffnet
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/leads?showAll=1");
+        if (res.ok) {
+          const data = await res.json();
+          setAllLeads(
+            data.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }))
+          );
+        }
+      } catch {
+        // ignorieren
+      }
+    })();
+  }, [open]);
+
+  // Klick ausserhalb des Lead-Dropdowns schliesst es
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (leadDropdownRef.current && !leadDropdownRef.current.contains(e.target as Node)) {
+        setShowLeadDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Gefilterte Leads
+  const filteredLeads = leadSearch.trim()
+    ? allLeads.filter((l) =>
+        l.name.toLowerCase().includes(leadSearch.toLowerCase())
+      )
+    : allLeads;
+
+  function resetForm() {
+    setSelectedLeadId(null);
+    setSelectedLeadName("");
+    setLeadSearch("");
+    setTyp("tippgeber");
+    setBetrag("");
+    setVersNummer("");
+    setDatum(new Date().toISOString().split("T")[0]);
+    setNotiz("");
+  }
+
+  async function handleSubmit() {
+    if (!selectedLeadId) {
+      toast.error("Bitte einen Lead auswaehlen");
+      return;
+    }
+    const betragNum = parseFloat(betrag.replace(",", "."));
+    if (isNaN(betragNum) || betragNum <= 0) {
+      toast.error("Bitte einen gueltigen Betrag eingeben");
+      return;
+    }
+    if (!datum) {
+      toast.error("Bitte ein Datum waehlen");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/provisions/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          versNummer: versNummer || undefined,
+          betrag: betragNum,
+          typ,
+          datum,
+          notiz: notiz || undefined,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Provision erfasst");
+        resetForm();
+        onOpenChange(false);
+        onCreated();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Fehler beim Speichern");
+      }
+    } catch {
+      toast.error("Fehler beim Speichern");
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Provision erfassen</DialogTitle>
+          <DialogDescription>
+            Manuelle Provision erfassen (z.B. Tippgeber-Provision)
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Lead-Auswahl */}
+          <div className="space-y-1.5" ref={leadDropdownRef}>
+            <Label>Lead *</Label>
+            {selectedLeadId ? (
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="bg-emerald-500">
+                  {selectedLeadName}
+                </Badge>
+                <button
+                  onClick={() => {
+                    setSelectedLeadId(null);
+                    setSelectedLeadName("");
+                    setLeadSearch("");
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  placeholder="Lead suchen..."
+                  value={leadSearch}
+                  onChange={(e) => {
+                    setLeadSearch(e.target.value);
+                    setShowLeadDropdown(true);
+                  }}
+                  onFocus={() => setShowLeadDropdown(true)}
+                />
+                {showLeadDropdown && filteredLeads.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover shadow-md">
+                    {filteredLeads.slice(0, 20).map((lead) => (
+                      <button
+                        key={lead.id}
+                        onClick={() => {
+                          setSelectedLeadId(lead.id);
+                          setSelectedLeadName(lead.name);
+                          setShowLeadDropdown(false);
+                          setLeadSearch("");
+                        }}
+                        className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent text-left"
+                      >
+                        {lead.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showLeadDropdown && leadSearch.length >= 1 && filteredLeads.length === 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md p-2">
+                    <p className="text-xs text-muted-foreground">Kein Lead gefunden</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Typ */}
+          <div className="space-y-1.5">
+            <Label>Typ *</Label>
+            <Select value={typ} onValueChange={(v) => { if (v) setTyp(v); }}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="abschluss">Abschlussprovision</SelectItem>
+                <SelectItem value="folge">Folgeprovision</SelectItem>
+                <SelectItem value="tippgeber">Tippgeber-Provision</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Betrag */}
+          <div className="space-y-1.5">
+            <Label>Betrag *</Label>
+            <div className="relative">
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={betrag}
+                onChange={(e) => setBetrag(e.target.value)}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                &euro;
+              </span>
+            </div>
+          </div>
+
+          {/* Vertragsnummer */}
+          <div className="space-y-1.5">
+            <Label>Vertragsnummer</Label>
+            <Input
+              placeholder="Optional"
+              value={versNummer}
+              onChange={(e) => setVersNummer(e.target.value)}
+            />
+          </div>
+
+          {/* Datum */}
+          <div className="space-y-1.5">
+            <Label>Datum *</Label>
+            <Input
+              type="date"
+              value={datum}
+              onChange={(e) => setDatum(e.target.value)}
+            />
+          </div>
+
+          {/* Notiz */}
+          <div className="space-y-1.5">
+            <Label>Notiz</Label>
+            <Textarea
+              placeholder="Optional — z.B. Vermittler-Name, Details..."
+              value={notiz}
+              onChange={(e) => setNotiz(e.target.value)}
+              rows={2}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !selectedLeadId || !betrag}
+            className="w-full sm:w-auto"
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4 mr-1" />
+            )}
+            Provision speichern
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // --- Hauptseite ---
 
 export default function ProvisionenPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Manuelle Eingabe Dialog
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
 
   // Upload State
   const [uploading, setUploading] = useState(false);
@@ -551,7 +830,18 @@ export default function ProvisionenPage() {
 
   return (
     <>
-      <Header title="Provisionen" />
+      <Header
+        title="Provisionen"
+        actions={
+          <Button
+            size="sm"
+            onClick={() => setManualDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Provision erfassen
+          </Button>
+        }
+      />
       <div className="p-4 sm:p-6 space-y-6">
         {/* Upload-Bereich */}
         <Card>
@@ -1033,6 +1323,16 @@ export default function ProvisionenPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Manuelle Provision Dialog */}
+      <ManualProvisionDialog
+        open={manualDialogOpen}
+        onOpenChange={setManualDialogOpen}
+        onCreated={() => {
+          fetchProvisions();
+          fetchImports();
+        }}
+      />
     </>
   );
 }

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { db } from "@/db";
-import { leads, insurances, leadProviders } from "@/db/schema";
+import { leads, insurances, leadProviders, provisions } from "@/db/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
 import { getSetting } from "@/lib/settings";
 import { auth } from "@/lib/auth";
@@ -205,19 +205,30 @@ function getKpis(range: DateRange, userId: number | null = null) {
     .where(and(sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')`, baseFilter))
     .get();
 
-  const totalRevenue = db
-    .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
-    .from(leads)
-    .where(and(eq(leads.phase, "Abgeschlossen"), baseFilter))
-    .get();
+  // Umsatz = Summe aller bestaetigten Provisionen (statt leads.umsatz)
+  let revenue = 0;
+  try {
+    const provisionFilter = and(
+      eq(provisions.confirmed, true),
+      userId !== null
+        ? sql`${provisions.leadId} IN (SELECT id FROM leads WHERE assigned_to = ${userId} OR assigned_to IS NULL)`
+        : undefined,
+    );
+    const totalRevenue = db
+      .select({ total: sql<number>`coalesce(sum(${provisions.betrag}), 0)` })
+      .from(provisions)
+      .where(provisionFilter)
+      .get();
+    revenue = totalRevenue?.total || 0;
+  } catch {
+    // provisions-Tabelle existiert noch nicht — Fallback auf 0
+  }
 
   const totalCosts = db
     .select({ total: sql<number>`coalesce(sum(${leads.terminKosten}), 0)` })
     .from(leads)
     .where(baseFilter)
     .get();
-
-  const revenue = totalRevenue?.total || 0;
   const costs = totalCosts?.total || 0;
   const roi = costs > 0 ? Math.round(((revenue - costs) / costs) * 1000) / 10 : 0;
 
@@ -255,17 +266,46 @@ function getPipelineData(range: DateRange, userId: number | null = null) {
 function getRevenueByMonth(userId: number | null = null) {
   const uFilter = assignedFilter(userId);
   const baseFilter = and(notGenehmigtReklamiert, uFilter ?? undefined);
-  const result = db
+
+  // Kosten aus leads (nach createdAt gruppiert)
+  const costsResult = db
     .select({
       month: sql<string>`strftime('%Y-%m', ${leads.createdAt})`,
-      revenue: sql<number>`coalesce(sum(${leads.umsatz}), 0)`,
       costs: sql<number>`coalesce(sum(${leads.terminKosten}), 0)`,
     })
     .from(leads)
     .where(baseFilter)
     .groupBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
-    .orderBy(sql`strftime('%Y-%m', ${leads.createdAt})`)
     .all();
+
+  const costsByMonth = new Map(costsResult.filter((r) => r.month != null).map((r) => [r.month, r.costs]));
+
+  // Umsatz aus bestaetigten Provisionen (nach buchungsDatum gruppiert)
+  let revenueByMonth = new Map<string, number>();
+  try {
+    const provisionFilter = and(
+      eq(provisions.confirmed, true),
+      userId !== null
+        ? sql`${provisions.leadId} IN (SELECT id FROM leads WHERE assigned_to = ${userId} OR assigned_to IS NULL)`
+        : undefined,
+    );
+    const provResult = db
+      .select({
+        month: sql<string>`strftime('%Y-%m', ${provisions.buchungsDatum})`,
+        revenue: sql<number>`coalesce(sum(${provisions.betrag}), 0)`,
+      })
+      .from(provisions)
+      .where(provisionFilter)
+      .groupBy(sql`strftime('%Y-%m', ${provisions.buchungsDatum})`)
+      .all();
+    revenueByMonth = new Map(provResult.filter((r) => r.month != null).map((r) => [r.month, r.revenue]));
+  } catch {
+    // provisions-Tabelle existiert noch nicht
+  }
+
+  // Alle Monate sammeln und mergen
+  const allMonths = new Set([...costsByMonth.keys(), ...revenueByMonth.keys()]);
+  const sortedMonths = [...allMonths].sort();
 
   const monthNames: Record<string, string> = {
     "01": "Jan", "02": "Feb", "03": "Mär", "04": "Apr",
@@ -273,15 +313,17 @@ function getRevenueByMonth(userId: number | null = null) {
     "09": "Sep", "10": "Okt", "11": "Nov", "12": "Dez",
   };
 
-  return result
-    .filter((r) => r.month != null)
-    .map((r) => ({
-      month: monthNames[r.month.split("-")[1]] || r.month,
-      rawMonth: r.month,
-      umsatz: r.revenue,
-      kosten: r.costs,
-      ueberschuss: r.revenue - r.costs,
-    }));
+  return sortedMonths.map((m) => {
+    const revenue = revenueByMonth.get(m) || 0;
+    const costs = costsByMonth.get(m) || 0;
+    return {
+      month: monthNames[m.split("-")[1]] || m,
+      rawMonth: m,
+      umsatz: revenue,
+      kosten: costs,
+      ueberschuss: revenue - costs,
+    };
+  });
 }
 
 function getGewerbeartData(range: DateRange, userId: number | null = null) {
@@ -440,34 +482,59 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
     });
   }
 
-  // Umsatz-Vergleich mit Vormonat
+  // Umsatz-Vergleich mit Vormonat (aus bestaetigten Provisionen)
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const revenueThisMonth = db
-    .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
-    .from(leads)
-    .where(
-      sql`${leads.phase} = 'Abgeschlossen'
-        AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${currentMonthKey}
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
-        ${uSql}`
-    )
-    .get();
+  let revThis = 0;
+  let revPrev = 0;
+  let revenueByMonthData: { month: string; revenue: number }[] = [];
 
-  const revenuePrevMonth = db
-    .select({ total: sql<number>`coalesce(sum(${leads.umsatz}), 0)` })
-    .from(leads)
-    .where(
-      sql`${leads.phase} = 'Abgeschlossen'
-        AND strftime('%Y-%m', ${leads.eingangsdatum}) = ${prevMonthKey}
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
-        ${uSql}`
-    )
-    .get();
+  try {
+    const provUserFilter = userId !== null
+      ? sql`AND ${provisions.leadId} IN (SELECT id FROM leads WHERE assigned_to = ${userId} OR assigned_to IS NULL)`
+      : sql``;
 
-  const revThis = revenueThisMonth?.total || 0;
-  const revPrev = revenuePrevMonth?.total || 0;
+    const revenueThisMonth = db
+      .select({ total: sql<number>`coalesce(sum(${provisions.betrag}), 0)` })
+      .from(provisions)
+      .where(
+        sql`${provisions.confirmed} = 1
+          AND strftime('%Y-%m', ${provisions.buchungsDatum}) = ${currentMonthKey}
+          ${provUserFilter}`
+      )
+      .get();
+
+    const revenuePrevMonth = db
+      .select({ total: sql<number>`coalesce(sum(${provisions.betrag}), 0)` })
+      .from(provisions)
+      .where(
+        sql`${provisions.confirmed} = 1
+          AND strftime('%Y-%m', ${provisions.buchungsDatum}) = ${prevMonthKey}
+          ${provUserFilter}`
+      )
+      .get();
+
+    revThis = revenueThisMonth?.total || 0;
+    revPrev = revenuePrevMonth?.total || 0;
+
+    // Bester Monat
+    revenueByMonthData = db
+      .select({
+        month: sql<string>`strftime('%Y-%m', ${provisions.buchungsDatum})`,
+        revenue: sql<number>`coalesce(sum(${provisions.betrag}), 0)`,
+      })
+      .from(provisions)
+      .where(
+        sql`${provisions.confirmed} = 1
+          ${provUserFilter}`
+      )
+      .groupBy(sql`strftime('%Y-%m', ${provisions.buchungsDatum})`)
+      .all()
+      .filter((r) => r.month != null && r.revenue > 0);
+  } catch {
+    // provisions-Tabelle existiert noch nicht
+  }
 
   if (revPrev > 0 && revThis > revPrev) {
     const pct = Math.round(((revThis - revPrev) / revPrev) * 100);
@@ -478,24 +545,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
     });
   }
 
-  // Bester Monat (nur wenn 2+ Monate mit Umsatz vorhanden)
-  const revenueByMonth = db
-    .select({
-      month: sql<string>`strftime('%Y-%m', ${leads.eingangsdatum})`,
-      revenue: sql<number>`coalesce(sum(${leads.umsatz}), 0)`,
-    })
-    .from(leads)
-    .where(
-      sql`${leads.phase} = 'Abgeschlossen'
-        AND (${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')
-        ${uSql}`
-    )
-    .groupBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
-    .all()
-    .filter((r) => r.month != null && r.revenue > 0);
-
-  if (revenueByMonth.length >= 2) {
-    const best = revenueByMonth.reduce((a, b) => (b.revenue > a.revenue ? b : a));
+  if (revenueByMonthData.length >= 2) {
+    const best = revenueByMonthData.reduce((a, b) => (b.revenue > a.revenue ? b : a));
     const monthNames: Record<string, string> = {
       "01": "Januar", "02": "Februar", "03": "M\u00e4rz", "04": "April",
       "05": "Mai", "06": "Juni", "07": "Juli", "08": "August",

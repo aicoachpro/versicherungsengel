@@ -6,12 +6,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Trash2, GripVertical, CalendarDays, Bell, Archive, Inbox } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag } from "lucide-react";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
 interface KanbanBoardProps {
   leads: Lead[];
   phases: string[];
+  productMap?: Record<number, string>;
   onPhaseChange: (leadId: number, newPhase: string) => void;
   onDelete: (id: number) => void;
   onArchive?: (id: number) => void;
@@ -19,25 +27,50 @@ interface KanbanBoardProps {
 
 const phaseColors: Record<string, string> = {
   "Termin eingegangen": "border-t-blue-500",
-  "Termin stattgefunden": "border-t-sky-500",
+  "Termin stattgefunden": "border-t-indigo-500",
   "Follow-up": "border-t-amber-500",
   "Angebot erstellt": "border-t-purple-500",
   "Abgeschlossen": "border-t-emerald-500",
   "Verloren": "border-t-red-400",
 };
 
-const phaseHeaderColors: Record<string, string> = {
+const phaseDotColors: Record<string, string> = {
   "Termin eingegangen": "bg-blue-500",
-  "Termin stattgefunden": "bg-sky-500",
+  "Termin stattgefunden": "bg-indigo-500",
   "Follow-up": "bg-amber-500",
   "Angebot erstellt": "bg-purple-500",
   "Abgeschlossen": "bg-emerald-500",
   "Verloren": "bg-red-400",
 };
 
+const phaseHeaderColors: Record<string, string> = {
+  "Termin eingegangen": "bg-blue-500",
+  "Termin stattgefunden": "bg-indigo-500",
+  "Follow-up": "bg-amber-500",
+  "Angebot erstellt": "bg-purple-500",
+  "Abgeschlossen": "bg-emerald-500",
+  "Verloren": "bg-red-400",
+};
+
+function formatCompactDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (target.getTime() === today.getTime()) return "heute";
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (target.getTime() === tomorrow.getTime()) return "morgen";
+
+  return date.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+}
+
 export function KanbanBoard({
   leads,
   phases,
+  productMap = {},
   onPhaseChange,
   onDelete,
   onArchive,
@@ -120,112 +153,108 @@ export function KanbanBoard({
                   {phaseLeads.length}
                 </Badge>
               </div>
-              <div className="space-y-3 min-h-[200px] rounded-xl bg-muted/40 p-2 border border-border/50">
+              <div className="space-y-2 min-h-[200px] rounded-xl bg-muted/40 p-2 border border-border/50">
                 {phaseLeads.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/60">
                     <Inbox className="h-6 w-6 mb-2" />
                     <p className="text-xs text-center">Keine Leads in dieser Phase</p>
                   </div>
                 )}
-                {phaseLeads.map((lead) => (
-                  <Card
-                    key={lead.id}
-                    id={`lead-${lead.id}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, lead.id)}
-                    onClick={() => router.push(`/pipeline/${lead.id}`)}
-                    className={`cursor-pointer border-t-2 ${phaseColors[phase]} shadow-sm hover:shadow-md transition-all active:cursor-grabbing`}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
+                {phaseLeads.map((lead) => {
+                  // Naechster relevanter Termin berechnen
+                  const now = new Date();
+                  const terminAbgelaufen = lead.termin && new Date(lead.termin) < now;
+                  const nextDate = terminAbgelaufen && lead.folgetermin
+                    ? lead.folgetermin
+                    : lead.termin;
+                  const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
+                  const productName = lead.productId ? productMap[lead.productId] : null;
+
+                  return (
+                    <Card
+                      key={lead.id}
+                      id={`lead-${lead.id}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, lead.id)}
+                      onClick={() => router.push(`/pipeline/${lead.id}`)}
+                      className={`group/card cursor-pointer border-t ${phaseColors[phase]} shadow-sm hover:shadow-md transition-shadow active:cursor-grabbing`}
+                    >
+                      <CardContent className="p-3">
+                        {/* Zeile 1: Phase-Dot + Firmenname + Grip (hover only) */}
+                        <div className="flex items-center gap-2">
+                          <div className={`h-2 w-2 rounded-full flex-shrink-0 ${phaseDotColors[phase]}`} />
+                          <p className="text-sm font-semibold flex-1 min-w-0 truncate">
                             {lead.name}
                           </p>
-                          {lead.ansprechpartner && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {lead.ansprechpartner}
-                            </p>
-                          )}
+                          <GripVertical className="h-4 w-4 text-muted-foreground/30 flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity" />
                         </div>
-                        <GripVertical className="h-4 w-4 text-muted-foreground/40 flex-shrink-0" />
-                      </div>
-                      {(() => {
-                        const now = new Date();
-                        const terminAbgelaufen = lead.termin && new Date(lead.termin) < now;
-                        const aktiverTermin = terminAbgelaufen && lead.folgetermin
-                          ? { datum: lead.folgetermin, label: "Folgetermin" }
-                          : lead.termin
-                            ? { datum: lead.termin, label: "Termin" }
-                            : null;
-                        const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
 
-                        return (
-                          <>
-                            {aktiverTermin && (
-                              <div className="mt-2 flex items-center gap-1.5 text-xs">
-                                <CalendarDays className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                                <span className="font-medium">
-                                  {aktiverTermin.label}:{" "}
-                                  {new Date(aktiverTermin.datum).toLocaleString("de-DE", {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
+                        {/* Zeile 2: Ansprechpartner */}
+                        {lead.ansprechpartner && (
+                          <p className="text-xs text-muted-foreground mt-0.5 ml-4 truncate">
+                            {lead.ansprechpartner}
+                          </p>
+                        )}
+
+                        {/* Zeile 3: Product-Badge + Termin */}
+                        {(productName || nextDate) && (
+                          <div className="flex items-center gap-2 mt-2 ml-4">
+                            {productName && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal">
+                                <Tag className="h-2.5 w-2.5" />
+                                {productName}
+                              </Badge>
+                            )}
+                            {nextDate && (
+                              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                                {formatCompactDate(nextDate)}
                                 {pushAktiv && (
                                   <span title="Push-Erinnerung aktiv">
-                                    <Bell className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                                    <Bell className="h-3 w-3 text-amber-500 flex-shrink-0" />
                                   </span>
                                 )}
-                              </div>
+                              </span>
                             )}
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {lead.branche && (
-                                <Badge variant="outline" className="text-xs">
-                                  {lead.branche}
-                                </Badge>
-                              )}
-                            </div>
-                          </>
-                        );
-                      })()}
-                      {lead.umsatz != null && lead.umsatz > 0 && (
-                        <p className="mt-2 text-xs font-medium text-emerald-600">
-                          {new Intl.NumberFormat("de-DE", {
-                            style: "currency",
-                            currency: "EUR",
-                            maximumFractionDigits: 0,
-                          }).format(lead.umsatz)}
-                        </p>
-                      )}
-                      <div className="mt-2 flex items-center justify-end gap-1">
-                        {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}
-                            aria-label={`${lead.name} archivieren`}
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                          </Button>
+                          </div>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: lead.id, name: lead.name }); }}
-                          aria-label={`${lead.name} löschen`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* Zeile 4: Actions (Dropdown) */}
+                        <div className="flex items-center justify-end mt-2 -mb-0.5 -mr-1">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-accent opacity-0 group-hover/card:opacity-100 transition-opacity"
+                              onClick={(e) => e.stopPropagation()}
+                              render={<button type="button" aria-label="Aktionen" />}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
+                              {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}
+                                  >
+                                    <Archive className="h-4 w-4" />
+                                    Archivieren
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: lead.id, name: lead.name }); }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                L\u00f6schen
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           );
@@ -246,8 +275,8 @@ export function KanbanBoard({
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={`"${deleteTarget?.name}" löschen?`}
-        description="Der Lead und alle zugehörigen Daten werden unwiderruflich gelöscht."
+        title={`\u201e${deleteTarget?.name}\u201c l\u00f6schen?`}
+        description="Der Lead und alle zugeh\u00f6rigen Daten werden unwiderruflich gel\u00f6scht."
         onConfirm={() => {
           if (deleteTarget) onDelete(deleteTarget.id);
           setDeleteTarget(null);

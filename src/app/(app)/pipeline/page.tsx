@@ -53,6 +53,13 @@ export interface Lead {
   updatedAt: string;
 }
 
+export interface LeadProduct {
+  id: number;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+}
+
 const PHASES = [
   "Termin eingegangen",
   "Termin stattgefunden",
@@ -78,6 +85,7 @@ function PipelineContent() {
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const [showAll, setShowAll] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [productMap, setProductMap] = useState<Record<number, string>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -127,6 +135,17 @@ function PipelineContent() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  // Products einmalig laden fuer Kanban-Card-Badges
+  useEffect(() => {
+    fetch("/api/lead-products?active=true")
+      .then((r) => r.ok ? r.json() : [])
+      .then((products: LeadProduct[]) => {
+        const map: Record<number, string> = {};
+        products.forEach((p) => { map[p.id] = p.name; });
+        setProductMap(map);
+      });
+  }, []);
 
   const handlePhaseChange = async (leadId: number, newPhase: string) => {
     await fetch("/api/leads", {
@@ -292,6 +311,7 @@ function PipelineContent() {
         <KanbanBoard
           leads={filteredLeads}
           phases={PHASES as unknown as string[]}
+          productMap={productMap}
           onPhaseChange={handlePhaseChange}
           onDelete={handleDelete}
           onArchive={handleArchive}
