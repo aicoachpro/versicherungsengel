@@ -65,9 +65,57 @@ async function chatOpenAI(messages: ChatMessage[]): Promise<AIResponse> {
     model,
     messages,
     max_tokens: 4096,
+    temperature: 0.1,
   });
 
   return { content: response.choices[0]?.message?.content || "" };
+}
+
+// Lead-Extraktion mit JSON-Modus (Mistral-optimiert, wie n8n-Workflow)
+export async function extractLeadFromEmail(emailText: string): Promise<string> {
+  const backend = getSetting("ai.backend");
+  const baseURL =
+    backend === "localai"
+      ? getSetting("ai.localaiUrl") || "http://localhost:8080"
+      : getSetting("ai.customUrl");
+  const apiKey =
+    backend === "custom"
+      ? getSetting("ai.customApiKey")
+      : "not-needed";
+  const model = getSetting("ai.model") || "mistral-small-latest";
+
+  const OpenAI = (await import("openai")).default;
+  const client = new OpenAI({
+    baseURL: baseURL.replace(/\/+$/, "") + "/v1",
+    apiKey,
+  });
+
+  const response = await client.chat.completions.create({
+    model,
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    max_tokens: 4096,
+    messages: [
+      {
+        role: "user",
+        content:
+          "Extrahiere Lead-Daten als JSON. Nutze EXAKT diese Felder:\n" +
+          "- name, ansprechpartner, email, telefon, website\n" +
+          "- strasse, plz, ort\n" +
+          "- gewerbeart (hauptberuflich/nebenberuflich)\n" +
+          "- branche (Bau, Handwerk, Dienstleistung, Produktion, IT, Gesundheit, Logistik, Handel, Gastronomie, Immobilien, Sonstiges)\n" +
+          "- unternehmensgroesse (1–9, 10–49, 50–199, 200–999, 1000+)\n" +
+          "- umsatzklasse (<1 Mio, 1–5 Mio, 5–20 Mio, 20–100 Mio, >100 Mio)\n" +
+          "- notizen, naechsterSchritt\n" +
+          "- termin (Datum und Uhrzeit im Format TT.MM.JJJJ HH:MM, oder null falls kein Termin genannt)\n" +
+          "- produkt (eines von: Beratung, Betriebshaftpflicht, Firmenversicherung, Flottenversicherung, Haftpflichtversicherung, Rechtsschutzversicherung, Vermögensschadenhaftpflicht, Sonstiges)\n\n" +
+          "Felder die nicht gefunden werden auf \"\" setzen.\n\n" +
+          "E-Mail-Inhalt: " + emailText,
+      },
+    ],
+  });
+
+  return response.choices[0]?.message?.content || "{}";
 }
 
 // Convenience: Lead-Extraktion aus Freitext

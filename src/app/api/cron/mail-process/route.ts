@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { leads, inboundEmails, leadProducts } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { extractLeadFromText } from "@/lib/ai-client";
+import { extractLeadFromEmail } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
 
 export async function GET(req: NextRequest) {
@@ -63,22 +63,23 @@ export async function GET(req: NextRequest) {
         email.body,
       ].join("\n");
 
-      // KI-Extraktion
-      const aiResponse = await extractLeadFromText(extractionText);
+      // KI-Extraktion (Mistral JSON-Modus, wie n8n-Workflow)
+      const aiResponse = await extractLeadFromEmail(extractionText);
 
-      // JSON aus der Antwort parsen (robust: auch bei Extra-Text oder abgeschnittener Antwort)
+      // JSON parsen (mit leadDaten-Wrapper-Handling wie n8n)
       let leadData: Record<string, string>;
       try {
-        const cleaned = aiResponse.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-        // Erstes JSON-Objekt aus der Antwort extrahieren
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("Kein JSON gefunden");
-        leadData = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(aiResponse);
+        leadData = parsed.leadDaten || parsed;
       } catch {
-        throw new Error(`KI-Antwort ist kein valides JSON: ${aiResponse.substring(0, 200)}`);
+        // Fallback: JSON aus Text extrahieren
+        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error(`KI-Antwort ist kein valides JSON: ${aiResponse.substring(0, 200)}`);
+        const parsed = JSON.parse(jsonMatch[0]);
+        leadData = parsed.leadDaten || parsed;
       }
 
-      // Lead erstellen — selbes Pattern wie POST /api/leads
+      // Lead erstellen
       const leadName: string = leadData.name || email.fromName || email.fromAddress;
       if (!leadName) {
         throw new Error("Kein Name aus E-Mail extrahierbar");
@@ -91,6 +92,15 @@ export async function GET(req: NextRequest) {
       const eingangsDatum = email.receivedAt
         ? email.receivedAt.split("T")[0]
         : new Date().toISOString().split("T")[0];
+
+      // Termin aus KI-Antwort (Format TT.MM.JJJJ HH:MM → ISO)
+      let termin: string | null = null;
+      if (leadData.termin && leadData.termin !== "null") {
+        const match = leadData.termin.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/);
+        if (match) {
+          termin = `${match[3]}-${match[2]}-${match[1]} ${match[4]}:${match[5]}`;
+        }
+      }
 
       // Produkt-ID aus lead_products-Tabelle ermitteln
       let productId: number | null = null;
@@ -112,10 +122,19 @@ export async function GET(req: NextRequest) {
         .values({
           name: leadName,
           phase: "Termin eingegangen",
+          termin,
           ansprechpartner: leadData.ansprechpartner || null,
           email: leadData.email || email.fromAddress || null,
           telefon: leadData.telefon || null,
           website: leadData.website || null,
+          strasse: leadData.strasse || null,
+          plz: leadData.plz || null,
+          ort: leadData.ort || null,
+          branche: (leadData.branche as typeof leads.branche.enumValues[number]) || null,
+          gewerbeart: (leadData.gewerbeart as typeof leads.gewerbeart.enumValues[number]) || null,
+          unternehmensgroesse: (leadData.unternehmensgroesse as typeof leads.unternehmensgroesse.enumValues[number]) || null,
+          umsatzklasse: (leadData.umsatzklasse as typeof leads.umsatzklasse.enumValues[number]) || null,
+          naechsterSchritt: leadData.naechsterSchritt || null,
           notizen: notizText,
           eingangsdatum: eingangsDatum,
           terminKosten: 320,
