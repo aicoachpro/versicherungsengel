@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       const isNotLead =
         /^(re:|aw:|fwd:|wg:)/i.test(subject) ||
         /reklamation/i.test(subject) ||
-        /bestätigung|bestaetigung/i.test(subject) ||
+        /auftragsbestätigung|buchungsbestätigung|zahlungsbestätigung|abmeldebestätigung/i.test(subject) ||
         /abwesenheit|out of office|autoreply|auto-reply/i.test(subject) ||
         /newsletter|unsubscribe|abmelden/i.test(subject) ||
         /rechnung|invoice|mahnung/i.test(subject) ||
