@@ -67,15 +67,8 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        // Nachrichten seit letztem Poll holen (Dedup per messageId in DB)
-        const searchCriteria: Record<string, unknown> = {};
-        if (account.lastPolledAt) {
-          const since = new Date(account.lastPolledAt);
-          since.setHours(since.getHours() - 6); // 6 Stunden Puffer
-          searchCriteria.since = since;
-        } else {
-          searchCriteria.seen = false;
-        }
+        // Ungelesene Mails holen (Dedup per messageId in DB)
+        const searchCriteria: Record<string, unknown> = { seen: false };
         const messages = client.fetch(searchCriteria, {
           uid: true,
           envelope: true,
