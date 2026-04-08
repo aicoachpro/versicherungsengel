@@ -42,6 +42,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
   pending: { label: "Ausstehend", variant: "secondary" },
   processing: { label: "Verarbeitung", variant: "outline" },
   done: { label: "Erledigt", variant: "default" },
+  skipped: { label: "Übersprungen", variant: "outline" },
   error: { label: "Fehler", variant: "destructive" },
 };
 

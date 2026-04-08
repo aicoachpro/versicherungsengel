@@ -27,6 +27,26 @@ export async function GET(req: NextRequest) {
 
   for (const email of pendingEmails) {
     try {
+      // Vorfilter: Nur potenzielle Neukunden-Mails verarbeiten
+      const subject = (email.subject || "").toLowerCase();
+      const isNotLead =
+        /^(re:|aw:|fwd:|wg:)/i.test(subject) ||
+        /reklamation/i.test(subject) ||
+        /bestätigung|bestaetigung/i.test(subject) ||
+        /abwesenheit|out of office|autoreply|auto-reply/i.test(subject) ||
+        /newsletter|unsubscribe|abmelden/i.test(subject) ||
+        /rechnung|invoice|mahnung/i.test(subject) ||
+        /intern|passwort|password/i.test(subject);
+
+      if (isNotLead) {
+        db.update(inboundEmails)
+          .set({ status: "skipped", errorMessage: "Keine Neukunden-Mail (Vorfilter)" })
+          .where(eq(inboundEmails.id, email.id))
+          .run();
+        console.log(`[mail-process] Übersprungen (kein Neukunde): "${email.subject}"`);
+        continue;
+      }
+
       // Status auf "processing" setzen
       db.update(inboundEmails)
         .set({ status: "processing" })
