@@ -67,8 +67,14 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        // UNSEEN Nachrichten suchen
-        const messages = client.fetch({ seen: false }, {
+        // Nachrichten suchen: UNSEEN oder seit letztem Poll empfangen
+        let searchCriteria: Record<string, unknown> = { seen: false };
+        if (account.lastPolledAt) {
+          const since = new Date(account.lastPolledAt);
+          since.setMinutes(since.getMinutes() - 5); // 5 Min Puffer
+          searchCriteria = { or: [{ seen: false }, { since }] };
+        }
+        const messages = client.fetch(searchCriteria, {
           uid: true,
           envelope: true,
           source: true,
@@ -102,10 +108,12 @@ export async function GET(req: NextRequest) {
             /\.ics["']?\s*$/im.test(source);
 
           if (isCalendarInvite) {
-            // Nur als gelesen markieren, nicht importieren
+            console.log(`[mail-poll] Kalender-Einladung übersprungen: "${subject}" von ${fromAddress}`);
             await client.messageFlagsAdd({ uid: msg.uid }, ["\\Seen"], { uid: true });
             continue;
           }
+
+          console.log(`[mail-poll] Neue Mail importiert: "${subject}" von ${fromAddress}`);
 
           // Body aus Source extrahieren
           let body = "";

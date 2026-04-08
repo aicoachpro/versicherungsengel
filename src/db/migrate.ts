@@ -249,6 +249,19 @@ sqlite.prepare(`
   )
 `).run();
 
+// Create notifications table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    entity_id INTEGER,
+    read_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Create provisions table if not exists
 sqlite.prepare(`
   CREATE TABLE IF NOT EXISTS provisions (

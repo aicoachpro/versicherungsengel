@@ -178,7 +178,7 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
                   {netto} von {expected} erwartet
-                  {reklamiert > 0 && ` \u00b7 ${reklamiert} reklamiert`}
+                  {reklamiert > 0 && ` · ${reklamiert} reklamiert`}
                 </p>
                 {carryOver > 0 && (
                   <p className="text-[10px] text-muted-foreground sm:text-xs">

@@ -246,7 +246,7 @@ export function KanbanBoard({
                                 onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: lead.id, name: lead.name }); }}
                               >
                                 <Trash2 className="h-4 w-4" />
-                                L\u00f6schen
+                                Löschen
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -275,8 +275,8 @@ export function KanbanBoard({
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={`\u201e${deleteTarget?.name}\u201c l\u00f6schen?`}
-        description="Der Lead und alle zugeh\u00f6rigen Daten werden unwiderruflich gel\u00f6scht."
+        title={`„${deleteTarget?.name}" löschen?`}
+        description="Der Lead und alle zugehörigen Daten werden unwiderruflich gelöscht."
         onConfirm={() => {
           if (deleteTarget) onDelete(deleteTarget.id);
           setDeleteTarget(null);
