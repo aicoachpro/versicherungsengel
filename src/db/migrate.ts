@@ -301,6 +301,14 @@ try {
   console.log("Added 'skipped_rows' column to provision_imports table");
 }
 
+// Add cost_per_lead column to provider_products if not exists
+try {
+  sqlite.prepare("SELECT cost_per_lead FROM provider_products LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE provider_products ADD COLUMN cost_per_lead REAL").run();
+  console.log("Added 'cost_per_lead' column to provider_products table");
+}
+
 // Add provider_id column to email_accounts if not exists
 try {
   sqlite.prepare("SELECT provider_id FROM email_accounts LIMIT 1").get();

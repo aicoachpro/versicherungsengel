@@ -158,6 +158,7 @@ interface LeadProvider {
   startMonth: string | null;
   active: boolean;
   products?: { id: number; name: string }[];
+  productPrices?: Record<number, number | null>;
   createdAt: string;
   updatedAt: string;
 }
@@ -171,6 +172,7 @@ type LeadProviderForm = {
   carryOver: string;
   startMonth: string;
   productIds: number[];
+  productPrices: Record<number, number | null>;
 };
 
 const EMPTY_FORM: LeadProviderForm = {
@@ -182,6 +184,7 @@ const EMPTY_FORM: LeadProviderForm = {
   carryOver: "true",
   startMonth: "",
   productIds: [],
+  productPrices: {},
 };
 
 interface ProviderProduct {
@@ -201,11 +204,13 @@ function LeadProviderDialog({
   onOpenChange,
   initialData,
   onSave,
+  providerId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData: LeadProviderForm;
   onSave: (data: LeadProviderForm) => Promise<void>;
+  providerId?: number;
 }) {
   const [form, setForm] = useState<LeadProviderForm>(initialData);
   const [saving, setSaving] = useState(false);
@@ -224,6 +229,9 @@ function LeadProviderDialog({
     }
   }, [open, initialData]);
 
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState<{ matched: number; skipped: number; results?: { sparte: string; matched: boolean }[] } | null>(null);
+
   const toggleProduct = (productId: number) => {
     setForm((prev) => {
       const ids = prev.productIds.includes(productId)
@@ -231,6 +239,16 @@ function LeadProviderDialog({
         : [...prev.productIds, productId];
       return { ...prev, productIds: ids };
     });
+  };
+
+  const setProductPrice = (productId: number, price: string) => {
+    setForm((prev) => ({
+      ...prev,
+      productPrices: {
+        ...prev.productPrices,
+        [productId]: price ? parseFloat(price) : null,
+      },
+    }));
   };
 
   const monthlyCost = (form.minPerMonth || 0) * (form.costPerLead || 0);
@@ -336,23 +354,96 @@ function LeadProviderDialog({
           </div>
           {allProducts.length > 0 && (
             <div className="space-y-2">
-              <Label>Lead-Produkte</Label>
-              <div className="rounded-md border p-3 space-y-2 max-h-40 overflow-y-auto">
-                {allProducts.filter((p) => p.active).map((product) => (
-                  <label key={product.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5">
+              <div className="flex items-center justify-between">
+                <Label>Lead-Produkte & Preise</Label>
+                {providerId && (
+                  <label className="cursor-pointer">
                     <input
-                      type="checkbox"
-                      checked={form.productIds.includes(product.id)}
-                      onChange={() => toggleProduct(product.id)}
-                      className="rounded border-input"
+                      type="file"
+                      accept=".csv,.txt"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !providerId) return;
+                        setCsvUploading(true);
+                        setCsvResult(null);
+                        try {
+                          const fd = new FormData();
+                          fd.append("file", file);
+                          const provId = providerId;
+                          const res = await fetch(`/api/lead-providers/${provId}/prices`, { method: "POST", body: fd });
+                          const data = await res.json();
+                          setCsvResult(data);
+                          if (data.matched > 0) {
+                            // Reload products from API
+                            const provRes = await fetch(`/api/lead-providers`);
+                            if (provRes.ok) {
+                              const provs = await provRes.json();
+                              const prov = provs.find((p: LeadProvider) => p.id === provId);
+                              if (prov) {
+                                setForm((prev) => ({
+                                  ...prev,
+                                  productIds: prov.productIds || [],
+                                  productPrices: prov.productPrices || {},
+                                }));
+                              }
+                            }
+                          }
+                        } catch {
+                          setCsvResult({ matched: 0, skipped: 0 });
+                        } finally {
+                          setCsvUploading(false);
+                          e.target.value = "";
+                        }
+                      }}
                     />
-                    {product.name}
+                    <span className="inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer">
+                      <Upload className="h-3 w-3" />
+                      {csvUploading ? "Lade..." : "CSV-Preisliste hochladen"}
+                    </span>
                   </label>
-                ))}
+                )}
+              </div>
+              {csvResult && (
+                <p className={`text-xs ${csvResult.matched > 0 ? "text-emerald-600" : "text-destructive"}`}>
+                  {csvResult.matched} Sparten zugeordnet, {csvResult.skipped} uebersprungen
+                </p>
+              )}
+              <div className="rounded-md border p-3 space-y-2 max-h-52 overflow-y-auto">
+                {allProducts.filter((p) => p.active).map((product) => {
+                  const isChecked = form.productIds.includes(product.id);
+                  return (
+                    <div key={product.id} className="flex items-center gap-2 text-sm hover:bg-accent/50 rounded px-1 py-0.5">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleProduct(product.id)}
+                          className="rounded border-input shrink-0"
+                        />
+                        <span className="truncate">{product.name}</span>
+                      </label>
+                      {isChecked && (
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          placeholder="EUR"
+                          className="w-20 h-7 text-xs"
+                          value={form.productPrices[product.id] ?? ""}
+                          onChange={(e) => setProductPrice(product.id, e.target.value)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
                 {allProducts.filter((p) => p.active).length === 0 && (
                   <p className="text-xs text-muted-foreground">Keine aktiven Produkte vorhanden</p>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Preis pro Sparte eingeben oder CSV hochladen (Format: Sparte;Preis). Ohne Preis gilt der Pauschalpreis.
+              </p>
             </div>
           )}
           {monthlyCost > 0 && (
@@ -423,6 +514,7 @@ function LeadProviderSection() {
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
         productIds: form.productIds,
+        productPrices: form.productPrices,
       }),
     });
     if (!res.ok) {
@@ -447,6 +539,7 @@ function LeadProviderSection() {
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
         productIds: form.productIds,
+        productPrices: form.productPrices,
       }),
     });
     if (!res.ok) {
@@ -491,7 +584,8 @@ function LeadProviderSection() {
         billingModel: editProvider.billingModel,
         carryOver: editProvider.carryOver ? "true" : "false",
         startMonth: editProvider.startMonth || "",
-        productIds: editProvider.products?.map((p) => p.id) || [],
+        productIds: (editProvider as unknown as { productIds?: number[] }).productIds || editProvider.products?.map((p) => p.id) || [],
+        productPrices: editProvider.productPrices || {},
       }
     : EMPTY_FORM;
 
@@ -626,6 +720,7 @@ function LeadProviderSection() {
         onOpenChange={(open) => { if (!open) setEditProvider(null); }}
         initialData={editFormData}
         onSave={handleEdit}
+        providerId={editProvider?.id}
       />
 
       {/* Delete confirmation */}

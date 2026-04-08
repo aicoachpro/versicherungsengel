@@ -205,6 +205,7 @@ export const leadProducts = sqliteTable("lead_products", {
 export const providerProducts = sqliteTable("provider_products", {
   providerId: integer("provider_id").notNull(),
   productId: integer("product_id").notNull(),
+  costPerLead: real("cost_per_lead"),
 });
 
 export const provisionImports = sqliteTable("provision_imports", {

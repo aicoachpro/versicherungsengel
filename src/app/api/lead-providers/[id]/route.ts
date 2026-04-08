@@ -56,10 +56,15 @@ export async function PATCH(
     db.delete(providerProducts)
       .where(eq(providerProducts.providerId, providerId))
       .run();
-    // Insert new links
+    // Insert new links with optional prices
+    const prices: Record<number, number | null> = body.productPrices || {};
     for (const pid of body.productIds) {
       db.insert(providerProducts)
-        .values({ providerId, productId: pid })
+        .values({
+          providerId,
+          productId: pid,
+          costPerLead: prices[pid] ?? null,
+        })
         .run();
     }
   }
@@ -88,6 +93,10 @@ export async function PATCH(
   return NextResponse.json({
     ...result,
     productIds: links.map((l) => l.productId),
+    productPrices: links.reduce((acc, l) => {
+      acc[l.productId] = l.costPerLead ?? null;
+      return acc;
+    }, {} as Record<number, number | null>),
   });
 }
 

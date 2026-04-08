@@ -26,13 +26,19 @@ export async function GET() {
     .orderBy(sql`${leadProviders.createdAt} DESC`)
     .all();
 
-  // Attach linked productIds for each provider
+  // Attach linked products with prices for each provider
   const allLinks = db.select().from(providerProducts).all();
   const result = all.map((p) => ({
     ...p,
     productIds: allLinks
       .filter((l) => l.providerId === p.id)
       .map((l) => l.productId),
+    productPrices: allLinks
+      .filter((l) => l.providerId === p.id)
+      .reduce((acc, l) => {
+        acc[l.productId] = l.costPerLead ?? null;
+        return acc;
+      }, {} as Record<number, number | null>),
   }));
 
   return NextResponse.json(result);

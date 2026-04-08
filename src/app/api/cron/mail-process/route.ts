@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, inboundEmails, leadProducts, emailAccounts, leadAssignmentRules } from "@/db/schema";
+import { leads, inboundEmails, leadProducts, emailAccounts, leadAssignmentRules, providerProducts, leadProviders } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { extractLeadFromEmail } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
@@ -169,6 +169,43 @@ export async function GET(req: NextRequest) {
         console.log(`[mail-process] Lead "${leadName}" zugewiesen an User #${assignedTo} (Provider #${providerId})`);
       }
 
+      // terminKosten dynamisch ermitteln:
+      // 1. Spezifischer Preis aus provider_products (Anbieter + Produkt)
+      // 2. Fallback: Pauschalpreis vom Anbieter (lead_providers.cost_per_lead)
+      let terminKosten = 320;
+      try {
+        if (providerId && productId) {
+          const ppRow = db
+            .select({ costPerLead: providerProducts.costPerLead })
+            .from(providerProducts)
+            .where(
+              and(
+                eq(providerProducts.providerId, providerId),
+                eq(providerProducts.productId, productId)
+              )
+            )
+            .get();
+          if (ppRow?.costPerLead != null) {
+            terminKosten = ppRow.costPerLead;
+          }
+        }
+        // Fallback: Pauschalpreis vom Anbieter
+        if (terminKosten === 320 && providerId) {
+          const provRow = db
+            .select({ costPerLead: leadProviders.costPerLead })
+            .from(leadProviders)
+            .where(eq(leadProviders.id, providerId))
+            .get();
+          if (provRow?.costPerLead != null) {
+            terminKosten = provRow.costPerLead;
+          }
+        }
+      } catch {
+        // Tabellen existieren evtl. noch nicht
+      }
+
+      console.log(`[mail-process] Lead "${leadName}" terminKosten: ${terminKosten} EUR`);
+
       const newLead = db
         .insert(leads)
         .values({
@@ -189,7 +226,7 @@ export async function GET(req: NextRequest) {
           naechsterSchritt: leadData.naechsterSchritt || null,
           notizen: notizText,
           eingangsdatum: eingangsDatum,
-          terminKosten: 320,
+          terminKosten,
           productId: productId,
           providerId: providerId,
           assignedTo: assignedTo,
