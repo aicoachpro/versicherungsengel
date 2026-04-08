@@ -301,6 +301,26 @@ try {
   console.log("Added 'skipped_rows' column to provision_imports table");
 }
 
+// Add provider_id column to email_accounts if not exists
+try {
+  sqlite.prepare("SELECT provider_id FROM email_accounts LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE email_accounts ADD COLUMN provider_id INTEGER").run();
+  console.log("Added 'provider_id' column to email_accounts table");
+}
+
+// Create lead_assignment_rules table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS lead_assignment_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    provider_id INTEGER NOT NULL,
+    product_id INTEGER,
+    user_id INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, inboundEmails, leadProducts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { leads, inboundEmails, leadProducts, emailAccounts, leadAssignmentRules } from "@/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import { extractLeadFromEmail } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
 
@@ -117,6 +117,58 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Provider-ID aus E-Mail-Konto ermitteln
+      let providerId: number | null = null;
+      let assignedTo: number | null = null;
+      try {
+        const account = db
+          .select({ providerId: emailAccounts.providerId })
+          .from(emailAccounts)
+          .where(eq(emailAccounts.id, email.accountId))
+          .get();
+        if (account?.providerId) {
+          providerId = account.providerId;
+
+          // Zuweisungsregel suchen: erst spezifisch (Anbieter + Produkt), dann pauschal (Anbieter)
+          if (productId) {
+            const specificRule = db
+              .select({ userId: leadAssignmentRules.userId })
+              .from(leadAssignmentRules)
+              .where(
+                and(
+                  eq(leadAssignmentRules.providerId, providerId),
+                  eq(leadAssignmentRules.productId, productId),
+                  eq(leadAssignmentRules.active, true)
+                )
+              )
+              .get();
+            if (specificRule) assignedTo = specificRule.userId;
+          }
+
+          // Fallback: Pauschalregel (ohne Produkt)
+          if (!assignedTo) {
+            const defaultRule = db
+              .select({ userId: leadAssignmentRules.userId })
+              .from(leadAssignmentRules)
+              .where(
+                and(
+                  eq(leadAssignmentRules.providerId, providerId),
+                  isNull(leadAssignmentRules.productId),
+                  eq(leadAssignmentRules.active, true)
+                )
+              )
+              .get();
+            if (defaultRule) assignedTo = defaultRule.userId;
+          }
+        }
+      } catch {
+        // Tabellen existieren evtl. noch nicht
+      }
+
+      if (assignedTo) {
+        console.log(`[mail-process] Lead "${leadName}" zugewiesen an User #${assignedTo} (Provider #${providerId})`);
+      }
+
       const newLead = db
         .insert(leads)
         .values({
@@ -139,6 +191,8 @@ export async function GET(req: NextRequest) {
           eingangsdatum: eingangsDatum,
           terminKosten: 320,
           productId: productId,
+          providerId: providerId,
+          assignedTo: assignedTo,
         })
         .returning()
         .get();

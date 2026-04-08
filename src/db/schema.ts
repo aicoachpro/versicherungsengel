@@ -171,6 +171,7 @@ export const emailAccounts = sqliteTable("email_accounts", {
   username: text("username").notNull(),
   password: text("password").notNull(),
   folder: text("folder").notNull().default("INBOX"),
+  providerId: integer("provider_id"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   lastPolledAt: text("last_polled_at"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
@@ -236,6 +237,15 @@ export const provisions = sqliteTable("provisions", {
   leadId: integer("lead_id"),
   matchConfidence: real("match_confidence"),
   confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const leadAssignmentRules = sqliteTable("lead_assignment_rules", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  providerId: integer("provider_id").notNull(),
+  productId: integer("product_id"),
+  userId: integer("user_id").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 

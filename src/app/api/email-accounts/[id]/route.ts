@@ -54,6 +54,7 @@ export async function PATCH(
     updates.password = encrypt(body.password);
   }
   if (body.folder !== undefined) updates.folder = body.folder;
+  if (body.providerId !== undefined) updates.providerId = body.providerId || null;
   if (body.active !== undefined) updates.active = body.active;
 
   if (Object.keys(updates).length === 0) {

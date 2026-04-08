@@ -1001,6 +1001,7 @@ interface EmailAccount {
   username: string;
   password: string;
   folder: string;
+  providerId: number | null;
   active: boolean;
   lastPolledAt: string | null;
   createdAt: string;
@@ -1014,6 +1015,7 @@ type EmailAccountForm = {
   username: string;
   password: string;
   folder: string;
+  providerId: string;
 };
 
 const EMPTY_EMAIL_FORM: EmailAccountForm = {
@@ -1024,6 +1026,7 @@ const EMPTY_EMAIL_FORM: EmailAccountForm = {
   username: "",
   password: "",
   folder: "INBOX",
+  providerId: "",
 };
 
 function EmailAccountDialog({
@@ -1040,12 +1043,17 @@ function EmailAccountDialog({
   const [form, setForm] = useState<EmailAccountForm>(initialData);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [emailProviders, setEmailProviders] = useState<{ id: number; name: string }[]>([]);
   const isEdit = initialData.name !== "";
 
   useEffect(() => {
     if (open) {
       setForm(initialData);
       setError("");
+      fetch("/api/lead-providers/active")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setEmailProviders(data))
+        .catch(() => setEmailProviders([]));
     }
   }, [open, initialData]);
 
@@ -1159,6 +1167,22 @@ function EmailAccountDialog({
               onChange={(e) => setForm((p) => ({ ...p, folder: e.target.value }))}
             />
           </div>
+          <div className="space-y-2">
+            <Label>Lead-Anbieter</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={form.providerId}
+              onChange={(e) => setForm((p) => ({ ...p, providerId: e.target.value }))}
+            >
+              <option value="">Kein Anbieter zugeordnet</option>
+              {emailProviders.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Ordne dieses Postfach einem Lead-Anbieter zu fuer automatische Bearbeiter-Zuweisung.
+            </p>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <DialogClose
@@ -1223,6 +1247,7 @@ function EmailAccountSection() {
         username: form.username,
         password: form.password,
         folder: form.folder || "INBOX",
+        providerId: form.providerId ? parseInt(form.providerId) : null,
       }),
     });
     if (!res.ok) {
@@ -1242,6 +1267,7 @@ function EmailAccountSection() {
       useSsl: form.useSsl === "true",
       username: form.username,
       folder: form.folder || "INBOX",
+      providerId: form.providerId ? parseInt(form.providerId) : null,
     };
     // Only send password if user entered a new one
     if (form.password && form.password !== "********") {
@@ -1308,6 +1334,7 @@ function EmailAccountSection() {
         username: editAccount.username,
         password: "",
         folder: editAccount.folder,
+        providerId: editAccount.providerId ? String(editAccount.providerId) : "",
       }
     : EMPTY_EMAIL_FORM;
 
@@ -1488,6 +1515,359 @@ function EmailAccountSection() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+interface AssignmentRule {
+  id: number;
+  providerId: number;
+  productId: number | null;
+  userId: number;
+  active: boolean;
+  providerName: string;
+  productName: string | null;
+  userName: string;
+}
+
+function LeadAssignmentSection() {
+  const [rules, setRules] = useState<AssignmentRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [providers, setProviders] = useState<{ id: number; name: string }[]>([]);
+  const [products, setProducts] = useState<{ id: number; name: string }[]>([]);
+  const [allUsers, setAllUsers] = useState<{ id: number; name: string }[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editRule, setEditRule] = useState<AssignmentRule | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchAll = async () => {
+    try {
+      const [rulesRes, provRes, prodRes, usersRes] = await Promise.all([
+        fetch("/api/lead-assignment-rules"),
+        fetch("/api/lead-providers/active"),
+        fetch("/api/lead-products"),
+        fetch("/api/users"),
+      ]);
+      if (rulesRes.ok) setRules(await rulesRes.json());
+      if (provRes.ok) setProviders(await provRes.json());
+      if (prodRes.ok) setProducts(await prodRes.json());
+      if (usersRes.ok) {
+        const userData = await usersRes.json();
+        setAllUsers(Array.isArray(userData) ? userData.map((u: { id: number; name: string }) => ({ id: u.id, name: u.name })) : []);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleSave = async (form: { providerId: number; productId: number | null; userId: number }) => {
+    const isEdit = editRule !== null;
+    const url = isEdit ? `/api/lead-assignment-rules/${editRule.id}` : "/api/lead-assignment-rules";
+    const method = isEdit ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Fehler beim Speichern");
+    }
+    setEditRule(null);
+    setDialogOpen(false);
+    await fetchAll();
+    showFeedback("success", isEdit ? "Regel aktualisiert" : "Regel hinzugefuegt");
+  };
+
+  const handleDelete = async () => {
+    if (deleteId === null) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/lead-assignment-rules/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) {
+        showFeedback("error", "Fehler beim Loeschen");
+      } else {
+        await fetchAll();
+        showFeedback("success", "Regel geloescht");
+      }
+    } catch {
+      showFeedback("error", "Verbindungsfehler");
+    } finally {
+      setDeleting(false);
+      setDeleteId(null);
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Lead-Zuweisung
+            </h3>
+            <Badge variant={rules.length > 0 ? "default" : "secondary"}>
+              {rules.length > 0 ? `${rules.length} Regel${rules.length > 1 ? "n" : ""}` : "Nicht konfiguriert"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Automatische Bearbeiter-Zuweisung bei eingehenden Leads. Pauschalregeln (ohne Produkt) gelten als Fallback.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {feedback && (
+            <p className={`text-sm ${feedback.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+              {feedback.message}
+            </p>
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Lade Zuweisungsregeln...
+            </div>
+          ) : rules.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Noch keine Zuweisungsregeln konfiguriert
+              </p>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => { setEditRule(null); setDialogOpen(true); }}
+              >
+                <Plus className="h-4 w-4" />
+                Regel hinzufuegen
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {rules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="rounded-lg border p-3 flex items-center justify-between gap-3"
+                >
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{rule.providerName}</span>
+                      {rule.productName ? (
+                        <Badge variant="outline" className="text-xs">{rule.productName}</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">Alle Leadarten</Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">→</span>
+                      <span className="text-sm">{rule.userName}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => { setEditRule(rule); setDialogOpen(true); }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(rule.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && rules.length > 0 && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => { setEditRule(null); setDialogOpen(true); }}
+            >
+              <Plus className="h-4 w-4" />
+              Regel hinzufuegen
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      <AssignmentRuleDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { if (!open) { setDialogOpen(false); setEditRule(null); } else { setDialogOpen(true); } }}
+        initialData={editRule ? { providerId: editRule.providerId, productId: editRule.productId, userId: editRule.userId } : { providerId: 0, productId: null, userId: 0 }}
+        providers={providers}
+        products={products}
+        users={allUsers}
+        onSave={handleSave}
+        isEdit={editRule !== null}
+      />
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Zuweisungsregel loeschen</DialogTitle>
+            <DialogDescription>
+              Soll diese Regel wirklich geloescht werden?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="gap-2"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? "Loesche..." : "Loeschen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function AssignmentRuleDialog({
+  open,
+  onOpenChange,
+  initialData,
+  providers,
+  products,
+  users,
+  onSave,
+  isEdit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialData: { providerId: number; productId: number | null; userId: number };
+  providers: { id: number; name: string }[];
+  products: { id: number; name: string }[];
+  users: { id: number; name: string }[];
+  onSave: (data: { providerId: number; productId: number | null; userId: number }) => Promise<void>;
+  isEdit: boolean;
+}) {
+  const [form, setForm] = useState(initialData);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setForm(initialData);
+      setError("");
+    }
+  }, [open, initialData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.providerId) {
+      setError("Anbieter ist erforderlich");
+      return;
+    }
+    if (!form.userId) {
+      setError("Bearbeiter ist erforderlich");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(form);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Regel bearbeiten" : "Zuweisungsregel hinzufuegen"}</DialogTitle>
+          <DialogDescription>
+            Lege fest, welcher Bearbeiter Leads von einem Anbieter bekommt. Ohne Produkt gilt die Regel pauschal.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Lead-Anbieter *</Label>
+            <select
+              className={selectClass}
+              value={form.providerId}
+              onChange={(e) => setForm((p) => ({ ...p, providerId: parseInt(e.target.value) || 0 }))}
+              required
+            >
+              <option value={0}>-- Anbieter waehlen --</option>
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Leadart / Produkt (optional)</Label>
+            <select
+              className={selectClass}
+              value={form.productId ?? ""}
+              onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value ? parseInt(e.target.value) : null }))}
+            >
+              <option value="">Alle Leadarten (pauschal)</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Bearbeiter *</Label>
+            <select
+              className={selectClass}
+              value={form.userId}
+              onChange={(e) => setForm((p) => ({ ...p, userId: parseInt(e.target.value) || 0 }))}
+              required
+            >
+              <option value={0}>-- Bearbeiter waehlen --</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+            >
+              Abbrechen
+            </DialogClose>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? "Speichere..." : "Speichern"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1957,6 +2337,8 @@ export default function SettingsPage() {
             <LeadProductSection />
 
             <EmailAccountSection />
+
+            <LeadAssignmentSection />
 
             <SettingsSection
               icon={<BookOpen className="h-5 w-5" />}

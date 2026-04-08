@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       username: body.username,
       password: encrypt(body.password),
       folder: body.folder ?? "INBOX",
+      providerId: body.providerId ?? null,
       active: body.active ?? true,
     })
     .returning()
