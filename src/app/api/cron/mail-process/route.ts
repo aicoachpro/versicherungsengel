@@ -46,12 +46,14 @@ export async function GET(req: NextRequest) {
       // KI-Extraktion
       const aiResponse = await extractLeadFromText(extractionText);
 
-      // JSON aus der Antwort parsen
+      // JSON aus der Antwort parsen (robust: auch bei Extra-Text oder abgeschnittener Antwort)
       let leadData: Record<string, string>;
       try {
-        // KI antwortet manchmal mit Markdown-Codeblocks
-        const jsonStr = aiResponse.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-        leadData = JSON.parse(jsonStr);
+        const cleaned = aiResponse.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+        // Erstes JSON-Objekt aus der Antwort extrahieren
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("Kein JSON gefunden");
+        leadData = JSON.parse(jsonMatch[0]);
       } catch {
         throw new Error(`KI-Antwort ist kein valides JSON: ${aiResponse.substring(0, 200)}`);
       }
