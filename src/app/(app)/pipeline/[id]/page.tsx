@@ -415,40 +415,47 @@ export default function LeadDetailPage() {
 
   async function loadData() {
     setLoading(true);
-    const [leadRes, vertragRes, produktRes, crossSellingRes, activityRes, docRes, provRes] = await Promise.all([
-      fetch("/api/leads"),
-      fetch(`/api/insurances?leadId=${leadId}`),
-      fetch("/api/produkte?kategorie=fremdvertrag"),
-      fetch("/api/produkte?kategorie=cross_selling"),
-      fetch(`/api/activities?leadId=${leadId}`),
-      fetch(`/api/documents?leadId=${leadId}`),
-      fetch(`/api/provisions?leadId=${leadId}&confirmed=true`),
-    ]);
-    const allLeads = await leadRes.json();
-    const foundLead = allLeads.find((l: Lead) => l.id === leadId);
-    setLead(foundLead || null);
-    setVertraege(await vertragRes.json());
-    setAktivitaeten(await activityRes.json());
-    setDokumente(await docRes.json());
-    setProvisionen(await provRes.json());
+    try {
+      const safeFetch = async (url: string) => {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        return res.json();
+      };
 
-    const produktList = await produktRes.json();
-    setProduktOptionen(produktList.map((p: { name: string }) => p.name));
+      const [allLeads, vertragData, produktList, csList, activityData, docData, provData] = await Promise.all([
+        safeFetch("/api/leads"),
+        safeFetch(`/api/insurances?leadId=${leadId}`),
+        safeFetch("/api/produkte?kategorie=fremdvertrag"),
+        safeFetch("/api/produkte?kategorie=cross_selling"),
+        safeFetch(`/api/activities?leadId=${leadId}`),
+        safeFetch(`/api/documents?leadId=${leadId}`),
+        safeFetch(`/api/provisions?leadId=${leadId}&confirmed=true`),
+      ]);
 
-    const csList = await crossSellingRes.json();
-    setCrossSellingOptionen(csList.map((p: { name: string }) => p.name));
+      const foundLead = (allLeads || []).find((l: Lead) => l.id === leadId);
+      setLead(foundLead || null);
+      setVertraege(vertragData || []);
+      setAktivitaeten(activityData || []);
+      setDokumente(docData || []);
+      setProvisionen(provData || []);
+      setProduktOptionen((produktList || []).map((p: { name: string }) => p.name));
+      setCrossSellingOptionen((csList || []).map((p: { name: string }) => p.name));
 
-    if (foundLead?.crossSelling) {
-      try {
-        setCrossSellingSelected(JSON.parse(foundLead.crossSelling));
-      } catch {
+      if (foundLead?.crossSelling) {
+        try {
+          setCrossSellingSelected(JSON.parse(foundLead.crossSelling));
+        } catch {
+          setCrossSellingSelected([]);
+        }
+      } else {
         setCrossSellingSelected([]);
       }
-    } else {
-      setCrossSellingSelected([]);
+    } catch (err) {
+      console.error("Lead-Detail laden fehlgeschlagen:", err);
+      setLead(null);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   function openNew() {

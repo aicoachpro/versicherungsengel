@@ -93,11 +93,24 @@ export async function GET(req: NextRequest) {
           const subject = msg.envelope?.subject || "(kein Betreff)";
           const receivedAt = msg.envelope?.date?.toISOString() || new Date().toISOString();
 
+          // Kalender-Einladungen überspringen (kein Lead-Content)
+          const source = msg.source?.toString() || "";
+          const isCalendarInvite =
+            /Content-Type:\s*text\/calendar/i.test(source) ||
+            /Content-Type:\s*application\/ics/i.test(source) ||
+            /^(Invitation|Einladung|Updated Invitation|Canceled):/i.test(subject) ||
+            /\.ics["']?\s*$/im.test(source);
+
+          if (isCalendarInvite) {
+            // Nur als gelesen markieren, nicht importieren
+            await client.messageFlagsAdd({ uid: msg.uid }, ["\\Seen"], { uid: true });
+            continue;
+          }
+
           // Body aus Source extrahieren
           let body = "";
           let htmlBody: string | null = null;
-          if (msg.source) {
-            const source = msg.source.toString();
+          if (source) {
             const { extractTextFromSource } = await import("./mail-utils");
             const extracted = extractTextFromSource(source);
             body = extracted.text || "(kein Inhalt)";

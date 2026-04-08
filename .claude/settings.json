@@ -17,7 +17,8 @@
       "Bash(pkill -f \"next dev --port 3333\")",
       "mcp__obsidian__list_all_tags",
       "Bash(npm test:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "WebFetch(domain:api.telegram.org)"
     ],
     "additionalDirectories": [
       "/tmp"

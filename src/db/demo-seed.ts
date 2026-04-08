@@ -83,7 +83,7 @@ export function seedDemoData(sqlite: Database.Database) {
       strasse: "Berliner Allee 78", plz: "10115", ort: "Berlin",
       branche: "IT", gewerbeart: "hauptberuflich",
       productId: 22, eingangsdatum: "2026-01-28",
-      folgetermin: "2026-04-10 10:00", folgeterminTyp: "Cross-Selling",
+      folgetermin: "2026-04-22 10:00", folgeterminTyp: "Cross-Selling",
       reklamiertAt: null, reklamationStatus: null, reklamationNotiz: null,
       notizen: "Cyberschutz abgeschlossen, Cross-Selling BHP geplant", umsatz: 3200,
     },
@@ -107,7 +107,7 @@ export function seedDemoData(sqlite: Database.Database) {
       strasse: "Hafenstr. 22", plz: "20457", ort: "Hamburg",
       branche: "IT", gewerbeart: "hauptberuflich",
       productId: 22, eingangsdatum: "2026-03-01",
-      folgetermin: "2026-04-05 10:00", folgeterminTyp: "Angebot nachfassen",
+      folgetermin: "2026-04-14 10:00", folgeterminTyp: "Angebot nachfassen",
       reklamiertAt: null, reklamationStatus: null, reklamationNotiz: null,
       notizen: "Cyberschutz-Angebot \u00fcber 2.400 EUR/Jahr verschickt", umsatz: null,
     },
@@ -118,7 +118,7 @@ export function seedDemoData(sqlite: Database.Database) {
       strasse: "Marktplatz 3", plz: "68159", ort: "Mannheim",
       branche: "Gastronomie", gewerbeart: "hauptberuflich",
       productId: 4, eingangsdatum: "2026-03-05",
-      folgetermin: "2026-04-08 14:00", folgeterminTyp: "Angebot nachfassen",
+      folgetermin: "2026-04-16 14:00", folgeterminTyp: "Angebot nachfassen",
       reklamiertAt: null, reklamationStatus: null, reklamationNotiz: null,
       notizen: "Firmenrechtsschutz-Angebot erstellt, wartet auf R\u00fcckmeldung", umsatz: null,
     },
@@ -131,7 +131,7 @@ export function seedDemoData(sqlite: Database.Database) {
       strasse: "Brotweg 7", plz: "30159", ort: "Hannover",
       branche: "Handel", gewerbeart: "hauptberuflich",
       productId: 2, eingangsdatum: "2026-03-10",
-      folgetermin: "2026-04-07 09:30", folgeterminTyp: "Nachfassen",
+      folgetermin: "2026-04-10 09:30", folgeterminTyp: "Nachfassen",
       reklamiertAt: null, reklamationStatus: null, reklamationNotiz: null,
       notizen: "Interesse an BHP, Unterlagen angefordert", umsatz: null,
     },
@@ -142,7 +142,7 @@ export function seedDemoData(sqlite: Database.Database) {
       strasse: "Hauptstr. 15", plz: "01067", ort: "Dresden",
       branche: "Dienstleistung", gewerbeart: "hauptberuflich",
       productId: 7, eingangsdatum: "2026-03-12",
-      folgetermin: "2026-04-09 11:00", folgeterminTyp: "Nachfassen",
+      folgetermin: "2026-04-11 11:00", folgeterminTyp: "Nachfassen",
       reklamiertAt: null, reklamationStatus: null, reklamationNotiz: null,
       notizen: "Haftpflicht + Inhalt, will Vergleichsangebot", umsatz: null,
     },
@@ -153,7 +153,7 @@ export function seedDemoData(sqlite: Database.Database) {
       strasse: "Waldstr. 31", plz: "90402", ort: "N\u00fcrnberg",
       branche: "Handwerk", gewerbeart: "hauptberuflich",
       productId: 5, eingangsdatum: "2026-03-15",
-      folgetermin: "2026-04-11 10:00", folgeterminTyp: "Beratung",
+      folgetermin: "2026-04-15 10:00", folgeterminTyp: "Beratung",
       reklamiertAt: null, reklamationStatus: null, reklamationNotiz: null,
       notizen: "Firmenversicherung, 3 MA, will alle Sparten pr\u00fcfen", umsatz: null,
     },
@@ -370,7 +370,7 @@ export function seedDemoData(sqlite: Database.Database) {
   const demoInsurances = [
     // Lead 1: M\u00fcller Elektrotechnik
     { bezeichnung: "BHP Allianz", leadId: 1, sparte: "Haftpflicht", versicherer: "Allianz", produkt: "Betriebshaftpflicht Plus", beitrag: 1200, zahlweise: "j\u00e4hrlich", ablauf: "2026-12-31", notizen: "Bestandsvertrag, l\u00e4uft Ende 2026 aus" },
-    { bezeichnung: "Inhaltsversicherung HUK", leadId: 1, sparte: "Inhalt", versicherer: "HUK-Coburg", produkt: "Gewerbe-Inhalt Komfort", beitrag: 850, zahlweise: "j\u00e4hrlich", ablauf: "2026-06-30", notizen: "L\u00e4uft bald aus \u2013 Cross-Selling-Chance!" },
+    { bezeichnung: "Inhaltsversicherung HUK", leadId: 1, sparte: "Inhalt", versicherer: "HUK-Coburg", produkt: "Gewerbe-Inhalt Komfort", beitrag: 850, zahlweise: "j\u00e4hrlich", ablauf: "2026-07-31", notizen: "L\u00e4uft bald aus \u2013 Cross-Selling-Chance!" },
 
     // Lead 3: IT-Systemhaus Krause
     { bezeichnung: "D&O DEVK", leadId: 3, sparte: "D&O", versicherer: "DEVK", produkt: "D&O Kompakt", beitrag: 2400, zahlweise: "j\u00e4hrlich", ablauf: "2027-03-31", notizen: "Bestehender D&O-Vertrag" },
@@ -379,7 +379,7 @@ export function seedDemoData(sqlite: Database.Database) {
     { bezeichnung: "Gewerbe-Rechtsschutz ARAG", leadId: 7, sparte: "Rechtsschutz", versicherer: "ARAG", produkt: "Firmen-Rechtsschutz", beitrag: 780, zahlweise: "j\u00e4hrlich", ablauf: "2026-09-30", notizen: "Nur Rechtsschutz, keine BHP" },
 
     // Lead 10: Dachdeckerei Sturm
-    { bezeichnung: "Betriebshaftpflicht Gothaer", leadId: 10, sparte: "Haftpflicht", versicherer: "Gothaer", produkt: "BHP Handwerk", beitrag: 1800, zahlweise: "halbj\u00e4hrlich", ablauf: "2026-08-15", notizen: "Alte BHP, Deckungsl\u00fccken vermutet" },
+    { bezeichnung: "Betriebshaftpflicht Gothaer", leadId: 10, sparte: "Haftpflicht", versicherer: "Gothaer", produkt: "BHP Handwerk", beitrag: 1800, zahlweise: "halbj\u00e4hrlich", ablauf: "2026-09-30", notizen: "Alte BHP, Deckungsl\u00fccken vermutet" },
     { bezeichnung: "Unfallversicherung Alte Leipziger", leadId: 10, sparte: "Sonstiges", versicherer: "Alte Leipziger", produkt: "Gruppen-Unfall", beitrag: 960, zahlweise: "j\u00e4hrlich", ablauf: "2027-01-01", notizen: "F\u00fcr 8 Mitarbeiter" },
   ];
 
@@ -393,6 +393,15 @@ export function seedDemoData(sqlite: Database.Database) {
   });
   insertInsurancesTransaction();
   console.log(`Demo-Seed: ${demoInsurances.length} Fremdvertr\u00e4ge erstellt.`);
+
+  // --- Demo Provision Import (Dummy fuer FK) ---
+  const existingImport = sqlite.prepare("SELECT id FROM provision_imports LIMIT 1").get();
+  if (!existingImport) {
+    sqlite.prepare(
+      `INSERT INTO provision_imports (id, filename, import_date, total_rows, total_betrag, matched_rows, unmatched_rows)
+       VALUES (0, 'demo-seed.csv', datetime('now'), 8, 3449, 8, 0)`
+    ).run();
+  }
 
   // --- Demo Provisions ---
   const insertProvision = sqlite.prepare(`
