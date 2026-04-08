@@ -197,6 +197,7 @@ export const inboundEmails = sqliteTable("inbound_emails", {
 export const leadProducts = sqliteTable("lead_products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  kuerzel: text("kuerzel"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),

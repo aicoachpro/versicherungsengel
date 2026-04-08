@@ -17,9 +17,28 @@ async function requireAdmin() {
 }
 
 /**
+ * Parst einen Preis-String im deutschen oder englischen Format:
+ * "64,41" → 64.41, "33.21" → 33.21, "\"64,41\"" → 64.41, "0" → 0
+ */
+function parsePrice(raw: string): number {
+  // Anführungszeichen entfernen
+  let s = raw.trim().replace(/^["']|["']$/g, "").trim();
+  // Deutsches Format: Komma als Dezimaltrenner (nur wenn kein Punkt vorhanden)
+  if (s.includes(",") && !s.includes(".")) {
+    s = s.replace(",", ".");
+  }
+  // Alles ausser Ziffern und Punkt entfernen
+  s = s.replace(/[^\d.]/g, "");
+  return parseFloat(s) || 0;
+}
+
+/**
  * POST /api/lead-providers/[id]/prices
- * CSV-Upload fuer Preisliste: "Sparte;Preis" (Semikolon-getrennt)
- * Matched Sparten gegen lead_products.name und setzt cost_per_lead
+ * CSV-Upload fuer Preisliste.
+ * Unterstuetzte Formate:
+ * - "Kuerzel;Produktbezeichnung;Preis" (3 Spalten, Check-Direkt Format)
+ * - "Sparte;Preis" (2 Spalten)
+ * Matching: Erst nach Kuerzel, dann nach Name (exakt + Teilstring)
  */
 export async function POST(
   req: NextRequest,
@@ -44,9 +63,13 @@ export async function POST(
 
   // Alle Lead-Produkte laden fuer Matching
   const allProducts = db.select().from(leadProducts).all();
-  const productMap = new Map<string, number>();
+
+  // Maps fuer schnelles Matching
+  const byKuerzel = new Map<string, number>();
+  const byName = new Map<string, number>();
   for (const p of allProducts) {
-    productMap.set(p.name.toLowerCase().trim(), p.id);
+    if (p.kuerzel) byKuerzel.set(p.kuerzel.toLowerCase(), p.id);
+    byName.set(p.name.toLowerCase().trim(), p.id);
   }
 
   let matched = 0;
@@ -56,45 +79,73 @@ export async function POST(
   // Bestehende Links loeschen und neu aufbauen
   db.delete(providerProducts).where(eq(providerProducts.providerId, providerId)).run();
 
+  // Format erkennen: Hat die erste Datenzeile 3 Spalten? (Kuerzel;Name;Preis)
+  const firstDataLine = lines.find((l) => !/^(kuerzel|sparte|produkt|name)/i.test(l));
+  const semis = (firstDataLine || "").split(";").length;
+  const isThreeCol = semis >= 3;
+
   for (const line of lines) {
     // Header-Zeile ueberspringen
-    if (/^(sparte|produkt|name)/i.test(line)) continue;
+    if (/^(kuerzel|sparte|produkt|name)/i.test(line)) continue;
 
-    // Semikolon oder Komma als Trenner
-    const parts = line.includes(";") ? line.split(";") : line.split(",");
-    if (parts.length < 2) continue;
+    const parts = line.split(";");
+    let kuerzel = "";
+    let sparte = "";
+    let preisRaw = "";
 
-    const sparte = parts[0].trim();
-    const preisStr = parts[1].trim().replace(",", ".").replace(/[^\d.]/g, "");
-    const preis = parseFloat(preisStr);
+    if (isThreeCol && parts.length >= 3) {
+      // Format: Kuerzel;Produktbezeichnung;Preis (Check-Direkt)
+      kuerzel = parts[0].trim();
+      sparte = parts[1].trim();
+      preisRaw = parts.slice(2).join(";"); // Preis kann Komma in Anfuehrungszeichen haben
+    } else if (parts.length >= 2) {
+      // Format: Sparte;Preis
+      sparte = parts[0].trim();
+      preisRaw = parts.slice(1).join(";");
+    } else {
+      continue;
+    }
 
-    if (!sparte || isNaN(preis)) {
-      results.push({ sparte: sparte || "(leer)", preis: 0, matched: false });
+    const preis = parsePrice(preisRaw);
+
+    if (!sparte && !kuerzel) {
+      results.push({ sparte: "(leer)", preis: 0, matched: false });
       skipped++;
       continue;
     }
 
-    // Fuzzy-Matching: exakt oder enthaltend
-    let productId = productMap.get(sparte.toLowerCase());
-    if (!productId) {
-      // Teilstring-Match
-      for (const [name, pid] of productMap.entries()) {
-        if (name.includes(sparte.toLowerCase()) || sparte.toLowerCase().includes(name)) {
+    // Matching-Reihenfolge:
+    // 1. Exakt nach Kuerzel
+    // 2. Exakt nach Name
+    // 3. Teilstring-Match nach Name
+    let productId: number | undefined;
+
+    if (kuerzel) {
+      productId = byKuerzel.get(kuerzel.toLowerCase());
+    }
+    if (!productId && sparte) {
+      productId = byName.get(sparte.toLowerCase());
+    }
+    if (!productId && sparte) {
+      const sparteLower = sparte.toLowerCase();
+      for (const [name, pid] of byName.entries()) {
+        if (name.includes(sparteLower) || sparteLower.includes(name)) {
           productId = pid;
           break;
         }
       }
     }
 
+    const label = sparte || kuerzel;
     if (productId) {
       db.insert(providerProducts)
         .values({ providerId, productId, costPerLead: preis })
         .run();
       matched++;
-      results.push({ sparte, preis, matched: true });
+      results.push({ sparte: label, preis, matched: true });
     } else {
       skipped++;
-      results.push({ sparte, preis, matched: false });
+      results.push({ sparte: label, preis, matched: false });
     }
   }
 
