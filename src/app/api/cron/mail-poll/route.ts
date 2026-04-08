@@ -67,12 +67,14 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        // Nachrichten suchen: UNSEEN oder seit letztem Poll empfangen
-        let searchCriteria: Record<string, unknown> = { seen: false };
+        // Nachrichten seit letztem Poll holen (Dedup per messageId in DB)
+        const searchCriteria: Record<string, unknown> = {};
         if (account.lastPolledAt) {
           const since = new Date(account.lastPolledAt);
-          since.setMinutes(since.getMinutes() - 5); // 5 Min Puffer
-          searchCriteria = { or: [{ seen: false }, { since }] };
+          since.setDate(since.getDate() - 1); // 1 Tag Puffer
+          searchCriteria.since = since;
+        } else {
+          searchCriteria.seen = false;
         }
         const messages = client.fetch(searchCriteria, {
           uid: true,
