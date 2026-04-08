@@ -135,7 +135,7 @@ export default function ReklamationenPage() {
   return (
     <>
       <Header title="Reklamationen" />
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Offene Reklamationen */}
         <Card>
           <CardHeader>
@@ -149,62 +149,112 @@ export default function ReklamationenPage() {
             {offene.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Keine offenen Reklamationen</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Ansprechpartner</TableHead>
-                    <TableHead>Kosten</TableHead>
-                    <TableHead>Reklamiert am</TableHead>
-                    <TableHead>Begründung</TableHead>
-                    <TableHead className="text-right">Aktion</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile: Karten-Ansicht */}
+                <div className="md:hidden space-y-3">
                   {offene.map((lead) => (
-                    <TableRow key={lead.id}>
-                      <TableCell>
-                        <button
-                          className="font-medium text-blue-600 hover:underline"
-                          onClick={() => router.push(`/pipeline/${lead.id}`)}
-                        >
-                          {lead.name}
-                        </button>
-                      </TableCell>
-                      <TableCell>{lead.ansprechpartner || "—"}</TableCell>
-                      <TableCell>{lead.terminKosten || 320}€</TableCell>
-                      <TableCell>
-                        {lead.reklamiertAt
-                          ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE")
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <NotizCell lead={lead} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1"
-                            onClick={() => setConfirmAction({ leadId: lead.id, status: "genehmigt", name: lead.name })}
+                    <div key={lead.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <button
+                            className="font-medium text-blue-600 hover:underline text-sm"
+                            onClick={() => router.push(`/pipeline/${lead.id}`)}
                           >
-                            <CheckCircle2 className="h-4 w-4" /> Genehmigen
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1 text-destructive"
-                            onClick={() => setConfirmAction({ leadId: lead.id, status: "abgelehnt", name: lead.name })}
-                          >
-                            <XCircle className="h-4 w-4" /> Ablehnen
-                          </Button>
+                            {lead.name}
+                          </button>
+                          {lead.ansprechpartner && (
+                            <p className="text-xs text-muted-foreground">{lead.ansprechpartner}</p>
+                          )}
                         </div>
-                      </TableCell>
-                    </TableRow>
+                        <span className="text-sm font-medium whitespace-nowrap">{lead.terminKosten || 320}€</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>Reklamiert: {lead.reklamiertAt ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE") : "—"}</span>
+                      </div>
+                      <div className="text-xs">
+                        <NotizCell lead={lead} />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 flex-1"
+                          onClick={() => setConfirmAction({ leadId: lead.id, status: "genehmigt", name: lead.name })}
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> Genehmigen
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 flex-1 text-destructive"
+                          onClick={() => setConfirmAction({ leadId: lead.id, status: "abgelehnt", name: lead.name })}
+                        >
+                          <XCircle className="h-4 w-4" /> Ablehnen
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+                {/* Desktop: Tabelle */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Lead</TableHead>
+                        <TableHead>Ansprechpartner</TableHead>
+                        <TableHead>Kosten</TableHead>
+                        <TableHead>Reklamiert am</TableHead>
+                        <TableHead>Begründung</TableHead>
+                        <TableHead className="text-right">Aktion</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {offene.map((lead) => (
+                        <TableRow key={lead.id}>
+                          <TableCell>
+                            <button
+                              className="font-medium text-blue-600 hover:underline"
+                              onClick={() => router.push(`/pipeline/${lead.id}`)}
+                            >
+                              {lead.name}
+                            </button>
+                          </TableCell>
+                          <TableCell>{lead.ansprechpartner || "—"}</TableCell>
+                          <TableCell>{lead.terminKosten || 320}€</TableCell>
+                          <TableCell>
+                            {lead.reklamiertAt
+                              ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE")
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            <NotizCell lead={lead} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => setConfirmAction({ leadId: lead.id, status: "genehmigt", name: lead.name })}
+                              >
+                                <CheckCircle2 className="h-4 w-4" /> Genehmigen
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1 text-destructive"
+                                onClick={() => setConfirmAction({ leadId: lead.id, status: "abgelehnt", name: lead.name })}
+                              >
+                                <XCircle className="h-4 w-4" /> Ablehnen
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -219,48 +269,82 @@ export default function ReklamationenPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Ansprechpartner</TableHead>
-                    <TableHead>Kosten</TableHead>
-                    <TableHead>Reklamiert am</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Begründung</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {erledigte.map((lead) => {
-                    const cfg = statusConfig[lead.reklamationStatus || "offen"];
-                    return (
-                      <TableRow key={lead.id}>
-                        <TableCell>
+              {/* Mobile: Karten-Ansicht */}
+              <div className="md:hidden space-y-3">
+                {erledigte.map((lead) => {
+                  const cfg = statusConfig[lead.reklamationStatus || "offen"];
+                  return (
+                    <div key={lead.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
                           <button
-                            className="font-medium text-blue-600 hover:underline"
+                            className="font-medium text-blue-600 hover:underline text-sm"
                             onClick={() => router.push(`/pipeline/${lead.id}`)}
                           >
                             {lead.name}
                           </button>
-                        </TableCell>
-                        <TableCell>{lead.ansprechpartner || "—"}</TableCell>
-                        <TableCell>{lead.terminKosten ?? 0}€</TableCell>
-                        <TableCell>
-                          {lead.reklamiertAt
-                            ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE")
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={cfg.color}>{cfg.label}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs">
-                          <NotizCell lead={lead} />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          {lead.ansprechpartner && (
+                            <p className="text-xs text-muted-foreground">{lead.ansprechpartner}</p>
+                          )}
+                        </div>
+                        <Badge className={cfg.color}>{cfg.label}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{lead.terminKosten ?? 0}€</span>
+                        <span>Reklamiert: {lead.reklamiertAt ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE") : "—"}</span>
+                      </div>
+                      <div className="text-xs">
+                        <NotizCell lead={lead} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Desktop: Tabelle */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Lead</TableHead>
+                      <TableHead>Ansprechpartner</TableHead>
+                      <TableHead>Kosten</TableHead>
+                      <TableHead>Reklamiert am</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Begründung</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {erledigte.map((lead) => {
+                      const cfg = statusConfig[lead.reklamationStatus || "offen"];
+                      return (
+                        <TableRow key={lead.id}>
+                          <TableCell>
+                            <button
+                              className="font-medium text-blue-600 hover:underline"
+                              onClick={() => router.push(`/pipeline/${lead.id}`)}
+                            >
+                              {lead.name}
+                            </button>
+                          </TableCell>
+                          <TableCell>{lead.ansprechpartner || "—"}</TableCell>
+                          <TableCell>{lead.terminKosten ?? 0}€</TableCell>
+                          <TableCell>
+                            {lead.reklamiertAt
+                              ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE")
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={cfg.color}>{cfg.label}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            <NotizCell lead={lead} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         )}

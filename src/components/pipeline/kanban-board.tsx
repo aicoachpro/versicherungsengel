@@ -119,159 +119,156 @@ export function KanbanBoard({
     e.preventDefault();
   };
 
+  // Mobile: Collapsed-Phasen State
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(phases[0] || null);
+
+  const renderLeadCard = (lead: Lead, phase: string) => {
+    const now = new Date();
+    const terminAbgelaufen = lead.termin && new Date(lead.termin) < now;
+    const nextDate = terminAbgelaufen && lead.folgetermin ? lead.folgetermin : lead.termin;
+    const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
+    const productName = lead.productId ? productMap[lead.productId] : null;
+
+    return (
+      <Card
+        key={lead.id}
+        id={`lead-${lead.id}`}
+        draggable
+        onDragStart={(e) => handleDragStart(e, lead.id)}
+        onClick={() => router.push(`/pipeline/${lead.id}`)}
+        className={`group/card cursor-pointer border-t ${phaseColors[phase]} shadow-sm hover:shadow-md transition-shadow active:cursor-grabbing`}
+      >
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full flex-shrink-0 ${phaseDotColors[phase]}`} />
+            <p className="text-sm font-semibold flex-1 min-w-0 truncate">{lead.name}</p>
+            <GripVertical className="h-4 w-4 text-muted-foreground/30 flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity hidden md:block" />
+          </div>
+          {lead.ansprechpartner && (
+            <p className="text-xs text-muted-foreground mt-0.5 ml-4 truncate">{lead.ansprechpartner}</p>
+          )}
+          {(productName || nextDate) && (
+            <div className="flex items-center gap-2 mt-2 ml-4 flex-wrap">
+              {productName && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal">
+                  <Tag className="h-2.5 w-2.5" />
+                  {productName}
+                </Badge>
+              )}
+              {nextDate && (
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                  {formatCompactDate(nextDate)}
+                  {pushAktiv && <Bell className="h-3 w-3 text-amber-500 flex-shrink-0" />}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex items-center justify-end mt-2 -mb-0.5 -mr-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-accent md:opacity-0 md:group-hover/card:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+                render={<button type="button" aria-label="Aktionen" />}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
+                {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
+                  <>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}>
+                      <Archive className="h-4 w-4" />
+                      Archivieren
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: lead.id, name: lead.name }); }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Löschen
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <>
-      <div className="relative">
-        {/* Scroll-Hint nur auf Mobile, verschwindet nach erstem Scrollen */}
-        {showScrollHint && (
-          <div className="md:hidden text-center text-xs text-muted-foreground/60 pb-2 animate-pulse">
-            &larr; Wischen zum Scrollen &rarr;
-          </div>
-        )}
+      {/* === MOBILE: Accordion-Ansicht nach Phase === */}
+      <div className="md:hidden space-y-3">
+        {phases.map((phase) => {
+          const phaseLeads = leads.filter((l) => l.phase === phase);
+          const isOpen = expandedPhase === phase;
+          return (
+            <div key={phase}>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted/60 border border-border/50"
+                onClick={() => setExpandedPhase(isOpen ? null : phase)}
+              >
+                <div className={`h-2.5 w-2.5 rounded-full ${phaseHeaderColors[phase]}`} />
+                <span className="text-sm font-semibold flex-1 text-left">{phase}</span>
+                <Badge variant="secondary" className="text-xs">{phaseLeads.length}</Badge>
+                <svg className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {isOpen && (
+                <div className="mt-2 space-y-2 px-1">
+                  {phaseLeads.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">Keine Leads</p>
+                  ) : (
+                    phaseLeads.map((lead) => renderLeadCard(lead, phase))
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Scroll-Container */}
+      {/* === DESKTOP: Kanban-Board === */}
+      <div className="hidden md:block relative">
         <div
           ref={scrollRef}
           className="overflow-x-auto"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-      <div className="flex gap-4 min-w-max">
-        {phases.map((phase) => {
-          const phaseLeads = leads.filter((l) => l.phase === phase);
-          return (
-            <div
-              key={phase}
-              id={`phase-${phase.replace(/\s+/g, "-").toLowerCase()}`}
-              className="w-72 flex-shrink-0"
-              onDrop={(e) => handleDrop(e, phase)}
-              onDragOver={handleDragOver}
-            >
-              <div className="mb-3 flex items-center gap-2">
-                <div className={`h-2.5 w-2.5 rounded-full ${phaseHeaderColors[phase]}`} />
-                <h3 className="text-sm font-semibold">{phase}</h3>
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {phaseLeads.length}
-                </Badge>
-              </div>
-              <div className="space-y-2 min-h-[200px] rounded-xl bg-muted/40 p-2 border border-border/50">
-                {phaseLeads.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/60">
-                    <Inbox className="h-6 w-6 mb-2" />
-                    <p className="text-xs text-center">Keine Leads in dieser Phase</p>
+          <div className="flex gap-4 min-w-max">
+            {phases.map((phase) => {
+              const phaseLeads = leads.filter((l) => l.phase === phase);
+              return (
+                <div
+                  key={phase}
+                  id={`phase-${phase.replace(/\s+/g, "-").toLowerCase()}`}
+                  className="w-72 flex-shrink-0"
+                  onDrop={(e) => handleDrop(e, phase)}
+                  onDragOver={handleDragOver}
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className={`h-2.5 w-2.5 rounded-full ${phaseHeaderColors[phase]}`} />
+                    <h3 className="text-sm font-semibold">{phase}</h3>
+                    <Badge variant="secondary" className="ml-auto text-xs">{phaseLeads.length}</Badge>
                   </div>
-                )}
-                {phaseLeads.map((lead) => {
-                  // Naechster relevanter Termin berechnen
-                  const now = new Date();
-                  const terminAbgelaufen = lead.termin && new Date(lead.termin) < now;
-                  const nextDate = terminAbgelaufen && lead.folgetermin
-                    ? lead.folgetermin
-                    : lead.termin;
-                  const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
-                  const productName = lead.productId ? productMap[lead.productId] : null;
-
-                  return (
-                    <Card
-                      key={lead.id}
-                      id={`lead-${lead.id}`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, lead.id)}
-                      onClick={() => router.push(`/pipeline/${lead.id}`)}
-                      className={`group/card cursor-pointer border-t ${phaseColors[phase]} shadow-sm hover:shadow-md transition-shadow active:cursor-grabbing`}
-                    >
-                      <CardContent className="p-3">
-                        {/* Zeile 1: Phase-Dot + Firmenname + Grip (hover only) */}
-                        <div className="flex items-center gap-2">
-                          <div className={`h-2 w-2 rounded-full flex-shrink-0 ${phaseDotColors[phase]}`} />
-                          <p className="text-sm font-semibold flex-1 min-w-0 truncate">
-                            {lead.name}
-                          </p>
-                          <GripVertical className="h-4 w-4 text-muted-foreground/30 flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity" />
-                        </div>
-
-                        {/* Zeile 2: Ansprechpartner */}
-                        {lead.ansprechpartner && (
-                          <p className="text-xs text-muted-foreground mt-0.5 ml-4 truncate">
-                            {lead.ansprechpartner}
-                          </p>
-                        )}
-
-                        {/* Zeile 3: Product-Badge + Termin */}
-                        {(productName || nextDate) && (
-                          <div className="flex items-center gap-2 mt-2 ml-4">
-                            {productName && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal">
-                                <Tag className="h-2.5 w-2.5" />
-                                {productName}
-                              </Badge>
-                            )}
-                            {nextDate && (
-                              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                                {formatCompactDate(nextDate)}
-                                {pushAktiv && (
-                                  <span title="Push-Erinnerung aktiv">
-                                    <Bell className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Zeile 4: Actions (Dropdown) */}
-                        <div className="flex items-center justify-end mt-2 -mb-0.5 -mr-1">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-accent opacity-0 group-hover/card:opacity-100 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                              render={<button type="button" aria-label="Aktionen" />}
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
-                              {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}
-                                  >
-                                    <Archive className="h-4 w-4" />
-                                    Archivieren
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                </>
-                              )}
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: lead.id, name: lead.name }); }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Löschen
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  <div className="space-y-2 min-h-[200px] rounded-xl bg-muted/40 p-2 border border-border/50">
+                    {phaseLeads.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/60">
+                        <Inbox className="h-6 w-6 mb-2" />
+                        <p className="text-xs text-center">Keine Leads in dieser Phase</p>
+                      </div>
+                    )}
+                    {phaseLeads.map((lead) => renderLeadCard(lead, phase))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-
-        {/* Fade-Gradient links (Mobile only) */}
-        {canScrollLeft && (
-          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent md:hidden" />
-        )}
-
-        {/* Fade-Gradient rechts (Mobile only) */}
-        {canScrollRight && (
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent md:hidden" />
-        )}
       </div>
+
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
