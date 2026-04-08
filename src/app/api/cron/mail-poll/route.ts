@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       // ImapFlow dynamisch importieren (wird vom anderen Agent installiert)
       const { ImapFlow } = await import("imapflow");
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = new ImapFlow({
         host: account.imapHost,
         port: account.imapPort || 993,
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
         logger: false,
         emitFreeze: 60000,
         socketTimeout: 90000,
-      });
+      } as any);
 
       await client.connect();
 
