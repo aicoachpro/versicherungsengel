@@ -40,6 +40,8 @@ export async function GET(req: NextRequest) {
           pass: decrypt(account.password),
         },
         logger: false,
+        emitFreeze: 60000,
+        socketTimeout: 90000,
       });
 
       await client.connect();
@@ -71,7 +73,7 @@ export async function GET(req: NextRequest) {
         const searchCriteria: Record<string, unknown> = {};
         if (account.lastPolledAt) {
           const since = new Date(account.lastPolledAt);
-          since.setDate(since.getDate() - 1); // 1 Tag Puffer
+          since.setHours(since.getHours() - 6); // 6 Stunden Puffer
           searchCriteria.since = since;
         } else {
           searchCriteria.seen = false;
