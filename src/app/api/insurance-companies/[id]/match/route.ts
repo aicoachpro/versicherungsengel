@@ -97,17 +97,26 @@ export async function POST(
       .run();
   }
 
-  // Neue Mappings einfuegen (nur gueltige IDs)
+  // Mindest-Confidence: Nur sehr gute Mappings automatisch speichern
+  const MIN_CONFIDENCE = 0.7;
+
+  // Neue Mappings einfuegen (nur gueltige IDs und Confidence >= Threshold)
   const validCompanyIds = new Set(cProducts.map((p) => p.id));
   const validLeadIds = new Set(lProducts.map((p) => p.id));
   let inserted = 0;
+  let rejected = 0;
   for (const m of parsed.mappings) {
     if (!validCompanyIds.has(m.companyProductId) || !validLeadIds.has(m.leadProductId)) continue;
+    const conf = m.confidence ?? 0;
+    if (conf < MIN_CONFIDENCE) {
+      rejected++;
+      continue;
+    }
     db.insert(productMappings)
       .values({
         companyProductId: m.companyProductId,
         leadProductId: m.leadProductId,
-        confidence: m.confidence ?? null,
+        confidence: conf,
         manuallyVerified: false,
       })
       .run();
@@ -118,5 +127,7 @@ export async function POST(
     matched: inserted,
     total: cProducts.length,
     unmatched: cProducts.length - inserted,
+    rejected,
+    minConfidence: MIN_CONFIDENCE,
   });
 }

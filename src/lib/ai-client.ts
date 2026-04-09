@@ -191,7 +191,9 @@ export async function matchProductsToLeadSparten(
     .map((p) => `${p.id}: ${p.name}`)
     .join("\n");
 
-  const prompt = `Du bist Versicherungs-Experte. Ordne jedes Gesellschafts-Produkt der besten passenden Lead-Sparte zu.
+  const prompt = `Du bist Versicherungs-Experte und ordnest Produkte sehr PRAEZISE zu.
+
+AUFGABE: Fuer jedes Gesellschafts-Produkt pruefe, ob es eine SEMANTISCH IDENTISCHE Lead-Sparte gibt.
 
 GESELLSCHAFTS-PRODUKTE (id: name):
 ${companyListe}
@@ -199,20 +201,30 @@ ${companyListe}
 LEAD-SPARTEN (id: [kuerzel] name):
 ${leadListe}
 
-Gib ein JSON-Array zurueck im Format:
+WICHTIGE REGELN:
+1. **Nur mappen bei echter Entsprechung**: Wenn kein semantisch aehnliches Lead-Produkt existiert, LASS ES WEG. Lieber kein Mapping als falsches Mapping.
+2. **Ein Produkt = nur eine Versicherungsart**: "Tierlebensversicherung" hat NICHTS mit "Vermoegensschadenhaftpflicht" zu tun - solche Zuordnungen sind VERBOTEN.
+3. **Wortstamm muss passen**: "Haftpflicht" passt nicht zu "Kasko", "Kranken" nicht zu "Leben", "Tier" nicht zu "Vermoegen".
+4. **Confidence realistisch einschaetzen**:
+   - 0.95-1.0: Exakte Entsprechung ("Betriebshaftpflichtversicherung" ↔ "BHV Betriebshaftpflichtversicherung")
+   - 0.80-0.94: Starke semantische Uebereinstimmung ("Kfz-Haftpflichtversicherung" ↔ "KFZ Kraftfahrzeugversicherung")
+   - 0.60-0.79: Moegliche Uebereinstimmung ("Private Krankenversicherung" ↔ "KVV Private Krankenvollversicherung")
+   - Unter 0.60: NICHT MAPPEN - lass das Produkt weg!
+5. **Wenn mehrere passen**, nimm die spezifischste Lead-Sparte.
+
+Gib JSON zurueck:
 {"mappings": [
-  {"companyProductId": 1, "leadProductId": 42, "confidence": 0.95},
+  {"companyProductId": 1, "leadProductId": 42, "confidence": 0.95, "reasoning": "kurze Begruendung"},
   ...
 ]}
 
-Regeln:
-- Fuer jedes Gesellschafts-Produkt EIN passendes Lead-Produkt finden
-- confidence: 0.9+ bei exakter Entsprechung, 0.7-0.9 bei semantischer Aehnlichkeit, <0.5 bei Unsicherheit
-- Wenn kein passendes Lead-Produkt gefunden wird, weglassen (nicht mit confidence 0 mappen)
-- Beispiele:
-  * "Betriebshaftpflichtversicherung" (Allianz) ↔ "BHV Betriebshaftpflichtversicherung" (Lead)
-  * "Private Krankenversicherung" (Allianz) ↔ "KVV Private Krankenvollversicherung" (Lead)
-  * "Kfz-Haftpflichtversicherung" (Allianz) ↔ "KFZ Kraftfahrzeugversicherung" (Lead)`;
+BEISPIELE fuer korrektes Verhalten:
+- Allianz "Betriebshaftpflichtversicherung" → [BHV] Betriebshaftpflichtversicherung (1.0)
+- Allianz "Tierlebensversicherung" → KEIN Mapping (keine passende Lead-Sparte existiert)
+- Allianz "Bootskasko" → KEIN Mapping (Lead-Liste hat nur "YBV Yacht-/Bootsversicherung", aber das ist Haftpflicht-naeher)
+- Allianz "Kfz-Haftpflichtversicherung" → [KFZ] Kraftfahrzeugversicherung (0.85)
+
+Lieber WENIGER aber PRAEZISE Mappings als viele falsche!`;
 
   const response = await client.chat.completions.create({
     model,
