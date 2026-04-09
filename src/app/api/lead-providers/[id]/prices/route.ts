@@ -114,7 +114,12 @@ export async function POST(
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
+  const priceType = (formData.get("priceType") as string) || "brutto"; // "brutto" | "netto"
   if (!file) return NextResponse.json({ error: "Keine Datei hochgeladen" }, { status: 400 });
+
+  // MwSt-Aufschlag bei Netto-Preisen (19% deutsche MwSt)
+  const VAT_RATE = 0.19;
+  const applyVat = priceType === "netto";
 
   // Datei als Buffer lesen und Encoding erkennen
   const arrayBuffer = await file.arrayBuffer();
@@ -181,7 +186,11 @@ export async function POST(
       continue;
     }
 
-    const preis = parsePrice(preisRaw);
+    const preisNetto = parsePrice(preisRaw);
+    // Bei netto-Upload: 19% MwSt aufschlagen und auf 2 Nachkommastellen runden
+    const preis = applyVat
+      ? Math.round(preisNetto * (1 + VAT_RATE) * 100) / 100
+      : preisNetto;
 
     if (!sparte && !kuerzel) {
       results.push({ sparte: "(leer)", preis: 0, matched: false });
@@ -228,6 +237,8 @@ export async function POST(
     matched,
     skipped,
     total: matched + skipped,
+    priceType,
+    vatApplied: applyVat,
     results,
   });
 }

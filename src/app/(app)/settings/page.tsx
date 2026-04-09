@@ -230,7 +230,8 @@ function LeadProviderDialog({
   }, [open, initialData]);
 
   const [csvUploading, setCsvUploading] = useState(false);
-  const [csvResult, setCsvResult] = useState<{ matched: number; skipped: number; results?: { sparte: string; matched: boolean }[] } | null>(null);
+  const [csvResult, setCsvResult] = useState<{ matched: number; skipped: number; vatApplied?: boolean; results?: { sparte: string; matched: boolean }[] } | null>(null);
+  const [pendingCsv, setPendingCsv] = useState<File | null>(null);
 
   const toggleProduct = (productId: number) => {
     setForm((prev) => {
@@ -249,6 +250,39 @@ function LeadProviderDialog({
         [productId]: price ? parseFloat(price) : null,
       },
     }));
+  };
+
+  const uploadCsv = async (file: File, priceType: "brutto" | "netto") => {
+    if (!providerId) return;
+    setCsvUploading(true);
+    setCsvResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("priceType", priceType);
+      const res = await fetch(`/api/lead-providers/${providerId}/prices`, { method: "POST", body: fd });
+      const data = await res.json();
+      setCsvResult(data);
+      if (data.matched > 0) {
+        // Reload products from API
+        const provRes = await fetch(`/api/lead-providers`);
+        if (provRes.ok) {
+          const provs = await provRes.json();
+          const prov = provs.find((p: LeadProvider) => p.id === providerId);
+          if (prov) {
+            setForm((prev) => ({
+              ...prev,
+              productIds: prov.productIds || [],
+              productPrices: prov.productPrices || {},
+            }));
+          }
+        }
+      }
+    } catch {
+      setCsvResult({ matched: 0, skipped: 0 });
+    } finally {
+      setCsvUploading(false);
+    }
   };
 
   const monthlyCost = (form.minPerMonth || 0) * (form.costPerLead || 0);
@@ -362,39 +396,13 @@ function LeadProviderDialog({
                       type="file"
                       accept=".csv,.txt"
                       className="hidden"
-                      onChange={async (e) => {
+                      onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (!file || !providerId) return;
-                        setCsvUploading(true);
-                        setCsvResult(null);
-                        try {
-                          const fd = new FormData();
-                          fd.append("file", file);
-                          const provId = providerId;
-                          const res = await fetch(`/api/lead-providers/${provId}/prices`, { method: "POST", body: fd });
-                          const data = await res.json();
-                          setCsvResult(data);
-                          if (data.matched > 0) {
-                            // Reload products from API
-                            const provRes = await fetch(`/api/lead-providers`);
-                            if (provRes.ok) {
-                              const provs = await provRes.json();
-                              const prov = provs.find((p: LeadProvider) => p.id === provId);
-                              if (prov) {
-                                setForm((prev) => ({
-                                  ...prev,
-                                  productIds: prov.productIds || [],
-                                  productPrices: prov.productPrices || {},
-                                }));
-                              }
-                            }
-                          }
-                        } catch {
-                          setCsvResult({ matched: 0, skipped: 0 });
-                        } finally {
-                          setCsvUploading(false);
-                          e.target.value = "";
+                        if (file) {
+                          setPendingCsv(file);
+                          setCsvResult(null);
                         }
+                        e.target.value = "";
                       }}
                     />
                     <span className="inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer">
@@ -407,6 +415,7 @@ function LeadProviderDialog({
               {csvResult && (
                 <p className={`text-xs ${csvResult.matched > 0 ? "text-emerald-600" : "text-destructive"}`}>
                   {csvResult.matched} Sparten zugeordnet, {csvResult.skipped} uebersprungen
+                  {csvResult.vatApplied && " (19% MwSt aufgeschlagen)"}
                 </p>
               )}
               <div className="rounded-md border p-3 space-y-2 max-h-52 overflow-y-auto">
@@ -465,6 +474,58 @@ function LeadProviderDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Brutto/Netto Dialog vor CSV-Upload (innerhalb des Dialogs damit Ref bleibt) */}
+      {pendingCsv && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setPendingCsv(null); }}
+        >
+          <div className="bg-background rounded-lg shadow-xl p-6 max-w-md w-full space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Preisliste hochladen</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Sind die Preise in <strong>{pendingCsv.name}</strong> Brutto oder Netto?
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Als Versicherungsvermittler bist du nicht vorsteuerabzugsberechtigt.
+                Bei Netto-Preisen wird automatisch 19% Mehrwertsteuer aufgeschlagen.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={async () => {
+                  const file = pendingCsv;
+                  setPendingCsv(null);
+                  await uploadCsv(file, "brutto");
+                }}
+                disabled={csvUploading}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Brutto-Preise (inkl. MwSt)
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const file = pendingCsv;
+                  setPendingCsv(null);
+                  await uploadCsv(file, "netto");
+                }}
+                disabled={csvUploading}
+              >
+                Netto-Preise (+ 19% MwSt aufschlagen)
+              </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setPendingCsv(null)}
+              >
+                Abbrechen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }
