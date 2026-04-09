@@ -80,6 +80,10 @@ export async function findContactByHandle(handle: string): Promise<{ id: string 
   return null;
 }
 
+export async function getCustomAttributes() {
+  return superchatFetch(`/custom-attributes`);
+}
+
 export async function updateContact(
   contactId: string,
   data: {

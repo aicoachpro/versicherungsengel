@@ -42,6 +42,7 @@ import {
   Sparkles,
   ShieldCheck,
   X,
+  RefreshCw,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -2892,6 +2893,111 @@ function AssignmentRuleDialog({
   );
 }
 
+interface SuperchatAttribute {
+  id: string;
+  name: string;
+  type: string;
+  optionValues: string;
+  syncedAt: string;
+}
+
+function SuperchatAttributesSection() {
+  const [attrs, setAttrs] = useState<SuperchatAttribute[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchAttrs = async () => {
+    try {
+      const res = await fetch("/api/superchat/attributes");
+      if (res.ok) setAttrs(await res.json());
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAttrs(); }, []);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 5000);
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/superchat/attributes", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        showFeedback("success", `${data.synced} Felder synchronisiert`);
+        await fetchAttrs();
+      } else {
+        showFeedback("error", data.error || "Sync fehlgeschlagen");
+      }
+    } catch {
+      showFeedback("error", "Verbindungsfehler");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const lastSync = attrs[0]?.syncedAt;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Superchat Custom Fields
+          </h3>
+          <Badge variant={attrs.length > 0 ? "default" : "secondary"}>
+            {attrs.length > 0 ? `${attrs.length} Felder` : "Nicht synchronisiert"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Synchronisiert alle Custom Attributes aus deinem Superchat-Workspace. Wird fuer das Lead-Mapping benoetigt (Leadquelle, Lead Produkt, Branche etc.).
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {feedback && (
+          <p className={`text-sm ${feedback.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+            {feedback.message}
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <Button onClick={handleSync} disabled={syncing} className="gap-2">
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {syncing ? "Synchronisiere..." : "Jetzt synchronisieren"}
+          </Button>
+          {lastSync && (
+            <span className="text-xs text-muted-foreground">
+              Zuletzt: {new Date(lastSync).toLocaleString("de-DE")}
+            </span>
+          )}
+        </div>
+        {loading ? null : attrs.length > 0 && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+              Synchronisierte Felder anzeigen
+            </summary>
+            <div className="mt-2 rounded-md border p-2 max-h-40 overflow-y-auto space-y-1">
+              {attrs.map((a) => (
+                <div key={a.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{a.name}</span>
+                  <span className="text-muted-foreground shrink-0">{a.type}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function AIBackendSection({
   settings,
   onSave,
@@ -3471,14 +3577,17 @@ export default function SettingsPage() {
 
         {/* === INTEGRATIONEN === */}
         {activeCategory === "integrations" && isAdmin && (
-          <SettingsSection
-            icon={<MessageSquare className="h-5 w-5" />}
-            title="Superchat"
-            description="Superchat-Integration für Kontakt-Synchronisation."
-            fields={SUPERCHAT_FIELDS}
-            settings={settings}
-            onSave={saveSection}
-          />
+          <>
+            <SettingsSection
+              icon={<MessageSquare className="h-5 w-5" />}
+              title="Superchat"
+              description="Superchat-Integration für Kontakt-Synchronisation."
+              fields={SUPERCHAT_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+            <SuperchatAttributesSection />
+          </>
         )}
 
         {/* === ACCOUNT & SICHERHEIT === */}

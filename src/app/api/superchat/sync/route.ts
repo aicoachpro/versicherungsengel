@@ -1,32 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, insurances } from "@/db/schema";
+import { leads, insurances, leadProducts, leadProviders, superchatAttributes } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { createContact, updateContact, findContactByHandle } from "@/lib/superchat";
 
-// Superchat Custom Attribute IDs (workspace-spezifisch)
-const SC_CA = {
-  LEADQUELLE: "ca_qovxvsnZGEJmPscEky8HU",
-  LEADPRODUKT: "ca_TUwAmMu5QOzpmf2wIcbKW",
-  LEADEINGANGSDATUM: "ca_by8bMKbLolULXKjXwJ64u",
-  LEAD_CONVERSION: "ca_kLorvm5KXX5ikAyMc5SNO",
-  KUNDENTYP: "ca_4RJmHLCpPTZ8lZS8qV85R",
-  STRASSE: "ca_sWumDPFT36T4daP0F8QdY",
-  PLZ: "ca_PvTaFBZYJqsX48qW4uRov",
-  ORT: "ca_caCze4Tq3cslzGpZLTzgG",
+// Fallback IDs (werden durch DB-Sync ueberschrieben)
+const FALLBACK_IDS: Record<string, string> = {
+  "Leadquelle": "ca_qovxvsnZGEJmPscEky8HU",
+  "Lead Produkt": "ca_TUwAmMu5QOzpmf2wIcbKW",
+  "Lead Eingangsdatum": "ca_by8bMKbLolULXKjXwJ64u",
+  "Lead Conversion": "ca_kLorvm5KXX5ikAyMc5SNO",
+  "Kundentyp": "ca_4RJmHLCpPTZ8lZS8qV85R",
+  "Straße und Hausnummer": "ca_sWumDPFT36T4daP0F8QdY",
+  "Postleitzahl": "ca_PvTaFBZYJqsX48qW4uRov",
+  "Ort": "ca_caCze4Tq3cslzGpZLTzgG",
+  "Branche": "ca_BnbwJqkMAOzJOShc1AaHI",
+  "Anrede": "ca_IZKZiiDJ7evJgkC8GyKep",
+  "Briefanrede": "ca_Ur2v3OMBK8CkWQCofpDOf",
 };
 
-// Mapping VE-Sparten → Superchat Lead Produkt Optionen (multi_select)
-const SPARTE_MAPPING: Record<string, string> = {
-  "Haftpflicht": "Haftpflichtversicherung",
-  "Inhalt": "Firmenversicherung",
-  "D&O": "Vermögensschadenhaftpflicht",
-  "Flotte": "Flottenversicherung",
-  "Rechtsschutz": "Rechtsschutzversicherung",
-  "KV": "privaten Krankenversicherung",
-};
+// Normalisiert einen String fuer Fuzzy-Matching gegen Superchat-Optionen
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+// Findet die beste Option aus einer Superchat-Option-Liste fuer einen gegebenen Wert
+function matchOption(value: string, options: string[]): string | null {
+  if (!value || !options?.length) return null;
+  // 1. Exakte Uebereinstimmung (case-insensitive)
+  const exact = options.find((o) => o.toLowerCase() === value.toLowerCase());
+  if (exact) return exact;
+  // 2. Normalisiert (ohne Umlaute/Sonderzeichen)
+  const valueNorm = normalize(value);
+  const norm = options.find((o) => normalize(o) === valueNorm);
+  if (norm) return norm;
+  // 3. Teilstring-Match (A enthaelt B oder B enthaelt A)
+  const partial = options.find((o) => {
+    const on = normalize(o);
+    return on.includes(valueNorm) || valueNorm.includes(on);
+  });
+  if (partial) return partial;
+  return null;
+}
+
+interface AttrInfo {
+  id: string;
+  type: string;
+  options: string[];
+}
+
+// Laedt alle Superchat-Attribute aus der DB als Map name → info
+function loadAttributeMap(): Map<string, AttrInfo> {
+  const map = new Map<string, AttrInfo>();
+  try {
+    const rows = db.select().from(superchatAttributes).all();
+    for (const r of rows) {
+      let options: string[] = [];
+      try {
+        const parsed = JSON.parse(r.optionValues || "[]");
+        options = Array.isArray(parsed) ? parsed.map((o: { value?: string }) => o.value || "").filter(Boolean) : [];
+      } catch {
+        // ignore
+      }
+      map.set(r.name, { id: r.id, type: r.type, options });
+    }
+  } catch {
+    // Tabelle noch nicht migriert
+  }
+  // Fuer Namen die noch nicht in DB sind: Fallback-IDs verwenden (ohne Options)
+  for (const [name, id] of Object.entries(FALLBACK_IDS)) {
+    if (!map.has(name)) map.set(name, { id, type: "text", options: [] });
+  }
+  return map;
+}
 
 /**
  * Lead an Superchat übertragen (Create oder Update).
@@ -55,33 +109,93 @@ export async function POST(req: NextRequest) {
   }
   const email = lead.email || undefined;
 
-  // Versicherungsprodukte als Lead Produkt (multi_select)
-  const allInsurances = db.select().from(insurances).where(eq(insurances.leadId, leadId)).all();
-  const produkte = allInsurances
-    .map((i) => SPARTE_MAPPING[i.sparte || ""] || "")
-    .filter(Boolean);
+  const attrMap = loadAttributeMap();
+  const pushAttr = (
+    attrs: Array<{ id: string; value: string | string[] }>,
+    name: string,
+    value: string | string[] | null | undefined
+  ) => {
+    if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) return;
+    const info = attrMap.get(name);
+    if (!info) return;
+    attrs.push({ id: info.id, value });
+  };
 
-  // Custom Attributes
-  const custom_attributes: Array<{ id: string; value: string | string[] }> = [
-    { id: SC_CA.LEADQUELLE, value: "Versicherungsengel" },
-    { id: SC_CA.KUNDENTYP, value: ["Lead"] },
-    { id: SC_CA.LEAD_CONVERSION, value: "Offen" },
-  ];
+  // Lead-Produkt-Name aus lead_products ermitteln
+  let leadProduktName: string | null = null;
+  if (lead.productId) {
+    try {
+      const lp = db.select().from(leadProducts).where(eq(leadProducts.id, lead.productId)).get();
+      if (lp) leadProduktName = lp.name;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Leadquelle aus dem Anbieter
+  let leadquelle: string | null = null;
+  if (lead.providerId) {
+    try {
+      const prov = db.select().from(leadProviders).where(eq(leadProviders.id, lead.providerId)).get();
+      if (prov) leadquelle = prov.name;
+    } catch {
+      // ignore
+    }
+  }
+  if (!leadquelle) leadquelle = "Versicherungsengel"; // Fallback
+
+  // Fuer Multi-/Single-Selects: Werte gegen Superchat-Optionen matchen
+  const leadquelleInfo = attrMap.get("Leadquelle");
+  const leadquelleMatched = leadquelleInfo?.options.length
+    ? matchOption(leadquelle, leadquelleInfo.options) || leadquelle
+    : leadquelle;
+
+  const leadProduktInfo = attrMap.get("Lead Produkt");
+  const produkte: string[] = [];
+
+  // 1. Aus dem neuen productId-Feld
+  if (leadProduktName) {
+    const matched = leadProduktInfo?.options.length
+      ? matchOption(leadProduktName, leadProduktInfo.options)
+      : leadProduktName;
+    if (matched) produkte.push(matched);
+  }
+
+  // 2. Aus abgeschlossenen Versicherungen (Legacy-Fallback)
+  try {
+    const allInsurances = db.select().from(insurances).where(eq(insurances.leadId, leadId)).all();
+    for (const ins of allInsurances) {
+      if (!ins.sparte) continue;
+      const matched = leadProduktInfo?.options.length
+        ? matchOption(ins.sparte, leadProduktInfo.options)
+        : null;
+      if (matched && !produkte.includes(matched)) produkte.push(matched);
+    }
+  } catch {
+    // ignore
+  }
+
+  // Branche matchen
+  const brancheInfo = attrMap.get("Branche");
+  const brancheMatched = lead.branche && brancheInfo?.options.length
+    ? matchOption(lead.branche, brancheInfo.options) || lead.branche
+    : lead.branche;
+
+  // Custom Attributes dynamisch zusammenbauen
+  const custom_attributes: Array<{ id: string; value: string | string[] }> = [];
+  pushAttr(custom_attributes, "Leadquelle", leadquelleMatched);
+  pushAttr(custom_attributes, "Kundentyp", ["Lead"]);
+  pushAttr(custom_attributes, "Lead Conversion", "Offen");
   if (lead.eingangsdatum) {
-    custom_attributes.push({ id: SC_CA.LEADEINGANGSDATUM, value: lead.eingangsdatum.split("T")[0] });
+    pushAttr(custom_attributes, "Lead Eingangsdatum", lead.eingangsdatum.split("T")[0]);
   }
   if (produkte.length) {
-    custom_attributes.push({ id: SC_CA.LEADPRODUKT, value: produkte });
+    pushAttr(custom_attributes, "Lead Produkt", produkte);
   }
-  if (lead.strasse) {
-    custom_attributes.push({ id: SC_CA.STRASSE, value: lead.strasse });
-  }
-  if (lead.plz) {
-    custom_attributes.push({ id: SC_CA.PLZ, value: lead.plz });
-  }
-  if (lead.ort) {
-    custom_attributes.push({ id: SC_CA.ORT, value: lead.ort });
-  }
+  pushAttr(custom_attributes, "Straße und Hausnummer", lead.strasse);
+  pushAttr(custom_attributes, "Postleitzahl", lead.plz);
+  pushAttr(custom_attributes, "Ort", lead.ort);
+  pushAttr(custom_attributes, "Branche", brancheMatched);
 
   try {
     let contactId = lead.superchatContactId;

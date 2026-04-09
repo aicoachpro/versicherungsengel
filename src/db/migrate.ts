@@ -570,6 +570,17 @@ sqlite.prepare(`
   )
 `).run();
 
+// Create superchat_attributes table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS superchat_attributes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    option_values TEXT NOT NULL DEFAULT '[]',
+    synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Create lead_assignment_rules table if not exists
 sqlite.prepare(`
   CREATE TABLE IF NOT EXISTS lead_assignment_rules (

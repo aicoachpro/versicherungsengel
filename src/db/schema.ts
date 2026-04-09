@@ -275,6 +275,14 @@ export const leadAssignmentRules = sqliteTable("lead_assignment_rules", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
+export const superchatAttributes = sqliteTable("superchat_attributes", {
+  id: text("id").primaryKey(), // Superchat custom attribute ID (ca_xxx)
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  optionValues: text("option_values").notNull().default("[]"), // JSON Array
+  syncedAt: text("synced_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),
