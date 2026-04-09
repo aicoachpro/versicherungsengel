@@ -423,13 +423,13 @@ function LeadProviderDialog({
                   {csvResult.vatApplied && " (19% MwSt aufgeschlagen)"}
                 </p>
               )}
-              {/* Suchfeld + Filter-Toggle */}
-              <div className="flex gap-2 items-center">
+              {/* Suchfeld + Filter-Toggle + Bulk-Aktionen */}
+              <div className="flex gap-2 items-center flex-wrap">
                 <Input
                   placeholder="Suche nach Name oder Kuerzel..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  className="h-8 text-xs flex-1"
+                  className="h-8 text-xs flex-1 min-w-[180px]"
                 />
                 <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer shrink-0 whitespace-nowrap">
                   <input
@@ -440,6 +440,16 @@ function LeadProviderDialog({
                   />
                   Nur aktive ({form.productIds.length})
                 </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  onClick={() => setForm((prev) => ({ ...prev, productIds: [], productPrices: {} }))}
+                  disabled={form.productIds.length === 0}
+                >
+                  Alle abwaehlen
+                </Button>
               </div>
               <div className="rounded-md border p-3 space-y-2 max-h-64 overflow-y-auto">
                 {(() => {
