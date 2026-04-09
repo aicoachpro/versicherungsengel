@@ -442,7 +442,7 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
       type: "warning",
       icon: "clock",
       text: `${staleLeads.count} Lead${staleLeads.count > 1 ? "s" : ""} warten seit \u00fcber 7 Tagen auf Kontakt`,
-      href: "/pipeline",
+      href: "/pipeline#phase-termin-eingegangen",
     });
   }
 
@@ -464,7 +464,7 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
       type: "danger",
       icon: "clipboard",
       text: `${overdueFollowups.count} \u00fcberf\u00e4llige${overdueFollowups.count > 1 ? " Folgetermine" : "r Folgetermin"}`,
-      href: "/pipeline",
+      href: "/wiedervorlage",
     });
   }
 
@@ -576,7 +576,7 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
       type: "info",
       icon: "clipboard",
       text: `${angebotLeads.count} Lead${angebotLeads.count > 1 ? "s" : ""} im Angebotsstatus \u2014 dranbleiben!`,
-      href: "/pipeline",
+      href: "/pipeline#phase-angebot-erstellt",
     });
   }
 

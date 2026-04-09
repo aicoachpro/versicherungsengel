@@ -33,7 +33,7 @@ interface Lead {
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   offen: { label: "Offen", color: "bg-yellow-100 text-yellow-700", icon: Clock },
-  genehmigt: { label: "Genehmigt", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
+  genehmigt: { label: "Genehmigung erhalten", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   abgelehnt: { label: "Abgelehnt", color: "bg-red-100 text-red-700", icon: XCircle },
 };
 
@@ -65,7 +65,7 @@ export default function ReklamationenPage() {
     });
     if (res.ok) {
       toast.success(status === "genehmigt"
-        ? "Reklamation genehmigt — Terminkosten gutgeschrieben"
+        ? "Genehmigung erhalten — Terminkosten gutgeschrieben"
         : "Reklamation abgelehnt — Kosten bleiben bestehen");
       loadData();
     } else {
@@ -181,7 +181,7 @@ export default function ReklamationenPage() {
                           className="gap-1 flex-1"
                           onClick={() => setConfirmAction({ leadId: lead.id, status: "genehmigt", name: lead.name })}
                         >
-                          <CheckCircle2 className="h-4 w-4" /> Genehmigen
+                          <CheckCircle2 className="h-4 w-4" /> Genehmigung erhalten
                         </Button>
                         <Button
                           size="sm"
@@ -237,7 +237,7 @@ export default function ReklamationenPage() {
                                 className="gap-1"
                                 onClick={() => setConfirmAction({ leadId: lead.id, status: "genehmigt", name: lead.name })}
                               >
-                                <CheckCircle2 className="h-4 w-4" /> Genehmigen
+                                <CheckCircle2 className="h-4 w-4" /> Genehmigung erhalten
                               </Button>
                               <Button
                                 size="sm"
@@ -353,11 +353,11 @@ export default function ReklamationenPage() {
       <ConfirmDialog
         open={!!confirmAction}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={confirmAction?.status === "genehmigt" ? "Reklamation genehmigen?" : "Reklamation ablehnen?"}
+        title={confirmAction?.status === "genehmigt" ? "Genehmigung durch VE erhalten?" : "Reklamation ablehnen?"}
         description={
           confirmAction?.status === "genehmigt"
-            ? `Die Terminkosten für "${confirmAction.name}" werden auf 0€ gesetzt.`
-            : `Die Kosten für "${confirmAction?.name}" bleiben bestehen.`
+            ? `Bestaetige, dass VersicherungsEngel die Reklamation fuer "${confirmAction.name}" genehmigt hat. Terminkosten werden auf 0€ gesetzt.`
+            : `Die Kosten fuer "${confirmAction?.name}" bleiben bestehen.`
         }
         onConfirm={() => {
           if (confirmAction) handleStatusChange(confirmAction.leadId, confirmAction.status);

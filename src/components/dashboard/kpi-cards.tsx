@@ -71,6 +71,7 @@ function CycleCard({ revenue, costs, roi }: { revenue: number; costs: number; ro
       icon: BarChart3,
       color: "text-purple-600",
       bg: "bg-purple-50 dark:bg-purple-950/30",
+      href: "/provisionen",
     },
     {
       title: "Umsatz",
@@ -78,6 +79,7 @@ function CycleCard({ revenue, costs, roi }: { revenue: number; costs: number; ro
       icon: DollarSign,
       color: "text-amber-600",
       bg: "bg-amber-50 dark:bg-amber-950/30",
+      href: "/provisionen",
     },
     {
       title: "Kosten",
@@ -85,34 +87,45 @@ function CycleCard({ revenue, costs, roi }: { revenue: number; costs: number; ro
       icon: DollarSign,
       color: "text-red-600",
       bg: "bg-red-50 dark:bg-red-950/30",
+      href: "/pipeline",
     },
   ];
 
   const current = slides[index];
 
   return (
-    <Card
-      className="shadow-sm cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
-      onClick={() => setIndex((i) => (i + 1) % slides.length)}
-    >
-      <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-6">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${current.bg}`}>
-          <current.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${current.color}`} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-muted-foreground sm:text-sm font-medium">{current.title}</p>
-          <p className="text-lg font-bold tracking-tight sm:text-2xl">{current.value}</p>
-        </div>
-        <div className="flex flex-col items-center gap-0.5 shrink-0">
-          <RefreshCw className="h-3.5 w-3.5 text-muted-foreground/40" />
-          <div className="flex gap-0.5">
-            {slides.map((_, i) => (
-              <div key={i} className={`h-1 w-1 rounded-full ${i === index ? "bg-foreground/60" : "bg-foreground/15"}`} />
-            ))}
+    <Link href={current.href}>
+      <Card
+        className="shadow-sm cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
+        onClick={(e) => {
+          // Rechte Haelfte: blaettern statt navigieren
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          if (clickX > rect.width * 0.7) {
+            e.preventDefault();
+            setIndex((i) => (i + 1) % slides.length);
+          }
+        }}
+      >
+        <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-6">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${current.bg}`}>
+            <current.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${current.color}`} />
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs text-muted-foreground sm:text-sm font-medium">{current.title}</p>
+            <p className="text-lg font-bold tracking-tight sm:text-2xl">{current.value}</p>
+          </div>
+          <div className="flex flex-col items-center gap-0.5 shrink-0">
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground/40" />
+            <div className="flex gap-0.5">
+              {slides.map((_, i) => (
+                <div key={i} className={`h-1 w-1 rounded-full ${i === index ? "bg-foreground/60" : "bg-foreground/15"}`} />
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
