@@ -3412,8 +3412,8 @@ export default function SettingsPage() {
     <div className="flex flex-col h-full">
       <Header title="Einstellungen" />
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-56 border-r bg-muted/20 p-3 overflow-y-auto shrink-0 hidden sm:block">
+        {/* Sidebar — nur auf sehr breiten Screens */}
+        <aside className="w-56 border-r bg-muted/20 p-3 overflow-y-auto shrink-0 hidden xl:block">
           <nav className="space-y-1">
             {visibleCategories.map((c) => {
               const Icon = c.icon;
@@ -3436,21 +3436,21 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
-        {/* Mobile: Category-Select */}
-        <div className="sm:hidden px-4 pt-4 shrink-0">
-          <select
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-            value={activeCategory}
-            onChange={(e) => setActiveCategory(e.target.value)}
-          >
-            {visibleCategories.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
-            ))}
-          </select>
-        </div>
-
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Mobile/iPad: Category-Select oben im Content */}
+          <div className="xl:hidden mb-4">
+            <select
+              className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm font-medium"
+              value={activeCategory}
+              onChange={(e) => setActiveCategory(e.target.value)}
+            >
+              {visibleCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="max-w-3xl space-y-6">
 
         {/* === ALLGEMEIN === */}
