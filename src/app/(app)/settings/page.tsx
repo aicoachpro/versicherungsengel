@@ -2371,7 +2371,7 @@ function LeadAssignmentSection() {
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={() => { setEditRule(null); setDialogOpen(true); }}
+                onClick={async () => { await fetchAll(); setEditRule(null); setDialogOpen(true); }}
               >
                 <Plus className="h-4 w-4" />
                 Regel hinzufuegen
@@ -2401,7 +2401,7 @@ function LeadAssignmentSection() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => { setEditRule(rule); setDialogOpen(true); }}
+                      onClick={async () => { await fetchAll(); setEditRule(rule); setDialogOpen(true); }}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -2423,7 +2423,7 @@ function LeadAssignmentSection() {
             <Button
               variant="outline"
               className="gap-2"
-              onClick={() => { setEditRule(null); setDialogOpen(true); }}
+              onClick={async () => { await fetchAll(); setEditRule(null); setDialogOpen(true); }}
             >
               <Plus className="h-4 w-4" />
               Regel hinzufuegen
@@ -2435,7 +2435,16 @@ function LeadAssignmentSection() {
       {/* Add/Edit Dialog */}
       <AssignmentRuleDialog
         open={dialogOpen}
-        onOpenChange={(open) => { if (!open) { setDialogOpen(false); setEditRule(null); } else { setDialogOpen(true); } }}
+        onOpenChange={(open) => {
+          if (open) {
+            // Beim Oeffnen: Provider neu laden damit productIds aktuell sind
+            fetchAll();
+            setDialogOpen(true);
+          } else {
+            setDialogOpen(false);
+            setEditRule(null);
+          }
+        }}
         initialData={editRule ? { providerId: editRule.providerId, productId: editRule.productId, userId: editRule.userId } : { providerId: 0, productId: null, userId: 0 }}
         providers={providers}
         products={products}
