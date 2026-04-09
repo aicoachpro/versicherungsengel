@@ -1945,6 +1945,8 @@ function InsuranceCompanyDialog({
   const [addingProduct, setAddingProduct] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [mappingSearch, setMappingSearch] = useState("");
+  const [showOnlyUnmapped, setShowOnlyUnmapped] = useState(false);
 
   const fetchMappings = async () => {
     setLoading(true);
@@ -2129,6 +2131,27 @@ function InsuranceCompanyDialog({
           </Button>
         </div>
 
+        {/* Suchfeld + Filter */}
+        {mappings.length > 0 && (
+          <div className="flex gap-2 items-center pb-2">
+            <Input
+              placeholder="Suche..."
+              value={mappingSearch}
+              onChange={(e) => setMappingSearch(e.target.value)}
+              className="h-8 text-xs flex-1"
+            />
+            <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer shrink-0 whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showOnlyUnmapped}
+                onChange={(e) => setShowOnlyUnmapped(e.target.checked)}
+                className="rounded border-input"
+              />
+              Nur ohne Mapping ({mappings.filter((m) => !m.leadProductId).length})
+            </label>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto border rounded-md">
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground p-4">
@@ -2140,6 +2163,26 @@ function InsuranceCompanyDialog({
               Noch keine Produkte. Lade eine CSV hoch (Format: Gesellschaft,Produkt)
             </p>
           ) : (
+            (() => {
+              const q = mappingSearch.toLowerCase().trim();
+              const filteredMappings = mappings
+                .filter((m) => !showOnlyUnmapped || !m.leadProductId)
+                .filter((m) => {
+                  if (!q) return true;
+                  return (
+                    m.companyProductName.toLowerCase().includes(q) ||
+                    (m.leadProductName && m.leadProductName.toLowerCase().includes(q)) ||
+                    (m.leadProductKuerzel && m.leadProductKuerzel.toLowerCase().includes(q))
+                  );
+                });
+              if (filteredMappings.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Keine Treffer
+                  </p>
+                );
+              }
+              return (
             <table className="w-full text-sm">
               <thead className="bg-muted/50 sticky top-0">
                 <tr>
@@ -2150,7 +2193,7 @@ function InsuranceCompanyDialog({
                 </tr>
               </thead>
               <tbody>
-                {mappings.map((m) => (
+                {filteredMappings.map((m) => (
                   <tr key={m.companyProductId} className="border-t hover:bg-muted/30 group">
                     <td className="p-2">
                       {editingId === m.companyProductId ? (
@@ -2231,6 +2274,8 @@ function InsuranceCompanyDialog({
                 ))}
               </tbody>
             </table>
+              );
+            })()
           )}
         </div>
 
@@ -2306,23 +2351,43 @@ function LeadAssignmentSection() {
     setTimeout(() => setFeedback(null), 3000);
   };
 
-  const handleSave = async (form: { providerId: number; productId: number | null; userId: number }) => {
+  const handleSave = async (form: { providerId: number; productIds: (number | null)[]; userId: number }) => {
     const isEdit = editRule !== null;
-    const url = isEdit ? `/api/lead-assignment-rules/${editRule.id}` : "/api/lead-assignment-rules";
-    const method = isEdit ? "PATCH" : "POST";
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Fehler beim Speichern");
+
+    if (isEdit) {
+      // Beim Edit: nur eine Regel, nimm das erste Produkt
+      const productId = form.productIds[0] ?? null;
+      const res = await fetch(`/api/lead-assignment-rules/${editRule.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerId: form.providerId, productId, userId: form.userId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Fehler beim Speichern");
+      }
+      showFeedback("success", "Regel aktualisiert");
+    } else {
+      // Beim Create: Fuer jede gewaehlte Leadart eine Regel anlegen
+      const ids = form.productIds.length > 0 ? form.productIds : [null];
+      let created = 0;
+      for (const productId of ids) {
+        const res = await fetch("/api/lead-assignment-rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ providerId: form.providerId, productId, userId: form.userId }),
+        });
+        if (res.ok) created++;
+      }
+      if (created === 0) {
+        throw new Error("Keine Regel konnte angelegt werden");
+      }
+      showFeedback("success", `${created} Regel${created > 1 ? "n" : ""} hinzugefuegt`);
     }
+
     setEditRule(null);
     setDialogOpen(false);
     await fetchAll();
-    showFeedback("success", isEdit ? "Regel aktualisiert" : "Regel hinzugefuegt");
   };
 
   const handleDelete = async () => {
@@ -2455,7 +2520,7 @@ function LeadAssignmentSection() {
             setEditRule(null);
           }
         }}
-        initialData={editRule ? { providerId: editRule.providerId, productId: editRule.productId, userId: editRule.userId } : { providerId: 0, productId: null, userId: 0 }}
+        initialData={editRule ? { providerId: editRule.providerId, productIds: editRule.productId ? [editRule.productId] : [], userId: editRule.userId } : { providerId: 0, productIds: [], userId: 0 }}
         providers={providers}
         products={products}
         users={allUsers}
@@ -2506,21 +2571,23 @@ function AssignmentRuleDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialData: { providerId: number; productId: number | null; userId: number };
+  initialData: { providerId: number; productIds: (number | null)[]; userId: number };
   providers: { id: number; name: string; productIds?: number[] }[];
   products: { id: number; name: string; kuerzel?: string | null }[];
   users: { id: number; name: string }[];
-  onSave: (data: { providerId: number; productId: number | null; userId: number }) => Promise<void>;
+  onSave: (data: { providerId: number; productIds: (number | null)[]; userId: number }) => Promise<void>;
   isEdit: boolean;
 }) {
   const [form, setForm] = useState(initialData);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
     if (open) {
       setForm(initialData);
       setError("");
+      setProductSearch("");
     }
   }, [open, initialData]);
 
@@ -2547,16 +2614,46 @@ function AssignmentRuleDialog({
 
   const selectClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
+  const selectedProvider = providers.find((p) => p.id === form.providerId);
+  const activePurchasedIds = selectedProvider?.productIds || [];
+  const availableProducts = form.providerId
+    ? products.filter((p) => activePurchasedIds.includes(p.id))
+    : [];
+  const q = productSearch.toLowerCase().trim();
+  const filteredProducts = q
+    ? availableProducts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.kuerzel && p.kuerzel.toLowerCase().includes(q))
+      )
+    : availableProducts;
+
+  const isPauschal = form.productIds.length === 0;
+
+  const toggleProduct = (productId: number) => {
+    setForm((prev) => {
+      const exists = prev.productIds.includes(productId);
+      return {
+        ...prev,
+        productIds: exists
+          ? prev.productIds.filter((id) => id !== productId)
+          : [...prev.productIds.filter((id) => id !== null), productId],
+      };
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Regel bearbeiten" : "Zuweisungsregel hinzufuegen"}</DialogTitle>
           <DialogDescription>
-            Lege fest, welcher Bearbeiter Leads von einem Anbieter bekommt. Ohne Produkt gilt die Regel pauschal.
+            {isEdit
+              ? "Bearbeite die Regel."
+              : "Waehle einen Anbieter und eine oder mehrere Leadarten. Ohne Auswahl gilt die Regel pauschal fuer alle Leads."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label>Lead-Anbieter *</Label>
             <select
@@ -2564,13 +2661,13 @@ function AssignmentRuleDialog({
               value={form.providerId}
               onChange={(e) => {
                 const newProviderId = parseInt(e.target.value) || 0;
-                // Produkt zuruecksetzen falls es beim neuen Anbieter nicht existiert
                 const newProvider = providers.find((p) => p.id === newProviderId);
-                const newProductIds = newProvider?.productIds || [];
+                const newPurchased = newProvider?.productIds || [];
                 setForm((prev) => ({
                   ...prev,
                   providerId: newProviderId,
-                  productId: prev.productId && newProductIds.includes(prev.productId) ? prev.productId : null,
+                  // Nur behalten was beim neuen Provider auch existiert
+                  productIds: prev.productIds.filter((id) => id !== null && newPurchased.includes(id)),
                 }));
               }}
               required
@@ -2581,41 +2678,83 @@ function AssignmentRuleDialog({
               ))}
             </select>
           </div>
+
           <div className="space-y-2">
-            <Label>Leadart / Produkt (optional)</Label>
-            {(() => {
-              // Nur Produkte die der gewaehlte Anbieter aktuell kauft
-              const selectedProvider = providers.find((p) => p.id === form.providerId);
-              const activeProductIds = selectedProvider?.productIds || [];
-              const filteredProducts = form.providerId
-                ? products.filter((p) => activeProductIds.includes(p.id))
-                : [];
-              return (
-                <>
-                  <select
-                    className={selectClass}
-                    value={form.productId ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value ? parseInt(e.target.value) : null }))}
-                    disabled={!form.providerId}
-                  >
-                    <option value="">Alle Leadarten (pauschal)</option>
-                    {filteredProducts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.kuerzel ? `[${p.kuerzel}] ` : ""}{p.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!form.providerId && (
-                    <p className="text-xs text-muted-foreground">Zuerst Anbieter waehlen</p>
+            <div className="flex items-center justify-between">
+              <Label>Leadarten (optional)</Label>
+              {form.productIds.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {form.productIds.length} ausgewaehlt
+                </span>
+              )}
+            </div>
+            {!form.providerId ? (
+              <p className="text-xs text-muted-foreground">Zuerst Anbieter waehlen</p>
+            ) : availableProducts.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Dieser Anbieter hat keine gekauften Sparten. Die Regel gilt pauschal fuer alle Leads.
+              </p>
+            ) : (
+              <>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    placeholder="Suche nach Name oder Kuerzel..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="h-8 text-xs flex-1"
+                  />
+                  {form.productIds.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs px-2"
+                      onClick={() => setForm((p) => ({ ...p, productIds: [] }))}
+                    >
+                      Alle abwaehlen
+                    </Button>
                   )}
-                  {form.providerId && filteredProducts.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Dieser Anbieter hat keine aktiven Produkte. Wechsle zu &quot;Alle Leadarten (pauschal)&quot; oder aktiviere Produkte im Anbieter-Dialog.
-                    </p>
+                </div>
+                <div className="rounded-md border p-2 max-h-48 overflow-y-auto space-y-1">
+                  {isPauschal && (
+                    <div className="text-xs text-muted-foreground italic px-1 py-0.5">
+                      Keine Auswahl = Pauschalregel fuer alle Leads
+                    </div>
                   )}
-                </>
-              );
-            })()}
+                  {filteredProducts.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">Keine Treffer</p>
+                  ) : (
+                    filteredProducts.map((p) => {
+                      const isChecked = form.productIds.includes(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          className="flex items-center gap-2 text-sm hover:bg-accent/50 rounded px-1 py-1 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleProduct(p.id)}
+                            className="rounded border-input shrink-0"
+                          />
+                          <span className="truncate">
+                            {p.kuerzel && (
+                              <span className="text-[10px] text-muted-foreground font-mono mr-1">[{p.kuerzel}]</span>
+                            )}
+                            {p.name}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                {!isEdit && form.productIds.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    {form.productIds.length} Regeln werden angelegt — eine pro Leadart.
+                  </p>
+                )}
+              </>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Bearbeiter *</Label>
@@ -2632,7 +2771,7 @@ function AssignmentRuleDialog({
             </select>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
+          <DialogFooter className="pt-4 border-t mt-4">
             <DialogClose
               render={<Button variant="outline" type="button" />}
             >
