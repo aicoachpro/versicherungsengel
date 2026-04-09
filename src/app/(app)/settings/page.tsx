@@ -2246,8 +2246,8 @@ interface AssignmentRule {
 function LeadAssignmentSection() {
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [providers, setProviders] = useState<{ id: number; name: string }[]>([]);
-  const [products, setProducts] = useState<{ id: number; name: string }[]>([]);
+  const [providers, setProviders] = useState<{ id: number; name: string; productIds?: number[] }[]>([]);
+  const [products, setProducts] = useState<{ id: number; name: string; kuerzel?: string | null }[]>([]);
   const [allUsers, setAllUsers] = useState<{ id: number; name: string }[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editRule, setEditRule] = useState<AssignmentRule | null>(null);
@@ -2259,12 +2259,24 @@ function LeadAssignmentSection() {
     try {
       const [rulesRes, provRes, prodRes, usersRes] = await Promise.all([
         fetch("/api/lead-assignment-rules"),
-        fetch("/api/lead-providers/active"),
+        fetch("/api/lead-providers"),
         fetch("/api/lead-products"),
         fetch("/api/users"),
       ]);
       if (rulesRes.ok) setRules(await rulesRes.json());
-      if (provRes.ok) setProviders(await provRes.json());
+      if (provRes.ok) {
+        const provData = await provRes.json();
+        // Nur aktive Provider
+        setProviders(
+          (Array.isArray(provData) ? provData : [])
+            .filter((p: { active: boolean }) => p.active)
+            .map((p: { id: number; name: string; productIds?: number[] }) => ({
+              id: p.id,
+              name: p.name,
+              productIds: p.productIds || [],
+            }))
+        );
+      }
       if (prodRes.ok) setProducts(await prodRes.json());
       if (usersRes.ok) {
         const userData = await usersRes.json();
@@ -2476,8 +2488,8 @@ function AssignmentRuleDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData: { providerId: number; productId: number | null; userId: number };
-  providers: { id: number; name: string }[];
-  products: { id: number; name: string }[];
+  providers: { id: number; name: string; productIds?: number[] }[];
+  products: { id: number; name: string; kuerzel?: string | null }[];
   users: { id: number; name: string }[];
   onSave: (data: { providerId: number; productId: number | null; userId: number }) => Promise<void>;
   isEdit: boolean;
@@ -2531,7 +2543,17 @@ function AssignmentRuleDialog({
             <select
               className={selectClass}
               value={form.providerId}
-              onChange={(e) => setForm((p) => ({ ...p, providerId: parseInt(e.target.value) || 0 }))}
+              onChange={(e) => {
+                const newProviderId = parseInt(e.target.value) || 0;
+                // Produkt zuruecksetzen falls es beim neuen Anbieter nicht existiert
+                const newProvider = providers.find((p) => p.id === newProviderId);
+                const newProductIds = newProvider?.productIds || [];
+                setForm((prev) => ({
+                  ...prev,
+                  providerId: newProviderId,
+                  productId: prev.productId && newProductIds.includes(prev.productId) ? prev.productId : null,
+                }));
+              }}
               required
             >
               <option value={0}>-- Anbieter waehlen --</option>
@@ -2542,16 +2564,39 @@ function AssignmentRuleDialog({
           </div>
           <div className="space-y-2">
             <Label>Leadart / Produkt (optional)</Label>
-            <select
-              className={selectClass}
-              value={form.productId ?? ""}
-              onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value ? parseInt(e.target.value) : null }))}
-            >
-              <option value="">Alle Leadarten (pauschal)</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            {(() => {
+              // Nur Produkte die der gewaehlte Anbieter aktuell kauft
+              const selectedProvider = providers.find((p) => p.id === form.providerId);
+              const activeProductIds = selectedProvider?.productIds || [];
+              const filteredProducts = form.providerId
+                ? products.filter((p) => activeProductIds.includes(p.id))
+                : [];
+              return (
+                <>
+                  <select
+                    className={selectClass}
+                    value={form.productId ?? ""}
+                    onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value ? parseInt(e.target.value) : null }))}
+                    disabled={!form.providerId}
+                  >
+                    <option value="">Alle Leadarten (pauschal)</option>
+                    {filteredProducts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.kuerzel ? `[${p.kuerzel}] ` : ""}{p.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!form.providerId && (
+                    <p className="text-xs text-muted-foreground">Zuerst Anbieter waehlen</p>
+                  )}
+                  {form.providerId && filteredProducts.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Dieser Anbieter hat keine aktiven Produkte. Wechsle zu &quot;Alle Leadarten (pauschal)&quot; oder aktiviere Produkte im Anbieter-Dialog.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="space-y-2">
             <Label>Bearbeiter *</Label>
