@@ -98,7 +98,7 @@ export async function POST(
   }
 
   // Mindest-Confidence: Nur sehr gute Mappings automatisch speichern
-  const MIN_CONFIDENCE = 0.7;
+  const MIN_CONFIDENCE = 0.85;
 
   // Neue Mappings einfuegen (nur gueltige IDs und Confidence >= Threshold)
   const validCompanyIds = new Set(cProducts.map((p) => p.id));

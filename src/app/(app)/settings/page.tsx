@@ -1888,6 +1888,10 @@ function InsuranceCompanyDialog({
   const [uploading, setUploading] = useState(false);
   const [matching, setMatching] = useState(false);
   const [allLeadProducts, setAllLeadProducts] = useState<{ id: number; name: string; kuerzel: string | null }[]>([]);
+  const [newProductName, setNewProductName] = useState("");
+  const [addingProduct, setAddingProduct] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const fetchMappings = async () => {
     setLoading(true);
@@ -1962,6 +1966,59 @@ function InsuranceCompanyDialog({
     }
   };
 
+  const handleAddProduct = async () => {
+    if (!newProductName.trim()) return;
+    setAddingProduct(true);
+    try {
+      const res = await fetch(`/api/insurance-companies/${company.id}/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProductName.trim() }),
+      });
+      if (res.ok) {
+        setNewProductName("");
+        await fetchMappings();
+        onFeedback("success", "Produkt hinzugefuegt");
+      } else {
+        onFeedback("error", "Fehler beim Hinzufuegen");
+      }
+    } finally {
+      setAddingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    try {
+      const res = await fetch(`/api/insurance-companies/${company.id}/products/${productId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        await fetchMappings();
+        onFeedback("success", "Produkt geloescht");
+      }
+    } catch {
+      onFeedback("error", "Fehler beim Loeschen");
+    }
+  };
+
+  const handleSaveEdit = async (productId: number) => {
+    if (!editingName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      await fetch(`/api/insurance-companies/${company.id}/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editingName.trim() }),
+      });
+      setEditingId(null);
+      await fetchMappings();
+    } catch {
+      onFeedback("error", "Fehler beim Speichern");
+    }
+  };
+
   return (
     <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
@@ -1972,7 +2029,7 @@ function InsuranceCompanyDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2 py-2">
+        <div className="flex gap-2 py-2 flex-wrap">
           <label className="cursor-pointer">
             <input
               type="file"
@@ -1998,6 +2055,27 @@ function InsuranceCompanyDialog({
           </Button>
         </div>
 
+        {/* Neues Produkt manuell hinzufuegen */}
+        <div className="flex gap-2 pb-2">
+          <Input
+            placeholder="Produkt manuell hinzufuegen..."
+            value={newProductName}
+            onChange={(e) => setNewProductName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleAddProduct(); }}
+            className="h-8 text-sm"
+            disabled={addingProduct}
+          />
+          <Button
+            size="sm"
+            onClick={handleAddProduct}
+            disabled={addingProduct || !newProductName.trim()}
+            className="gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Hinzufuegen
+          </Button>
+        </div>
+
         <div className="flex-1 overflow-y-auto border rounded-md">
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground p-4">
@@ -2015,12 +2093,37 @@ function InsuranceCompanyDialog({
                   <th className="text-left p-2 font-medium">Gesellschafts-Produkt</th>
                   <th className="text-left p-2 font-medium">Lead-Sparte</th>
                   <th className="text-right p-2 font-medium w-16">Konf.</th>
+                  <th className="w-20" />
                 </tr>
               </thead>
               <tbody>
                 {mappings.map((m) => (
-                  <tr key={m.companyProductId} className="border-t hover:bg-muted/30">
-                    <td className="p-2">{m.companyProductName}</td>
+                  <tr key={m.companyProductId} className="border-t hover:bg-muted/30 group">
+                    <td className="p-2">
+                      {editingId === m.companyProductId ? (
+                        <div className="flex gap-1">
+                          <Input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveEdit(m.companyProductId);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            className="h-7 text-sm"
+                            autoFocus
+                          />
+                          <Button
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => handleSaveEdit(m.companyProductId)}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="block truncate">{m.companyProductName}</span>
+                      )}
+                    </td>
                     <td className="p-2">
                       <select
                         className="w-full h-8 text-xs rounded border border-input bg-transparent px-2"
@@ -2039,12 +2142,37 @@ function InsuranceCompanyDialog({
                       {m.manuallyVerified ? (
                         <span className="text-emerald-600">manuell</span>
                       ) : m.confidence != null ? (
-                        <span className={m.confidence >= 0.8 ? "text-emerald-600" : m.confidence >= 0.5 ? "text-amber-600" : "text-destructive"}>
+                        <span className={m.confidence >= 0.85 ? "text-emerald-600" : m.confidence >= 0.7 ? "text-amber-600" : "text-destructive"}>
                           {Math.round(m.confidence * 100)}%
                         </span>
                       ) : (
-                        "—"
+                        <span className="text-muted-foreground">—</span>
                       )}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex gap-1 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setEditingId(m.companyProductId);
+                            setEditingName(m.companyProductName);
+                          }}
+                          title="Bearbeiten"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteProduct(m.companyProductId)}
+                          title="Loeschen"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

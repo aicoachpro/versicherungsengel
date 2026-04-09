@@ -80,8 +80,8 @@ export async function GET(
 
 /**
  * POST /api/insurance-companies/[id]/products
- * CSV-Upload: Gesellschaft,Produkt
- * Ersetzt alle bestehenden Produkte dieser Gesellschaft.
+ * Entweder: CSV-Upload (multipart/form-data mit "file")
+ * Oder:     Einzelnes Produkt hinzufuegen (JSON { name: string })
  */
 export async function POST(
   req: NextRequest,
@@ -97,6 +97,23 @@ export async function POST(
   const company = db.select().from(insuranceCompanies).where(eq(insuranceCompanies.id, companyId)).get();
   if (!company) return NextResponse.json({ error: "Gesellschaft nicht gefunden" }, { status: 404 });
 
+  const contentType = req.headers.get("content-type") || "";
+
+  // JSON: Einzelnes Produkt hinzufuegen
+  if (contentType.includes("application/json")) {
+    const body = await req.json();
+    if (!body.name || typeof body.name !== "string") {
+      return NextResponse.json({ error: "Name fehlt" }, { status: 400 });
+    }
+    const result = db
+      .insert(companyProducts)
+      .values({ companyId, name: body.name.trim() })
+      .returning()
+      .get();
+    return NextResponse.json(result, { status: 201 });
+  }
+
+  // CSV-Upload
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "Keine Datei hochgeladen" }, { status: 400 });
