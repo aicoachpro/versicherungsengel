@@ -42,12 +42,12 @@ export async function PATCH(
   const updates: Record<string, unknown> = {};
 
   if (body.name !== undefined) updates.name = body.name;
-  if (body.leadType !== undefined) updates.leadType = body.leadType;
-  if (body.minPerMonth !== undefined) updates.minPerMonth = body.minPerMonth;
-  if (body.costPerLead !== undefined) updates.costPerLead = body.costPerLead;
-  if (body.billingModel !== undefined) updates.billingModel = body.billingModel;
+  if (body.leadType !== undefined) updates.leadType = body.leadType ?? "";
+  if (body.minPerMonth !== undefined) updates.minPerMonth = body.minPerMonth ?? 0;
+  if (body.costPerLead !== undefined) updates.costPerLead = body.costPerLead ?? 0;
+  if (body.billingModel !== undefined) updates.billingModel = body.billingModel ?? "prepaid";
   if (body.carryOver !== undefined) updates.carryOver = body.carryOver;
-  if (body.startMonth !== undefined) updates.startMonth = body.startMonth;
+  if (body.startMonth !== undefined) updates.startMonth = body.startMonth ?? "";
   if (body.active !== undefined) updates.active = body.active;
 
   // Update provider-products junction if productIds provided

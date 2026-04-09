@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
     .values({
       name: body.name,
       leadType: body.leadType ?? "",
-      minPerMonth: body.minPerMonth ?? 10,
-      costPerLead: body.costPerLead ?? 320,
+      minPerMonth: body.minPerMonth ?? 0,
+      costPerLead: body.costPerLead ?? 0,
       billingModel: body.billingModel ?? "prepaid",
       carryOver: body.carryOver ?? true,
       startMonth: body.startMonth ?? "",
