@@ -192,6 +192,7 @@ const EMPTY_FORM: LeadProviderForm = {
 interface ProviderProduct {
   id: number;
   name: string;
+  kuerzel?: string | null;
   active: boolean;
 }
 
@@ -234,6 +235,8 @@ function LeadProviderDialog({
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState<{ matched: number; skipped: number; vatApplied?: boolean; results?: { sparte: string; matched: boolean }[] } | null>(null);
   const [pendingCsv, setPendingCsv] = useState<File | null>(null);
+  const [productSearch, setProductSearch] = useState("");
+  const [showOnlyActive, setShowOnlyActive] = useState(false);
 
   const toggleProduct = (productId: number) => {
     setForm((prev) => {
@@ -420,40 +423,80 @@ function LeadProviderDialog({
                   {csvResult.vatApplied && " (19% MwSt aufgeschlagen)"}
                 </p>
               )}
-              <div className="rounded-md border p-3 space-y-2 max-h-52 overflow-y-auto">
-                {allProducts.filter((p) => p.active).map((product) => {
-                  const isChecked = form.productIds.includes(product.id);
-                  return (
-                    <div key={product.id} className="flex items-center gap-2 text-sm hover:bg-accent/50 rounded px-1 py-0.5">
-                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleProduct(product.id)}
-                          className="rounded border-input shrink-0"
-                        />
-                        <span className="truncate">{product.name}</span>
-                      </label>
-                      {isChecked && (
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          placeholder="EUR"
-                          className="w-20 h-7 text-xs"
-                          value={form.productPrices[product.id] ?? ""}
-                          onChange={(e) => setProductPrice(product.id, e.target.value)}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-                {allProducts.filter((p) => p.active).length === 0 && (
-                  <p className="text-xs text-muted-foreground">Keine aktiven Produkte vorhanden</p>
-                )}
+              {/* Suchfeld + Filter-Toggle */}
+              <div className="flex gap-2 items-center">
+                <Input
+                  placeholder="Suche nach Name oder Kuerzel..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="h-8 text-xs flex-1"
+                />
+                <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer shrink-0 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyActive}
+                    onChange={(e) => setShowOnlyActive(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  Nur aktive ({form.productIds.length})
+                </label>
+              </div>
+              <div className="rounded-md border p-3 space-y-2 max-h-64 overflow-y-auto">
+                {(() => {
+                  const q = productSearch.toLowerCase().trim();
+                  const filtered = allProducts
+                    .filter((p) => p.active)
+                    .filter((p) => !showOnlyActive || form.productIds.includes(p.id))
+                    .filter((p) => {
+                      if (!q) return true;
+                      return (
+                        p.name.toLowerCase().includes(q) ||
+                        (p.kuerzel && p.kuerzel.toLowerCase().includes(q))
+                      );
+                    });
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        {q ? "Keine Treffer" : showOnlyActive ? "Keine aktiven Produkte" : "Keine Produkte"}
+                      </p>
+                    );
+                  }
+                  return filtered.map((product) => {
+                    const isChecked = form.productIds.includes(product.id);
+                    return (
+                      <div key={product.id} className="flex items-center gap-2 text-sm hover:bg-accent/50 rounded px-1 py-0.5">
+                        <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleProduct(product.id)}
+                            className="rounded border-input shrink-0"
+                          />
+                          <span className="truncate">
+                            {product.kuerzel && (
+                              <span className="text-[10px] text-muted-foreground font-mono mr-1">[{product.kuerzel}]</span>
+                            )}
+                            {product.name}
+                          </span>
+                        </label>
+                        {isChecked && (
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            placeholder="EUR"
+                            className="w-20 h-7 text-xs"
+                            value={form.productPrices[product.id] ?? ""}
+                            onChange={(e) => setProductPrice(product.id, e.target.value)}
+                          />
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
               <p className="text-xs text-muted-foreground">
-                Preis pro Sparte eingeben oder CSV hochladen (Format: Sparte;Preis). Ohne Preis gilt der Pauschalpreis.
+                Preis pro Sparte eingeben oder CSV hochladen. Ohne Preis gilt der Pauschalpreis.
               </p>
             </div>
           )}
