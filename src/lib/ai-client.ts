@@ -99,18 +99,32 @@ export async function extractLeadFromEmail(emailText: string): Promise<string> {
       {
         role: "user",
         content:
-          "Extrahiere Lead-Daten als JSON. Nutze EXAKT diese Felder:\n" +
-          "- name, ansprechpartner, email, telefon, website\n" +
+          "Du bist ein Datenextraktions-Assistent fuer Versicherungsvermittler.\n" +
+          "Die E-Mail kann von verschiedenen Lead-Anbietern kommen (Versicherungsengel, LeadCloser, CheckDirect, direkte Anfrage etc.) und in verschiedenen Formaten sein:\n" +
+          "- Strukturiert als Label-Wert-Liste (z.B. 'Name: Max Mustermann')\n" +
+          "- Strukturiert als Tabelle\n" +
+          "- Freitext-E-Mail\n" +
+          "- HTML-formatierte Mail\n\n" +
+          "Extrahiere alle Lead-Daten als JSON mit EXAKT diesen Feldern:\n" +
+          "- name (Firmenname, bei Privatperson der volle Name)\n" +
+          "- ansprechpartner (Person als Kontaktperson)\n" +
+          "- email, telefon, website\n" +
           "- strasse, plz, ort\n" +
-          "- gewerbeart (hauptberuflich/nebenberuflich)\n" +
+          "- gewerbeart (hauptberuflich/nebenberuflich, nur bei Gewerbe-Leads)\n" +
           "- branche (Bau, Handwerk, Dienstleistung, Produktion, IT, Gesundheit, Logistik, Handel, Gastronomie, Immobilien, Sonstiges)\n" +
           "- unternehmensgroesse (1–9, 10–49, 50–199, 200–999, 1000+)\n" +
           "- umsatzklasse (<1 Mio, 1–5 Mio, 5–20 Mio, 20–100 Mio, >100 Mio)\n" +
-          "- notizen, naechsterSchritt\n" +
-          "- termin (Datum und Uhrzeit im Format TT.MM.JJJJ HH:MM, oder null falls kein Termin genannt)\n" +
-          "- produkt (eines von: Beratung, Betriebshaftpflicht, Firmenversicherung, Flottenversicherung, Haftpflichtversicherung, Rechtsschutzversicherung, Vermögensschadenhaftpflicht, Sonstiges)\n\n" +
-          "Felder die nicht gefunden werden auf \"\" setzen.\n\n" +
-          "E-Mail-Inhalt: " + emailText,
+          "- notizen (alle zusaetzlichen relevanten Infos aus der Mail)\n" +
+          "- naechsterSchritt (was der Interessent als naechstes wuenscht)\n" +
+          "- termin (Datum + Uhrzeit im Format TT.MM.JJJJ HH:MM, oder null falls kein Termin genannt)\n" +
+          "- produkt (die Versicherungsart/Sparte nach der gefragt wird, z.B. 'Betriebshaftpflicht', 'KFZ-Versicherung', 'Private Krankenversicherung', 'Lebensversicherung', 'Rechtsschutz' etc.)\n\n" +
+          "WICHTIGE REGELN:\n" +
+          "1. Felder die nicht gefunden werden auf \"\" setzen (bzw. null bei termin)\n" +
+          "2. Bei Freitext-Mails: Lies die Mail genau und extrahiere semantisch, auch wenn keine Labels vorhanden sind\n" +
+          "3. Bei mehreren moeglichen Werten: nimm den spezifischsten\n" +
+          "4. Das 'produkt'-Feld ist wichtig - versuche IMMER eine Sparte zu identifizieren\n" +
+          "5. Bei Privatpersonen (keine Firma) setze 'name' auf den vollen Namen der Person\n\n" +
+          "E-Mail-Inhalt:\n" + emailText,
       },
     ],
   });

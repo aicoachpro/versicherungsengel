@@ -41,6 +41,7 @@ import {
   Tag,
   Sparkles,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -1746,6 +1747,116 @@ interface CompanyMapping {
   manuallyVerified: boolean;
 }
 
+interface LeadProductInfo {
+  id: number;
+  name: string;
+  kuerzel: string | null;
+  purchased?: boolean;
+}
+
+function MappingCombobox({
+  value,
+  onChange,
+  products,
+}: {
+  value: number | null;
+  onChange: (id: number | null) => void;
+  products: LeadProductInfo[];
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const selected = products.find((p) => p.id === value);
+  const displayText = selected
+    ? `${selected.kuerzel ? `[${selected.kuerzel}] ` : ""}${selected.name}`
+    : "";
+
+  // Standard: nur gekaufte Sparten, bei showAll alle
+  const baseList = showAll ? products : products.filter((p) => p.purchased);
+
+  const q = search.toLowerCase().trim();
+  const filtered = q
+    ? baseList.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.kuerzel && p.kuerzel.toLowerCase().includes(q))
+      )
+    : baseList;
+
+  return (
+    <div className="relative">
+      <div className="flex gap-1">
+        <Input
+          value={open ? search : displayText}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            if (!open) setOpen(true);
+          }}
+          onFocus={() => { setOpen(true); setSearch(""); }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={selected ? "" : "— kein Mapping —"}
+          className="h-8 text-xs"
+        />
+        {value && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0"
+            onClick={() => { onChange(null); setSearch(""); }}
+            title="Mapping entfernen"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-64 overflow-y-auto">
+          <button
+            type="button"
+            className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent border-b text-muted-foreground"
+            onMouseDown={(e) => { e.preventDefault(); onChange(null); setSearch(""); setOpen(false); }}
+          >
+            — kein Mapping —
+          </button>
+          {filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">
+              {q ? "Keine Treffer" : "Keine gekauften Sparten"}
+            </p>
+          ) : (
+            filtered.slice(0, 50).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(p.id);
+                  setSearch("");
+                  setOpen(false);
+                }}
+              >
+                {p.kuerzel && (
+                  <span className="text-[10px] text-muted-foreground font-mono mr-1">[{p.kuerzel}]</span>
+                )}
+                {p.name}
+              </button>
+            ))
+          )}
+          <button
+            type="button"
+            className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent border-t text-primary"
+            onMouseDown={(e) => { e.preventDefault(); setShowAll(!showAll); }}
+          >
+            {showAll ? "→ Nur gekaufte anzeigen" : "→ Alle Sparten anzeigen"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InsuranceCompanySection() {
   const [companies, setCompanies] = useState<InsuranceCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1940,7 +2051,7 @@ function InsuranceCompanyDialog({
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [matching, setMatching] = useState(false);
-  const [allLeadProducts, setAllLeadProducts] = useState<{ id: number; name: string; kuerzel: string | null }[]>([]);
+  const [allLeadProducts, setAllLeadProducts] = useState<LeadProductInfo[]>([]);
   const [newProductName, setNewProductName] = useState("");
   const [addingProduct, setAddingProduct] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -2221,18 +2332,11 @@ function InsuranceCompanyDialog({
                       )}
                     </td>
                     <td className="p-2">
-                      <select
-                        className="w-full h-8 text-xs rounded border border-input bg-transparent px-2"
-                        value={m.leadProductId ?? ""}
-                        onChange={(e) => handleMappingChange(m.companyProductId, e.target.value ? parseInt(e.target.value) : null)}
-                      >
-                        <option value="">— kein Mapping —</option>
-                        {allLeadProducts.map((lp) => (
-                          <option key={lp.id} value={lp.id}>
-                            {lp.kuerzel ? `[${lp.kuerzel}] ` : ""}{lp.name}
-                          </option>
-                        ))}
-                      </select>
+                      <MappingCombobox
+                        value={m.leadProductId}
+                        onChange={(id) => handleMappingChange(m.companyProductId, id)}
+                        products={allLeadProducts as LeadProductInfo[]}
+                      />
                     </td>
                     <td className="p-2 text-right text-xs">
                       {m.manuallyVerified ? (

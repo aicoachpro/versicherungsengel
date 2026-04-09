@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, leadProducts } from "@/db/schema";
+import { users, leadProducts, providerProducts } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
@@ -32,7 +32,25 @@ export async function GET() {
     .orderBy(sql`${leadProducts.sortOrder} ASC`)
     .all();
 
-  return NextResponse.json(all);
+  // Markiere Produkte als 'purchased' wenn sie bei irgendeinem Anbieter gekauft werden
+  let purchasedSet = new Set<number>();
+  try {
+    const purchased = db
+      .select({ productId: providerProducts.productId })
+      .from(providerProducts)
+      .where(eq(providerProducts.purchased, true))
+      .all();
+    purchasedSet = new Set(purchased.map((p) => p.productId));
+  } catch {
+    // Tabelle evtl. noch nicht migriert
+  }
+
+  const result = all.map((p) => ({
+    ...p,
+    purchased: purchasedSet.has(p.id),
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
