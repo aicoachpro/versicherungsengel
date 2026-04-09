@@ -530,6 +530,38 @@ try {
   console.log("Added 'provider_id' column to email_accounts table");
 }
 
+// Create insurance_companies table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS insurance_companies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
+// Create company_products table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS company_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    company_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
+// Create product_mappings table if not exists
+sqlite.prepare(`
+  CREATE TABLE IF NOT EXISTS product_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    company_product_id INTEGER NOT NULL,
+    lead_product_id INTEGER NOT NULL,
+    confidence REAL,
+    manually_verified INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`).run();
+
 // Create lead_assignment_rules table if not exists
 sqlite.prepare(`
   CREATE TABLE IF NOT EXISTS lead_assignment_rules (

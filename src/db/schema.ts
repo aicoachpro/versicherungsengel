@@ -242,6 +242,29 @@ export const provisions = sqliteTable("provisions", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 
+export const insuranceCompanies = sqliteTable("insurance_companies", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const companyProducts = sqliteTable("company_products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const productMappings = sqliteTable("product_mappings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  companyProductId: integer("company_product_id").notNull(),
+  leadProductId: integer("lead_product_id").notNull(),
+  confidence: real("confidence"),
+  manuallyVerified: integer("manually_verified", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const leadAssignmentRules = sqliteTable("lead_assignment_rules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   providerId: integer("provider_id").notNull(),

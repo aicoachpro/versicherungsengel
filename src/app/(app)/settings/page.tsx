@@ -39,6 +39,8 @@ import {
   CircleX,
   Inbox,
   Tag,
+  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -1674,6 +1676,391 @@ function EmailAccountSection() {
   );
 }
 
+interface InsuranceCompany {
+  id: number;
+  name: string;
+  active: boolean;
+  productCount: number;
+}
+
+interface CompanyMapping {
+  companyProductId: number;
+  companyProductName: string;
+  leadProductId: number | null;
+  leadProductName: string | null;
+  leadProductKuerzel: string | null;
+  confidence: number | null;
+  manuallyVerified: boolean;
+}
+
+function InsuranceCompanySection() {
+  const [companies, setCompanies] = useState<InsuranceCompany[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [openCompany, setOpenCompany] = useState<InsuranceCompany | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await fetch("/api/insurance-companies");
+      if (res.ok) setCompanies(await res.json());
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchCompanies(); }, []);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleAdd = async () => {
+    if (!newName.trim()) return;
+    setAdding(true);
+    try {
+      const res = await fetch("/api/insurance-companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (res.ok) {
+        setNewName("");
+        await fetchCompanies();
+        showFeedback("success", "Gesellschaft hinzugefuegt");
+      } else {
+        showFeedback("error", "Fehler beim Anlegen");
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleteId === null) return;
+    try {
+      const res = await fetch(`/api/insurance-companies/${deleteId}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchCompanies();
+        showFeedback("success", "Gesellschaft geloescht");
+      } else {
+        showFeedback("error", "Fehler beim Loeschen");
+      }
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              Gesellschaften & Produkte
+            </h3>
+            <Badge variant={companies.length > 0 ? "default" : "secondary"}>
+              {companies.length > 0 ? `${companies.length} Gesellschaft${companies.length > 1 ? "en" : ""}` : "Keine"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Lade Produktlisten deiner Versicherungsgesellschaften hoch. Die KI ordnet dann automatisch die Lead-Anbieter-Sparten den passenden Gesellschafts-Produkten zu.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {feedback && (
+            <p className={`text-sm ${feedback.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+              {feedback.message}
+            </p>
+          )}
+
+          {/* Neue Gesellschaft anlegen */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Gesellschaft hinzufuegen (z.B. Allianz, AXA, Gothaer)"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+              disabled={adding}
+            />
+            <Button onClick={handleAdd} disabled={adding || !newName.trim()} className="gap-1">
+              <Plus className="h-4 w-4" />
+              Hinzufuegen
+            </Button>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Lade Gesellschaften...
+            </div>
+          ) : companies.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              Noch keine Gesellschaften. Fuege eine hinzu und lade dann die Produktliste hoch.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {companies.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-lg border p-3 flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {c.productCount} Produkt{c.productCount !== 1 ? "e" : ""}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => setOpenCompany(c)}
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                      Verwalten
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(c.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Verwalten-Dialog */}
+      {openCompany && (
+        <InsuranceCompanyDialog
+          company={openCompany}
+          onClose={() => { setOpenCompany(null); fetchCompanies(); }}
+          onFeedback={showFeedback}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Gesellschaft loeschen</DialogTitle>
+            <DialogDescription>
+              Alle Produkte und Mappings dieser Gesellschaft werden geloescht. Fortfahren?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" type="button" />}>Abbrechen</DialogClose>
+            <Button variant="destructive" onClick={handleDelete} className="gap-2">
+              <Trash2 className="h-4 w-4" />
+              Loeschen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function InsuranceCompanyDialog({
+  company,
+  onClose,
+  onFeedback,
+}: {
+  company: InsuranceCompany;
+  onClose: () => void;
+  onFeedback: (type: "success" | "error", message: string) => void;
+}) {
+  const [mappings, setMappings] = useState<CompanyMapping[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [matching, setMatching] = useState(false);
+  const [allLeadProducts, setAllLeadProducts] = useState<{ id: number; name: string; kuerzel: string | null }[]>([]);
+
+  const fetchMappings = async () => {
+    setLoading(true);
+    try {
+      const [mRes, lpRes] = await Promise.all([
+        fetch(`/api/insurance-companies/${company.id}/mappings`),
+        fetch("/api/lead-products"),
+      ]);
+      if (mRes.ok) setMappings(await mRes.json());
+      if (lpRes.ok) setAllLeadProducts(await lpRes.json());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchMappings(); }, [company.id]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/insurance-companies/${company.id}/products`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onFeedback("success", `${data.inserted} Produkte importiert`);
+        await fetchMappings();
+      } else {
+        onFeedback("error", data.error || "Fehler beim Upload");
+      }
+    } catch {
+      onFeedback("error", "Verbindungsfehler");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleMatch = async () => {
+    setMatching(true);
+    try {
+      const res = await fetch(`/api/insurance-companies/${company.id}/match`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        onFeedback("success", `${data.matched} von ${data.total} Produkten gematcht`);
+        await fetchMappings();
+      } else {
+        onFeedback("error", data.error || "KI-Matching fehlgeschlagen");
+      }
+    } catch {
+      onFeedback("error", "Verbindungsfehler");
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const handleMappingChange = async (companyProductId: number, leadProductId: number | null) => {
+    try {
+      await fetch(`/api/insurance-companies/${company.id}/mappings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyProductId, leadProductId }),
+      });
+      await fetchMappings();
+    } catch {
+      onFeedback("error", "Fehler beim Speichern");
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{company.name}</DialogTitle>
+          <DialogDescription>
+            Produkte hochladen und per KI den Lead-Sparten zuordnen.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex gap-2 py-2">
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept=".csv,.txt"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 cursor-pointer">
+              <Upload className="h-4 w-4" />
+              {uploading ? "Lade..." : "CSV hochladen"}
+            </span>
+          </label>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={handleMatch}
+            disabled={matching || mappings.length === 0}
+          >
+            {matching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {matching ? "KI matcht..." : "KI-Matching starten"}
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto border rounded-md">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground p-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Lade...
+            </div>
+          ) : mappings.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Noch keine Produkte. Lade eine CSV hoch (Format: Gesellschaft,Produkt)
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>
+                  <th className="text-left p-2 font-medium">Gesellschafts-Produkt</th>
+                  <th className="text-left p-2 font-medium">Lead-Sparte</th>
+                  <th className="text-right p-2 font-medium w-16">Konf.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mappings.map((m) => (
+                  <tr key={m.companyProductId} className="border-t hover:bg-muted/30">
+                    <td className="p-2">{m.companyProductName}</td>
+                    <td className="p-2">
+                      <select
+                        className="w-full h-8 text-xs rounded border border-input bg-transparent px-2"
+                        value={m.leadProductId ?? ""}
+                        onChange={(e) => handleMappingChange(m.companyProductId, e.target.value ? parseInt(e.target.value) : null)}
+                      >
+                        <option value="">— kein Mapping —</option>
+                        {allLeadProducts.map((lp) => (
+                          <option key={lp.id} value={lp.id}>
+                            {lp.kuerzel ? `[${lp.kuerzel}] ` : ""}{lp.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-2 text-right text-xs">
+                      {m.manuallyVerified ? (
+                        <span className="text-emerald-600">manuell</span>
+                      ) : m.confidence != null ? (
+                        <span className={m.confidence >= 0.8 ? "text-emerald-600" : m.confidence >= 0.5 ? "text-amber-600" : "text-destructive"}>
+                          {Math.round(m.confidence * 100)}%
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Schliessen</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface AssignmentRule {
   id: number;
   providerId: number;
@@ -2493,6 +2880,8 @@ export default function SettingsPage() {
             <LeadProductSection />
 
             <EmailAccountSection />
+
+            <InsuranceCompanySection />
 
             <LeadAssignmentSection />
 

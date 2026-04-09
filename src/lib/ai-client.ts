@@ -164,6 +164,67 @@ Falls keine Lead-Daten erkennbar sind, antworte mit [].`,
   ).content;
 }
 
+// Produkt-Mapping: Lead-Anbieter-Sparten ↔ Gesellschafts-Produkte
+// Mistral bekommt beide Listen und ordnet semantisch zu.
+export async function matchProductsToLeadSparten(
+  leadSparten: { id: number; name: string; kuerzel: string | null }[],
+  companyProducts: { id: number; name: string }[]
+): Promise<string> {
+  const backend = getSetting("ai.backend");
+  const baseURL =
+    backend === "localai"
+      ? getSetting("ai.localaiUrl") || "http://localhost:8080"
+      : getSetting("ai.customUrl");
+  const apiKey = backend === "custom" ? getSetting("ai.customApiKey") : "not-needed";
+  const model = getSetting("ai.model") || "mistral-small-latest";
+
+  const OpenAI = (await import("openai")).default;
+  const client = new OpenAI({
+    baseURL: baseURL.replace(/\/+$/, "") + "/v1",
+    apiKey,
+  });
+
+  const leadListe = leadSparten
+    .map((s) => `${s.id}: ${s.kuerzel ? `[${s.kuerzel}] ` : ""}${s.name}`)
+    .join("\n");
+  const companyListe = companyProducts
+    .map((p) => `${p.id}: ${p.name}`)
+    .join("\n");
+
+  const prompt = `Du bist Versicherungs-Experte. Ordne jedes Gesellschafts-Produkt der besten passenden Lead-Sparte zu.
+
+GESELLSCHAFTS-PRODUKTE (id: name):
+${companyListe}
+
+LEAD-SPARTEN (id: [kuerzel] name):
+${leadListe}
+
+Gib ein JSON-Array zurueck im Format:
+{"mappings": [
+  {"companyProductId": 1, "leadProductId": 42, "confidence": 0.95},
+  ...
+]}
+
+Regeln:
+- Fuer jedes Gesellschafts-Produkt EIN passendes Lead-Produkt finden
+- confidence: 0.9+ bei exakter Entsprechung, 0.7-0.9 bei semantischer Aehnlichkeit, <0.5 bei Unsicherheit
+- Wenn kein passendes Lead-Produkt gefunden wird, weglassen (nicht mit confidence 0 mappen)
+- Beispiele:
+  * "Betriebshaftpflichtversicherung" (Allianz) ↔ "BHV Betriebshaftpflichtversicherung" (Lead)
+  * "Private Krankenversicherung" (Allianz) ↔ "KVV Private Krankenvollversicherung" (Lead)
+  * "Kfz-Haftpflichtversicherung" (Allianz) ↔ "KFZ Kraftfahrzeugversicherung" (Lead)`;
+
+  const response = await client.chat.completions.create({
+    model,
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    max_tokens: 8000,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  return response.choices[0]?.message?.content || "{}";
+}
+
 // Verbindungstest
 export async function testConnection(): Promise<{
   ok: boolean;
