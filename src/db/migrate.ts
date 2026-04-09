@@ -522,6 +522,14 @@ try {
   console.log("Added 'cost_per_lead' column to provider_products table");
 }
 
+// Add purchased column to provider_products if not exists
+try {
+  sqlite.prepare("SELECT purchased FROM provider_products LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE provider_products ADD COLUMN purchased INTEGER NOT NULL DEFAULT 0").run();
+  console.log("Added 'purchased' column to provider_products table");
+}
+
 // Add provider_id column to email_accounts if not exists
 try {
   sqlite.prepare("SELECT provider_id FROM email_accounts LIMIT 1").get();

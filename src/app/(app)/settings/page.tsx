@@ -3045,13 +3045,67 @@ export default function SettingsPage() {
     { key: "superchat.apiKey", label: "API Key", placeholder: "Superchat API Key" },
   ];
 
+  const [activeCategory, setActiveCategory] = useState<string>("general");
+
+  const categories = [
+    { id: "general", label: "Allgemein", icon: Building2, adminOnly: true },
+    { id: "leads", label: "Lead-Management", icon: Inbox, adminOnly: true },
+    { id: "companies", label: "Gesellschaften", icon: ShieldCheck, adminOnly: true },
+    { id: "ai-mail", label: "KI & Mail", icon: Brain, adminOnly: true },
+    { id: "notifications", label: "Benachrichtigungen", icon: Bell, adminOnly: true },
+    { id: "integrations", label: "Integrationen", icon: Send, adminOnly: true },
+    { id: "account", label: "Account & Sicherheit", icon: Shield, adminOnly: false },
+  ];
+
+  const visibleCategories = categories.filter((c) => !c.adminOnly || isAdmin);
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       <Header title="Einstellungen" />
-      <div className="flex-1 p-6 space-y-6 max-w-2xl">
-        <p className="text-sm text-muted-foreground -mt-2">Konfiguration und Integrationen für deine Instanz.</p>
-        {/* Admin-only sections */}
-        {isAdmin && (
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-56 border-r bg-muted/20 p-3 overflow-y-auto shrink-0 hidden sm:block">
+          <nav className="space-y-1">
+            {visibleCategories.map((c) => {
+              const Icon = c.icon;
+              const isActive = activeCategory === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveCategory(c.id)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-foreground/80 hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{c.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* Mobile: Category-Select */}
+        <div className="sm:hidden px-4 pt-4 shrink-0">
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            value={activeCategory}
+            onChange={(e) => setActiveCategory(e.target.value)}
+          >
+            {visibleCategories.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="max-w-3xl space-y-6">
+
+        {/* === ALLGEMEIN === */}
+        {activeCategory === "general" && isAdmin && (
           <>
             <SettingsSection
               icon={<Building2 className="h-5 w-5" />}
@@ -3062,7 +3116,6 @@ export default function SettingsPage() {
               onSave={saveSection}
             />
 
-            {/* Logo Upload */}
             <Card>
               <CardHeader>
                 <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -3110,16 +3163,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <LeadProviderSection />
-
-            <LeadProductSection />
-
-            <EmailAccountSection />
-
-            <InsuranceCompanySection />
-
-            <LeadAssignmentSection />
-
             <SettingsSection
               icon={<BookOpen className="h-5 w-5" />}
               title="Obsidian"
@@ -3128,27 +3171,28 @@ export default function SettingsPage() {
               settings={settings}
               onSave={saveSection}
             />
+          </>
+        )}
 
-            <SettingsSection
-              icon={<Bell className="h-5 w-5" />}
-              title="Pushover"
-              description="Push-Benachrichtigungen für Folgetermine und neue Leads."
-              fields={PUSHOVER_FIELDS}
-              settings={settings}
-              onSave={saveSection}
-            />
+        {/* === LEAD-MANAGEMENT === */}
+        {activeCategory === "leads" && isAdmin && (
+          <>
+            <LeadProviderSection />
+            <LeadProductSection />
+            <LeadAssignmentSection />
+          </>
+        )}
 
-            <SettingsSection
-              icon={<Send className="h-5 w-5" />}
-              title="Telegram"
-              description="Telegram-Bot für Benachrichtigungen und Self-Healing Alerts."
-              fields={TELEGRAM_FIELDS}
-              settings={settings}
-              onSave={saveSection}
-            />
+        {/* === GESELLSCHAFTEN === */}
+        {activeCategory === "companies" && isAdmin && (
+          <InsuranceCompanySection />
+        )}
 
+        {/* === KI & MAIL === */}
+        {activeCategory === "ai-mail" && isAdmin && (
+          <>
             <AIBackendSection settings={settings} onSave={saveSection} />
-
+            <EmailAccountSection />
             <SettingsSection
               icon={<Mail className="h-5 w-5" />}
               title="E-Mail (Resend)"
@@ -3157,18 +3201,46 @@ export default function SettingsPage() {
               settings={settings}
               onSave={saveSection}
             />
+          </>
+        )}
 
+        {/* === BENACHRICHTIGUNGEN === */}
+        {activeCategory === "notifications" && isAdmin && (
+          <>
             <SettingsSection
-              icon={<MessageSquare className="h-5 w-5" />}
-              title="Superchat"
-              description="Superchat-Integration für Kontakt-Synchronisation."
-              fields={SUPERCHAT_FIELDS}
+              icon={<Bell className="h-5 w-5" />}
+              title="Pushover"
+              description="Push-Benachrichtigungen für Folgetermine und neue Leads."
+              fields={PUSHOVER_FIELDS}
+              settings={settings}
+              onSave={saveSection}
+            />
+            <SettingsSection
+              icon={<Send className="h-5 w-5" />}
+              title="Telegram"
+              description="Telegram-Bot für Benachrichtigungen und Self-Healing Alerts."
+              fields={TELEGRAM_FIELDS}
               settings={settings}
               onSave={saveSection}
             />
           </>
         )}
 
+        {/* === INTEGRATIONEN === */}
+        {activeCategory === "integrations" && isAdmin && (
+          <SettingsSection
+            icon={<MessageSquare className="h-5 w-5" />}
+            title="Superchat"
+            description="Superchat-Integration für Kontakt-Synchronisation."
+            fields={SUPERCHAT_FIELDS}
+            settings={settings}
+            onSave={saveSection}
+          />
+        )}
+
+        {/* === ACCOUNT & SICHERHEIT === */}
+        {activeCategory === "account" && (
+          <>
         {/* Account Info */}
         <Card>
           <CardHeader>
@@ -3327,6 +3399,11 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
+
+          </div>
+        </div>
       </div>
     </div>
   );

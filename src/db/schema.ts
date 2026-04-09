@@ -207,6 +207,7 @@ export const providerProducts = sqliteTable("provider_products", {
   providerId: integer("provider_id").notNull(),
   productId: integer("product_id").notNull(),
   costPerLead: real("cost_per_lead"),
+  purchased: integer("purchased", { mode: "boolean" }).notNull().default(false),
 });
 
 export const provisionImports = sqliteTable("provision_imports", {

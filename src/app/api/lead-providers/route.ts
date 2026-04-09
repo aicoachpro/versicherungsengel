@@ -27,19 +27,22 @@ export async function GET() {
     .all();
 
   // Attach linked products with prices for each provider
+  // productIds = nur gekaufte (purchased=true)
+  // allProductIds = alle mit bekanntem Preis (fuer Preis-Anzeige)
+  // productPrices = Preise pro Produkt
   const allLinks = db.select().from(providerProducts).all();
-  const result = all.map((p) => ({
-    ...p,
-    productIds: allLinks
-      .filter((l) => l.providerId === p.id)
-      .map((l) => l.productId),
-    productPrices: allLinks
-      .filter((l) => l.providerId === p.id)
-      .reduce((acc, l) => {
+  const result = all.map((p) => {
+    const links = allLinks.filter((l) => l.providerId === p.id);
+    return {
+      ...p,
+      productIds: links.filter((l) => l.purchased).map((l) => l.productId),
+      allProductIds: links.map((l) => l.productId),
+      productPrices: links.reduce((acc, l) => {
         acc[l.productId] = l.costPerLead ?? null;
         return acc;
       }, {} as Record<number, number | null>),
-  }));
+    };
+  });
 
   return NextResponse.json(result);
 }

@@ -153,6 +153,16 @@ export async function POST(
   let skipped = 0;
   const results: { sparte: string; preis: number; matched: boolean }[] = [];
 
+  // Bestehende purchased-Flags merken bevor wir die Preise neu setzen
+  const existingPurchased = db
+    .select()
+    .from(providerProducts)
+    .where(eq(providerProducts.providerId, providerId))
+    .all();
+  const purchasedSet = new Set(
+    existingPurchased.filter((pp) => pp.purchased).map((pp) => pp.productId)
+  );
+
   // Bestehende Links loeschen und neu aufbauen
   db.delete(providerProducts).where(eq(providerProducts.providerId, providerId)).run();
 
@@ -222,8 +232,14 @@ export async function POST(
 
     const label = sparte || kuerzel;
     if (productId) {
+      // purchased-Flag aus alten Daten uebernehmen (standardmaessig false)
       db.insert(providerProducts)
-        .values({ providerId, productId, costPerLead: preis })
+        .values({
+          providerId,
+          productId,
+          costPerLead: preis,
+          purchased: purchasedSet.has(productId),
+        })
         .run();
       matched++;
       results.push({ sparte: label, preis, matched: true });

@@ -51,19 +51,27 @@ export async function PATCH(
   if (body.active !== undefined) updates.active = body.active;
 
   // Update provider-products junction if productIds provided
+  // productIds = Liste der GEKAUFTEN Sparten
+  // productPrices = Preise (auch fuer nicht-gekaufte Sparten moeglich)
   if (Array.isArray(body.productIds)) {
-    // Delete existing links
-    db.delete(providerProducts)
-      .where(eq(providerProducts.providerId, providerId))
-      .run();
-    // Insert new links with optional prices
+    const purchasedSet = new Set<number>(body.productIds);
     const prices: Record<number, number | null> = body.productPrices || {};
-    for (const pid of body.productIds) {
+
+    // Alle bestehenden Links fuer diesen Provider loeschen
+    db.delete(providerProducts).where(eq(providerProducts.providerId, providerId)).run();
+
+    // Alle Produkte mit Preis oder "purchased"-Status wieder einfuegen
+    const allProductIds = new Set<number>([
+      ...purchasedSet,
+      ...Object.keys(prices).map((k) => parseInt(k)),
+    ]);
+    for (const pid of allProductIds) {
       db.insert(providerProducts)
         .values({
           providerId,
           productId: pid,
           costPerLead: prices[pid] ?? null,
+          purchased: purchasedSet.has(pid),
         })
         .run();
     }
@@ -92,7 +100,8 @@ export async function PATCH(
 
   return NextResponse.json({
     ...result,
-    productIds: links.map((l) => l.productId),
+    productIds: links.filter((l) => l.purchased).map((l) => l.productId),
+    allProductIds: links.map((l) => l.productId),
     productPrices: links.reduce((acc, l) => {
       acc[l.productId] = l.costPerLead ?? null;
       return acc;
