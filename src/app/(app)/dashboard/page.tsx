@@ -426,8 +426,8 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
     : sql``;
 
   // Leads ohne Aktivitaet seit >7 Tagen (nicht abgeschlossen/verloren, nicht reklamiert)
-  const staleLeads = db
-    .select({ count: sql<number>`count(*)` })
+  const staleLeadsList = db
+    .select({ id: leads.id, name: leads.name })
     .from(leads)
     .where(
       sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
@@ -435,20 +435,23 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
         AND ${leads.updatedAt} < ${sevenDaysAgo}
         ${uSql}`
     )
-    .get();
+    .all();
 
-  if (staleLeads && staleLeads.count > 0) {
+  if (staleLeadsList.length > 0) {
+    const names = staleLeadsList.slice(0, 3).map((l) => l.name).join(", ");
+    const more = staleLeadsList.length > 3 ? ` (+${staleLeadsList.length - 3})` : "";
+    const ids = staleLeadsList.map((l) => l.id).join(",");
     insights.push({
       type: "warning",
       icon: "clock",
-      text: `${staleLeads.count} Lead${staleLeads.count > 1 ? "s" : ""} warten seit \u00fcber 7 Tagen auf Kontakt`,
-      href: "/pipeline#phase-termin-eingegangen",
+      text: `${staleLeadsList.length} Lead${staleLeadsList.length > 1 ? "s" : ""} warten seit \u00fcber 7 Tagen: ${names}${more}`,
+      href: `/pipeline?highlight=${ids}`,
     });
   }
 
   // Ueberfaellige Folgetermine
-  const overdueFollowups = db
-    .select({ count: sql<number>`count(*)` })
+  const overdueList = db
+    .select({ id: leads.id, name: leads.name })
     .from(leads)
     .where(
       sql`${leads.folgetermin} IS NOT NULL
@@ -457,13 +460,15 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
         AND ${leads.reklamiertAt} IS NULL
         ${uSql}`
     )
-    .get();
+    .all();
 
-  if (overdueFollowups && overdueFollowups.count > 0) {
+  if (overdueList.length > 0) {
+    const names = overdueList.slice(0, 3).map((l) => l.name).join(", ");
+    const more = overdueList.length > 3 ? ` (+${overdueList.length - 3})` : "";
     insights.push({
       type: "danger",
       icon: "clipboard",
-      text: `${overdueFollowups.count} \u00fcberf\u00e4llige${overdueFollowups.count > 1 ? " Folgetermine" : "r Folgetermin"}`,
+      text: `${overdueList.length} \u00fcberf\u00e4llige${overdueList.length > 1 ? " Folgetermine" : "r Folgetermin"}: ${names}${more}`,
       href: "/wiedervorlage",
     });
   }
@@ -561,22 +566,25 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
   }
 
   // Conversion Hint: Leads im Angebotsstatus
-  const angebotLeads = db
-    .select({ count: sql<number>`count(*)` })
+  const angebotList = db
+    .select({ id: leads.id, name: leads.name })
     .from(leads)
     .where(
       sql`${leads.phase} = 'Angebot erstellt'
         AND ${leads.reklamiertAt} IS NULL
         ${uSql}`
     )
-    .get();
+    .all();
 
-  if (angebotLeads && angebotLeads.count > 0) {
+  if (angebotList.length > 0) {
+    const names = angebotList.slice(0, 3).map((l) => l.name).join(", ");
+    const more = angebotList.length > 3 ? ` (+${angebotList.length - 3})` : "";
+    const ids = angebotList.map((l) => l.id).join(",");
     insights.push({
       type: "info",
       icon: "clipboard",
-      text: `${angebotLeads.count} Lead${angebotLeads.count > 1 ? "s" : ""} im Angebotsstatus \u2014 dranbleiben!`,
-      href: "/pipeline#phase-angebot-erstellt",
+      text: `${angebotList.length} Lead${angebotList.length > 1 ? "s" : ""} im Angebotsstatus: ${names}${more}`,
+      href: `/pipeline?highlight=${ids}`,
     });
   }
 

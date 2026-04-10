@@ -113,14 +113,23 @@ function PipelineContent() {
       }, 150);
     }
 
-    // Scroll zur Lead-Kachel + Highlight
-    if (leadId) {
+    // Scroll zur Lead-Kachel + Highlight (einzeln oder mehrere)
+    const highlightIds = searchParams.get("highlight")?.split(",").map(Number).filter(Boolean) || [];
+    if (leadId) highlightIds.push(Number(leadId));
+
+    if (highlightIds.length > 0) {
       setTimeout(() => {
-        const el = document.getElementById(`lead-${leadId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-          el.classList.add("ring-2", "ring-primary", "ring-offset-2");
-          setTimeout(() => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 3000);
+        let scrolled = false;
+        for (const hId of highlightIds) {
+          const el = document.getElementById(`lead-${hId}`);
+          if (el) {
+            if (!scrolled) {
+              el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+              scrolled = true;
+            }
+            el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+            setTimeout(() => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 5000);
+          }
         }
       }, 300);
     }
