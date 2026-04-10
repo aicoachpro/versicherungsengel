@@ -157,13 +157,54 @@ export async function POST(req: NextRequest) {
     ? matchOption(leadquelle, leadquelleInfo.options) || leadquelle
     : leadquelle;
 
+  // Gruppen-Mapping: Granulare Lead-Sparten → Superchat-Oberkategorien
+  // Superchat hat nur 23 Optionen, unsere DB hat 160 Sparten
+  const SPARTE_GRUPPEN: Record<string, string[]> = {
+    "Hundeversicherung": ["hund", "hunde", "tierkv-h"],
+    "Pferdeversicherung": ["pferd", "pferde"],
+    "KFZ-Versicherung": ["kfz", "kraftfahrzeug", "auto", "bmw", "tesla", "ferrari", "porsche", "lamborghini", "jaguar", "land rover", "mercedes", "amg", "volvo", "oldtimer", "vollkasko", "moped", "motorrad", "wohnmobil", "neuwagen"],
+    "Firmenversicherung": ["firmen", "betriebsinhalt", "geschaeftsinhalts", "gewerb", "industrie", "betriebsausfall", "betriebsunterbrechung", "buero", "maschinenbruch", "maschinen", "kombi-sach", "transport", "logistik", "werkverkehr", "elektronik", "montage", "landwirtschaft", "automaten"],
+    "Betriebshaftpflicht": ["betriebshaftpflicht", "berufshaftpflicht", "produkthaftpflicht", "veranstaltungshaftpflicht"],
+    "Haftpflichtversicherung": ["private haftpflicht", "phv", "hundehaftpflicht", "pferdehaftpflicht", "jagdhaftpflicht", "tierhaftpflicht", "skipperhaftpflicht", "bootshaftpflicht"],
+    "Rechtsschutzversicherung": ["rechtsschutz", "berufsrechtsschutz", "familienrechtsschutz", "mieterrechtsschutz", "verkehrsrechtsschutz", "vermieterrechtsschutz", "vertragsrechtsschutz", "manager-rechtsschutz"],
+    "Vermögensschadenhaftpflicht": ["vermoegensschaden", "vermoegenssschaden", "d&o", "directors"],
+    "privaten Krankenversicherung": ["private kranken", "krankenvoll", "pkv", "kvv", "kvb", "beamte kranken", "gesetzliche kranken"],
+    "Krankenzusatzversicherung": ["krankenzusatz", "betriebliche kranken", "b-kv"],
+    "Zahnzusatzversicherung": ["zahn", "pkv-zahn"],
+    "Unfallversicherung": ["unfall", "sportunfall", "gruppenunfall"],
+    "Sterbegeldversicherung": ["sterbegeld"],
+    "Hausratversicherung": ["hausrat"],
+    "Wohngebäudeversicherung": ["wohngebaeude", "wohngebaude", "wohngebäude", "mehrfamilienhaus", "photovoltaik"],
+    "Flottenversicherung": ["flotte", "flotten"],
+    "Firmenrechtsschutzversicherung": ["firmenrechtsschutz", "gewerbliche rechtsschutz"],
+    "privaten Pflegeversicherung": ["pflege", "pflegezusatz"],
+    "Finanzierung": ["finanzierung", "baufinanzierung", "immobilienfinanzierung", "bauspar", "kapitalanlage"],
+    "Beratung": ["beratung"],
+  };
+
+  function mapToSuperchatProdukt(produktName: string, options: string[]): string | null {
+    if (!produktName) return null;
+    const lower = normalize(produktName);
+    // 1. Gruppen-Matching
+    for (const [scOption, keywords] of Object.entries(SPARTE_GRUPPEN)) {
+      if (keywords.some((kw) => lower.includes(normalize(kw)))) {
+        // Prüfe ob die SC-Option existiert
+        const found = options.find((o) => normalize(o) === normalize(scOption));
+        if (found) return found;
+      }
+    }
+    // 2. Fallback: normales Fuzzy-Matching
+    return matchOption(produktName, options);
+  }
+
   const leadProduktInfo = attrMap.get("Lead Produkt");
+  const scOptions = leadProduktInfo?.options || [];
   const produkte: string[] = [];
 
   // 1. Aus dem neuen productId-Feld
   if (leadProduktName) {
-    const matched = leadProduktInfo?.options.length
-      ? matchOption(leadProduktName, leadProduktInfo.options)
+    const matched = scOptions.length
+      ? mapToSuperchatProdukt(leadProduktName, scOptions)
       : leadProduktName;
     if (matched) produkte.push(matched);
   }
@@ -173,8 +214,8 @@ export async function POST(req: NextRequest) {
     const allInsurances = db.select().from(insurances).where(eq(insurances.leadId, leadId)).all();
     for (const ins of allInsurances) {
       if (!ins.sparte) continue;
-      const matched = leadProduktInfo?.options.length
-        ? matchOption(ins.sparte, leadProduktInfo.options)
+      const matched = scOptions.length
+        ? mapToSuperchatProdukt(ins.sparte, scOptions)
         : null;
       if (matched && !produkte.includes(matched)) produkte.push(matched);
     }
