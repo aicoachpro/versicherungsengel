@@ -41,6 +41,10 @@ export async function GET() {
         acc[l.productId] = l.costPerLead ?? null;
         return acc;
       }, {} as Record<number, number | null>),
+      superchatMappings: links.reduce((acc, l) => {
+        if (l.superchatOption) acc[l.productId] = l.superchatOption;
+        return acc;
+      }, {} as Record<number, string>),
     };
   });
 

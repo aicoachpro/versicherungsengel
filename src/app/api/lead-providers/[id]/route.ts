@@ -53,9 +53,11 @@ export async function PATCH(
   // Update provider-products junction if productIds provided
   // productIds = Liste der GEKAUFTEN Sparten
   // productPrices = Preise (auch fuer nicht-gekaufte Sparten moeglich)
+  // superchatMappings = Manuelles Superchat-Produkt pro Sparte
   if (Array.isArray(body.productIds)) {
     const purchasedSet = new Set<number>(body.productIds);
     const prices: Record<number, number | null> = body.productPrices || {};
+    const scMappings: Record<number, string> = body.superchatMappings || {};
 
     // Alle bestehenden Links fuer diesen Provider loeschen
     db.delete(providerProducts).where(eq(providerProducts.providerId, providerId)).run();
@@ -72,6 +74,7 @@ export async function PATCH(
           productId: pid,
           costPerLead: prices[pid] ?? null,
           purchased: purchasedSet.has(pid),
+          superchatOption: scMappings[pid] || null,
         })
         .run();
     }
@@ -106,6 +109,10 @@ export async function PATCH(
       acc[l.productId] = l.costPerLead ?? null;
       return acc;
     }, {} as Record<number, number | null>),
+    superchatMappings: links.reduce((acc, l) => {
+      if (l.superchatOption) acc[l.productId] = l.superchatOption;
+      return acc;
+    }, {} as Record<number, string>),
   });
 }
 

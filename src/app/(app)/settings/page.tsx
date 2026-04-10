@@ -177,6 +177,7 @@ type LeadProviderForm = {
   startMonth: string;
   productIds: number[];
   productPrices: Record<number, number | null>;
+  superchatMappings: Record<number, string>;
 };
 
 const EMPTY_FORM: LeadProviderForm = {
@@ -189,6 +190,7 @@ const EMPTY_FORM: LeadProviderForm = {
   startMonth: "",
   productIds: [],
   productPrices: {},
+  superchatMappings: {},
 };
 
 interface ProviderProduct {
@@ -231,6 +233,23 @@ function LeadProviderDialog({
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => setAllProducts(data))
         .catch(() => setAllProducts([]));
+      // Superchat "Lead Produkt" Optionen laden
+      fetch("/api/superchat/attributes")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((attrs: { name: string; optionValues: string }[]) => {
+          const lp = attrs.find((a) => a.name === "Lead Produkt");
+          if (lp) {
+            try {
+              const parsed = JSON.parse(lp.optionValues || "[]");
+              const vals = Array.isArray(parsed) ? parsed.map((o: { value?: string }) => o.value || "").filter(Boolean) : [];
+              // Deduplizieren
+              setScOptions([...new Set(vals)]);
+            } catch {
+              setScOptions([]);
+            }
+          }
+        })
+        .catch(() => setScOptions([]));
     }
   }, [open, initialData]);
 
@@ -239,6 +258,7 @@ function LeadProviderDialog({
   const [pendingCsv, setPendingCsv] = useState<File | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [scOptions, setScOptions] = useState<string[]>([]);
 
   const toggleProduct = (productId: number) => {
     setForm((prev) => {
@@ -492,15 +512,33 @@ function LeadProviderDialog({
                           </span>
                         </label>
                         {isChecked && (
-                          <Input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            placeholder="EUR"
-                            className="w-20 h-7 text-xs"
-                            value={form.productPrices[product.id] ?? ""}
-                            onChange={(e) => setProductPrice(product.id, e.target.value)}
-                          />
+                          <>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              placeholder="EUR"
+                              className="w-20 h-7 text-xs shrink-0"
+                              value={form.productPrices[product.id] ?? ""}
+                              onChange={(e) => setProductPrice(product.id, e.target.value)}
+                            />
+                            {scOptions.length > 0 && (
+                              <select
+                                className="h-7 text-[10px] rounded border border-input bg-transparent px-1 w-28 shrink-0"
+                                value={form.superchatMappings[product.id] ?? ""}
+                                onChange={(e) => setForm((prev) => ({
+                                  ...prev,
+                                  superchatMappings: { ...prev.superchatMappings, [product.id]: e.target.value || undefined } as Record<number, string>,
+                                }))}
+                                title="Superchat Lead-Produkt"
+                              >
+                                <option value="">SC: --</option>
+                                {scOptions.map((o) => (
+                                  <option key={o} value={o}>{o}</option>
+                                ))}
+                              </select>
+                            )}
+                          </>
                         )}
                       </div>
                     );
@@ -633,6 +671,7 @@ function LeadProviderSection() {
         startMonth: form.startMonth || null,
         productIds: form.productIds,
         productPrices: form.productPrices,
+        superchatMappings: form.superchatMappings,
       }),
     });
     if (!res.ok) {
@@ -658,6 +697,7 @@ function LeadProviderSection() {
         startMonth: form.startMonth || null,
         productIds: form.productIds,
         productPrices: form.productPrices,
+        superchatMappings: form.superchatMappings,
       }),
     });
     if (!res.ok) {
@@ -704,6 +744,7 @@ function LeadProviderSection() {
         startMonth: editProvider.startMonth || "",
         productIds: (editProvider as unknown as { productIds?: number[] }).productIds || editProvider.products?.map((p) => p.id) || [],
         productPrices: editProvider.productPrices || {},
+        superchatMappings: (editProvider as unknown as { superchatMappings?: Record<number, string> }).superchatMappings || {},
       }
     : EMPTY_FORM;
 

@@ -209,6 +209,7 @@ export const providerProducts = sqliteTable("provider_products", {
   productId: integer("product_id").notNull(),
   costPerLead: real("cost_per_lead"),
   purchased: integer("purchased", { mode: "boolean" }).notNull().default(false),
+  superchatOption: text("superchat_option"),
 });
 
 export const provisionImports = sqliteTable("provision_imports", {

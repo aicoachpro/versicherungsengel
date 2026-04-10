@@ -522,6 +522,14 @@ try {
   console.log("Added 'cost_per_lead' column to provider_products table");
 }
 
+// Add superchat_option column to provider_products if not exists
+try {
+  sqlite.prepare("SELECT superchat_option FROM provider_products LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE provider_products ADD COLUMN superchat_option TEXT").run();
+  console.log("Added 'superchat_option' column to provider_products table");
+}
+
 // Add purchased column to provider_products if not exists
 try {
   sqlite.prepare("SELECT purchased FROM provider_products LIMIT 1").get();

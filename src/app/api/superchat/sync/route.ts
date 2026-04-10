@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, insurances, leadProducts, leadProviders, superchatAttributes } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { leads, insurances, leadProducts, leadProviders, superchatAttributes, providerProducts } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { createContact, updateContact, findContactByHandle } from "@/lib/superchat";
@@ -201,8 +201,31 @@ export async function POST(req: NextRequest) {
   const scOptions = leadProduktInfo?.options || [];
   const produkte: string[] = [];
 
-  // 1. Aus dem neuen productId-Feld
-  if (leadProduktName) {
+  // 1. Manuelles Mapping prüfen (provider_products.superchat_option)
+  let manualMapping: string | null = null;
+  if (lead.providerId && lead.productId) {
+    try {
+      const pp = db
+        .select({ superchatOption: providerProducts.superchatOption })
+        .from(providerProducts)
+        .where(
+          and(
+            eq(providerProducts.providerId, lead.providerId),
+            eq(providerProducts.productId, lead.productId)
+          )
+        )
+        .get();
+      if (pp?.superchatOption) manualMapping = pp.superchatOption;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (manualMapping) {
+    // Manuelles Mapping hat Vorrang
+    produkte.push(manualMapping);
+  } else if (leadProduktName) {
+    // 2. Fallback: Automatisches Gruppen-Mapping
     const matched = scOptions.length
       ? mapToSuperchatProdukt(leadProduktName, scOptions)
       : leadProduktName;
