@@ -86,6 +86,26 @@ export async function getCustomAttributes() {
   return superchatFetch(`/custom-attributes`);
 }
 
+export async function sendTemplateMessage(params: {
+  phone: string;
+  channelId: string;
+  templateId: string;
+  variables: Array<{ position: number; value: string }>;
+}) {
+  return superchatFetch(`/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      to: [{ identifier: params.phone }],
+      from: { channel_id: params.channelId },
+      content: {
+        type: "whats_app_template",
+        template_id: params.templateId,
+        variables: params.variables,
+      },
+    }),
+  });
+}
+
 export async function updateContact(
   contactId: string,
   data: {

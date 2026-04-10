@@ -245,27 +245,80 @@ export async function GET(req: NextRequest) {
         .run();
 
       // Automatisch an Superchat uebertragen (non-blocking)
+      let superchatContactPhone: string | null = null;
       try {
         const baseUrl = process.env.AUTH_URL || "http://localhost:3000";
         const syncRes = await fetch(`${baseUrl}/api/superchat/sync`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            // Cron-Auth fuer internen Aufruf
             "x-cron-secret": process.env.CRON_SECRET || "vf-cron-2024-secure",
           },
           body: JSON.stringify({ leadId: newLead.id }),
         });
         if (syncRes.ok) {
           const syncData = await syncRes.json();
-          console.log(`[mail-process] Superchat-Sync fuer Lead #${newLead.id}: ${syncData.action} (Contact: ${syncData.contactId})`);
+          console.log(`[mail-process] Superchat-Sync fuer Lead #${newLead.id}: ${syncData.action}`);
+          superchatContactPhone = syncData.transferred?.phone || null;
         } else {
           const syncErr = await syncRes.json().catch(() => ({}));
           console.log(`[mail-process] Superchat-Sync Skip fuer Lead #${newLead.id}: ${syncErr.error || syncRes.status}`);
         }
       } catch (syncErr) {
-        // Nicht blockieren wenn Superchat nicht erreichbar
         console.log(`[mail-process] Superchat-Sync Fehler fuer Lead #${newLead.id}:`, syncErr instanceof Error ? syncErr.message : String(syncErr));
+      }
+
+      // Auto-WhatsApp fuer LeadCloser-Leads ausserhalb Geschaeftszeiten
+      if (superchatContactPhone && providerId) {
+        try {
+          const provRow = db
+            .select({ name: leadProviders.name, superchatListId: leadProviders.superchatListId })
+            .from(leadProviders)
+            .where(eq(leadProviders.id, providerId))
+            .get();
+
+          // Nur fuer LeadCloser/CheckDirect (nicht Versicherungsengel)
+          const isLeadCloser = provRow?.name?.toLowerCase().includes("check") ||
+                               provRow?.name?.toLowerCase().includes("leadcloser") ||
+                               provRow?.name?.toLowerCase().includes("lead closer");
+
+          if (isLeadCloser) {
+            // Zeitfenster: Sonntag ganzer Tag, Mo-Sa 20:00-08:00 (Europe/Berlin)
+            const berlinTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+            const day = berlinTime.getDay(); // 0=So, 6=Sa
+            const hour = berlinTime.getHours();
+            const isOffHours = day === 0 || hour >= 20 || hour < 8;
+
+            if (isOffHours) {
+              const { sendTemplateMessage } = await import("@/lib/superchat");
+
+              // Grussformel zusammenbauen
+              const anrede = leadData.ansprechpartner
+                ? `Hallo ${leadData.ansprechpartner.split(" ")[0]},`
+                : "Hallo,";
+
+              // Produkt-Name fuer Variable 2
+              const produktName = productId
+                ? (db.select({ name: leadProducts.name }).from(leadProducts).where(eq(leadProducts.id, productId)).get()?.name || "Versicherung")
+                : "Versicherung";
+
+              await sendTemplateMessage({
+                phone: superchatContactPhone,
+                channelId: "mc_93p5ySMwRlwDycW7PBvTX",
+                templateId: "tn_RjcDqQy2JuiapRhtM16w5",
+                variables: [
+                  { position: 1, value: anrede },
+                  { position: 2, value: produktName },
+                ],
+              });
+              console.log(`[mail-process] Auto-WhatsApp gesendet an ${superchatContactPhone} fuer Lead #${newLead.id}`);
+            } else {
+              console.log(`[mail-process] Auto-WhatsApp uebersprungen (Geschaeftszeiten) fuer Lead #${newLead.id}`);
+            }
+          }
+        } catch (waErr) {
+          console.log(`[mail-process] Auto-WhatsApp Fehler fuer Lead #${newLead.id}:`, waErr instanceof Error ? waErr.message : String(waErr));
+        }
       }
 
       processed++;
