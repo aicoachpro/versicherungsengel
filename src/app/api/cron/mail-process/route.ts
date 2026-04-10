@@ -244,6 +244,30 @@ export async function GET(req: NextRequest) {
         .where(eq(inboundEmails.id, email.id))
         .run();
 
+      // Automatisch an Superchat uebertragen (non-blocking)
+      try {
+        const baseUrl = process.env.AUTH_URL || "http://localhost:3000";
+        const syncRes = await fetch(`${baseUrl}/api/superchat/sync`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Cron-Auth fuer internen Aufruf
+            "x-cron-secret": process.env.CRON_SECRET || "vf-cron-2024-secure",
+          },
+          body: JSON.stringify({ leadId: newLead.id }),
+        });
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          console.log(`[mail-process] Superchat-Sync fuer Lead #${newLead.id}: ${syncData.action} (Contact: ${syncData.contactId})`);
+        } else {
+          const syncErr = await syncRes.json().catch(() => ({}));
+          console.log(`[mail-process] Superchat-Sync Skip fuer Lead #${newLead.id}: ${syncErr.error || syncRes.status}`);
+        }
+      } catch (syncErr) {
+        // Nicht blockieren wenn Superchat nicht erreichbar
+        console.log(`[mail-process] Superchat-Sync Fehler fuer Lead #${newLead.id}:`, syncErr instanceof Error ? syncErr.message : String(syncErr));
+      }
+
       processed++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

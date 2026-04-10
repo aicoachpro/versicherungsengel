@@ -570,6 +570,14 @@ sqlite.prepare(`
   )
 `).run();
 
+// Add superchat_list_id column to lead_providers if not exists
+try {
+  sqlite.prepare("SELECT superchat_list_id FROM lead_providers LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE lead_providers ADD COLUMN superchat_list_id TEXT").run();
+  console.log("Added 'superchat_list_id' column to lead_providers table");
+}
+
 // Create superchat_attributes table if not exists
 sqlite.prepare(`
   CREATE TABLE IF NOT EXISTS superchat_attributes (

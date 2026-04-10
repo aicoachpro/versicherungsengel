@@ -87,8 +87,11 @@ function loadAttributeMap(): Map<string, AttrInfo> {
  * Body: { leadId: number }
  */
 export async function POST(req: NextRequest) {
+  // Erlaubt: Session-Auth ODER Cron-Secret (fuer automatischen Sync aus mail-process)
+  const cronSecret = req.headers.get("x-cron-secret");
+  const isCronAuth = cronSecret === (process.env.CRON_SECRET || "vf-cron-2024-secure");
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session && !isCronAuth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { leadId } = await req.json();
   if (!leadId) return NextResponse.json({ error: "leadId ist Pflichtfeld" }, { status: 400 });
@@ -132,12 +135,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Leadquelle aus dem Anbieter
+  // Leadquelle + Kontaktliste aus dem Anbieter
   let leadquelle: string | null = null;
+  let superchatListId: string | null = null;
   if (lead.providerId) {
     try {
       const prov = db.select().from(leadProviders).where(eq(leadProviders.id, lead.providerId)).get();
-      if (prov) leadquelle = prov.name;
+      if (prov) {
+        leadquelle = prov.name;
+        superchatListId = prov.superchatListId || null;
+      }
     } catch {
       // ignore
     }
@@ -197,6 +204,9 @@ export async function POST(req: NextRequest) {
   pushAttr(custom_attributes, "Ort", lead.ort);
   pushAttr(custom_attributes, "Branche", brancheMatched);
 
+  // Kontaktliste(n) basierend auf Lead-Anbieter
+  const contact_list_ids = superchatListId ? [superchatListId] : undefined;
+
   try {
     let contactId = lead.superchatContactId;
     let action: "create" | "update" = "create";
@@ -209,6 +219,7 @@ export async function POST(req: NextRequest) {
           first_name,
           last_name,
           custom_attributes,
+          contact_list_ids,
         });
         action = "update";
       } catch (err: unknown) {
@@ -253,6 +264,7 @@ export async function POST(req: NextRequest) {
             phone: handles.phone,
             email: handles.email,
             custom_attributes,
+            contact_list_ids,
           });
           contactId = result.id;
           action = "create";
@@ -271,7 +283,7 @@ export async function POST(req: NextRequest) {
           || (email ? await findContactByHandle(email) : null);
         if (existing?.id) {
           contactId = existing.id;
-          await updateContact(contactId!, { first_name, last_name, custom_attributes });
+          await updateContact(contactId!, { first_name, last_name, custom_attributes, contact_list_ids });
           action = "update";
         } else {
           // Handles existieren als Geister-Kontakte (blockiert aber unsichtbar)
@@ -283,6 +295,7 @@ export async function POST(req: NextRequest) {
               last_name,
               email: fallbackEmail,
               custom_attributes,
+              contact_list_ids,
             });
             contactId = result.id;
             action = "create";
@@ -294,7 +307,7 @@ export async function POST(req: NextRequest) {
               const fallbackExisting = await findContactByHandle(fallbackEmail);
               if (fallbackExisting?.id) {
                 contactId = fallbackExisting.id;
-                await updateContact(contactId!, { first_name, last_name, custom_attributes });
+                await updateContact(contactId!, { first_name, last_name, custom_attributes, contact_list_ids });
                 action = "update";
                 warnings.push(`Bestehender Fallback-Kontakt aktualisiert: ${fallbackEmail}`);
               } else {
@@ -316,15 +329,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { userId, userName } = getAuditUser(session);
-    logAudit({
-      userId,
-      userName,
-      action: action === "create" ? "create" : "update",
-      entity: "lead",
-      entityId: leadId,
-      entityName: `Superchat-Sync: ${lead.name}`,
-    });
+    if (session) {
+      const { userId, userName } = getAuditUser(session);
+      logAudit({
+        userId,
+        userName,
+        action: action === "create" ? "create" : "update",
+        entity: "lead",
+        entityId: leadId,
+        entityName: `Superchat-Sync: ${lead.name}`,
+      });
+    } else {
+      logAudit({
+        userId: 0,
+        userName: "System (Mail-Cron)",
+        action: action === "create" ? "create" : "update",
+        entity: "lead",
+        entityId: leadId,
+        entityName: `Superchat-Auto-Sync: ${lead.name}`,
+      });
+    }
 
     return NextResponse.json({
       success: true,

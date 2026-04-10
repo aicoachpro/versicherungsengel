@@ -158,6 +158,7 @@ export const leadProviders = sqliteTable("lead_providers", {
   billingModel: text("billing_model").notNull().default("prepaid"),
   carryOver: integer("carry_over", { mode: "boolean" }).notNull().default(true),
   startMonth: text("start_month").notNull().default(""),
+  superchatListId: text("superchat_list_id"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
