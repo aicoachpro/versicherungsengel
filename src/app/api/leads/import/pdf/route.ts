@@ -34,13 +34,15 @@ function parseJsonFromResponse(text: string): ExtractedLead[] {
 }
 
 async function extractFromPdf(file: File): Promise<PdfResult> {
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+  const buffer = Buffer.from(arrayBuffer);
 
   // PDF-Text extrahieren mit unpdf
   let pdfText = "";
   try {
     const { extractText } = await import("unpdf");
-    const result = await extractText(buffer);
+    const result = await extractText(uint8);
     pdfText = Array.isArray(result.text) ? result.text.join("\n") : (result.text || "");
   } catch (err) {
     // Fallback: Rohtext aus PDF-Stream
