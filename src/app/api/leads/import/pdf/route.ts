@@ -36,51 +36,40 @@ function parseJsonFromResponse(text: string): ExtractedLead[] {
 async function extractFromPdf(file: File): Promise<PdfResult> {
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // PDF-Text extrahieren — Rohtext aus PDF-Stream parsen
+  // PDF-Text extrahieren mit unpdf
   let pdfText = "";
   try {
-    const str = buffer.toString("latin1");
-    // PDF-Text-Objekte extrahieren: (Text) oder <hex>
-    const textParts: string[] = [];
-    // Suche nach BT...ET Bloecken (Text-Objekte)
-    const btEtPattern = /BT\s([\s\S]*?)ET/g;
-    let match;
-    while ((match = btEtPattern.exec(str)) !== null) {
-      const block = match[1];
-      // Text in Klammern extrahieren: Tj oder TJ Operatoren
-      const tjPattern = /\(([^)]*)\)/g;
-      let tm;
-      while ((tm = tjPattern.exec(block)) !== null) {
-        const decoded = tm[1]
-          .replace(/\\n/g, "\n")
-          .replace(/\\r/g, "\r")
-          .replace(/\\t/g, "\t")
-          .replace(/\\\(/g, "(")
-          .replace(/\\\)/g, ")")
-          .replace(/\\\\/g, "\\");
-        if (decoded.trim()) textParts.push(decoded);
-      }
-    }
-    pdfText = textParts.join(" ").replace(/\s+/g, " ").trim();
-
-    // Fallback: Wenn keine BT/ET Bloecke gefunden, versuche direkte Text-Extraktion
-    if (!pdfText) {
-      const simplePattern = /\(([^)]{2,})\)/g;
-      const parts: string[] = [];
-      while ((match = simplePattern.exec(str)) !== null) {
-        const text = match[1].replace(/[^\x20-\x7E\xC0-\xFF]/g, " ").trim();
-        if (text.length > 1) parts.push(text);
-      }
-      pdfText = parts.join(" ").replace(/\s+/g, " ").trim();
-    }
+    const { extractText } = await import("unpdf");
+    const result = await extractText(buffer);
+    pdfText = Array.isArray(result.text) ? result.text.join("\n") : (result.text || "");
   } catch (err) {
-    return {
-      filename: file.name,
-      extracted: [],
-      confidence: 0,
-      rawText: "",
-      error: `PDF konnte nicht gelesen werden: ${err instanceof Error ? err.message : String(err)}`,
-    };
+    // Fallback: Rohtext aus PDF-Stream
+    try {
+      const str = buffer.toString("latin1");
+      const btEtPattern = /BT\s([\s\S]*?)ET/g;
+      const textParts: string[] = [];
+      let match;
+      while ((match = btEtPattern.exec(str)) !== null) {
+        const tjPattern = /\(([^)]*)\)/g;
+        let tm;
+        while ((tm = tjPattern.exec(match[1])) !== null) {
+          const decoded = tm[1].replace(/\\[nrt]/g, " ").replace(/\\\(/g, "(").replace(/\\\)/g, ")");
+          if (decoded.trim()) textParts.push(decoded);
+        }
+      }
+      pdfText = textParts.join(" ").replace(/\s+/g, " ").trim();
+    } catch {
+      // ignore
+    }
+    if (!pdfText) {
+      return {
+        filename: file.name,
+        extracted: [],
+        confidence: 0,
+        rawText: "",
+        error: `PDF konnte nicht gelesen werden: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
 
   if (!pdfText.trim()) {
