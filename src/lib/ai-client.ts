@@ -154,24 +154,38 @@ export async function extractLeadFromPDF(pdfText: string): Promise<string> {
         role: "system",
         content: `Du bist ein Datenextraktions-Assistent fuer Versicherungsvermittler.
 Analysiere den folgenden PDF-Inhalt und extrahiere alle Lead-Daten.
+
+Das PDF kann verschiedene Formate haben:
+1. Allianz Lead.NOW: Strukturiert mit "Informationen zum Interessenten", "Gewuenschtes Produkt", Kontaktdaten
+2. Allgemeine Lead-PDFs: Freitext oder Tabellen
+
 Gib ein JSON-Array zurueck. Jeder Lead ist ein Objekt mit diesen Feldern:
-- name (Firmenname, PFLICHT)
-- ansprechpartner
+- name (Name des Interessenten/Kontakts, PFLICHT - bei Privatpersonen der volle Name)
+- ansprechpartner (gleich wie name bei Privatpersonen, bei Firmen der Ansprechpartner)
 - email
-- telefon
+- telefon (mit Laendervorwahl wenn vorhanden)
 - website
 - branche (Bau, Handwerk, Dienstleistung, Produktion, IT, Gesundheit, Logistik, Handel, Gastronomie, Immobilien, Sonstiges)
-- strasse
+- strasse (Strasse und Hausnummer)
 - plz
 - ort
 - unternehmensgroesse (1-9, 10-49, 50-199, 200-999, 1000+)
 - umsatzklasse (<1 Mio, 1-5 Mio, 5-20 Mio, 20-100 Mio, >100 Mio)
 - gewerbeart (hauptberuflich/nebenberuflich)
-- notizen (zusaetzliche relevante Infos)
+- notizen (zusaetzliche relevante Infos wie Leadherkunft, Lead-ID, Reklamationsstatus, Historie)
+- produkt (Versicherungsart/-sparte die angefragt wird, z.B. "Zahnzusatzversicherung", "Betriebshaftpflicht", "KFZ-Versicherung")
+- termin (Datum im Format YYYY-MM-DDTHH:MM wenn ein Termin/Eingangsdatum genannt wird, sonst null)
+- terminKosten (Kosten pro Lead als Zahl, default 0)
 - confidence (0-1, wie sicher du bei der Extraktion bist. Unter 0.5 = sehr unsicher)
 
-Setze leere Felder auf "". Antworte NUR mit dem JSON-Array.
-Falls keine Lead-Daten erkennbar sind, antworte mit [].`,
+WICHTIGE REGELN:
+1. Setze leere Felder auf ""
+2. Bei "Gewuenschtes Produkt: Zusatzversicherung Zahn" → produkt = "Zahnzusatzversicherung"
+3. Strasse und PLZ/Ort trennen (z.B. "Arthur-Strobel-Str. 33, 09127 Chemnitz" → strasse="Arthur-Strobel-Str. 33", plz="09127", ort="Chemnitz")
+4. Telefon mit + Vorwahl uebernehmen
+5. Bei Allianz Lead.NOW: "Eingangsdatum" als termin verwenden
+6. Antworte NUR mit dem JSON-Array, kein anderer Text
+7. Falls keine Lead-Daten erkennbar sind, antworte mit []`,
       },
       { role: "user", content: pdfText },
     ])
