@@ -1,32 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import Anthropic from "@anthropic-ai/sdk";
+import { extractLeadFromPDF } from "@/lib/ai-client";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES = 10;
 const RAW_TEXT_PREVIEW_LENGTH = 500;
-
-const EXTRACTION_PROMPT = `Analysiere den PDF-Inhalt und extrahiere alle Lead-Daten.
-Gib ein JSON-Array zurueck. Jeder Lead ist ein Objekt mit diesen Feldern:
-- name (Firmenname, PFLICHT)
-- ansprechpartner
-- email
-- telefon
-- website
-- branche (Bau, Handwerk, Dienstleistung, Produktion, IT, Gesundheit, Logistik, Handel, Gastronomie, Immobilien, Sonstiges)
-- strasse
-- plz
-- ort
-- unternehmensgroesse (1-9, 10-49, 50-199, 200-999, 1000+)
-- umsatzklasse (<1 Mio, 1-5 Mio, 5-20 Mio, 20-100 Mio, >100 Mio)
-- gewerbeart (hauptberuflich/nebenberuflich)
-- termin (Datum im Format YYYY-MM-DDTHH:MM, oder null)
-- terminKosten (Zahl, default 320)
-- notizen (zusaetzliche relevante Infos aus dem PDF)
-- confidence (0-1, wie sicher du bei der Extraktion bist. Unter 0.5 = sehr unsicher)
-
-Setze leere Felder auf "". Antworte NUR mit dem JSON-Array, kein anderer Text.
-Falls keine Lead-Daten erkennbar sind, antworte mit [].`;
 
 interface ExtractedLead {
   name?: string;
@@ -47,41 +25,78 @@ function parseJsonFromResponse(text: string): ExtractedLead[] {
   const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
 
+  // Falls die Antwort ein Objekt mit "leads" oder Array ist
   const parsed = JSON.parse(jsonStr);
-  if (!Array.isArray(parsed)) {
-    throw new Error("KI-Antwort war kein gueltiges Array");
-  }
-  return parsed;
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed.leads && Array.isArray(parsed.leads)) return parsed.leads;
+  if (parsed.name) return [parsed]; // Einzelner Lead
+  throw new Error("KI-Antwort war kein gueltiges Lead-Array");
 }
 
-async function extractFromPdf(
-  client: Anthropic,
-  file: File,
-): Promise<PdfResult> {
+async function extractFromPdf(file: File): Promise<PdfResult> {
   const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data: base64 },
-          },
-          { type: "text", text: EXTRACTION_PROMPT },
-        ],
-      },
-    ],
-  });
+  // PDF-Text extrahieren — Rohtext aus PDF-Stream parsen
+  let pdfText = "";
+  try {
+    const str = buffer.toString("latin1");
+    // PDF-Text-Objekte extrahieren: (Text) oder <hex>
+    const textParts: string[] = [];
+    // Suche nach BT...ET Bloecken (Text-Objekte)
+    const btEtPattern = /BT\s([\s\S]*?)ET/g;
+    let match;
+    while ((match = btEtPattern.exec(str)) !== null) {
+      const block = match[1];
+      // Text in Klammern extrahieren: Tj oder TJ Operatoren
+      const tjPattern = /\(([^)]*)\)/g;
+      let tm;
+      while ((tm = tjPattern.exec(block)) !== null) {
+        const decoded = tm[1]
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, "\r")
+          .replace(/\\t/g, "\t")
+          .replace(/\\\(/g, "(")
+          .replace(/\\\)/g, ")")
+          .replace(/\\\\/g, "\\");
+        if (decoded.trim()) textParts.push(decoded);
+      }
+    }
+    pdfText = textParts.join(" ").replace(/\s+/g, " ").trim();
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
-  const leads = parseJsonFromResponse(text);
+    // Fallback: Wenn keine BT/ET Bloecke gefunden, versuche direkte Text-Extraktion
+    if (!pdfText) {
+      const simplePattern = /\(([^)]{2,})\)/g;
+      const parts: string[] = [];
+      while ((match = simplePattern.exec(str)) !== null) {
+        const text = match[1].replace(/[^\x20-\x7E\xC0-\xFF]/g, " ").trim();
+        if (text.length > 1) parts.push(text);
+      }
+      pdfText = parts.join(" ").replace(/\s+/g, " ").trim();
+    }
+  } catch (err) {
+    return {
+      filename: file.name,
+      extracted: [],
+      confidence: 0,
+      rawText: "",
+      error: `PDF konnte nicht gelesen werden: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
-  // Durchschnittliche Confidence berechnen
+  if (!pdfText.trim()) {
+    return {
+      filename: file.name,
+      extracted: [],
+      confidence: 0,
+      rawText: "",
+      error: "PDF enthaelt keinen lesbaren Text (evtl. gescanntes Bild)",
+    };
+  }
+
+  // KI-Extraktion ueber das konfigurierte Backend (Mistral/Claude/LocalAI)
+  const aiResponse = await extractLeadFromPDF(pdfText);
+  const leads = parseJsonFromResponse(aiResponse);
+
   const avgConfidence =
     leads.length > 0
       ? leads.reduce((sum, l) => sum + (typeof l.confidence === "number" ? l.confidence : 0.5), 0) / leads.length
@@ -91,7 +106,7 @@ async function extractFromPdf(
     filename: file.name,
     extracted: leads,
     confidence: Math.round(avgConfidence * 100) / 100,
-    rawText: text.substring(0, RAW_TEXT_PREVIEW_LENGTH),
+    rawText: pdfText.substring(0, RAW_TEXT_PREVIEW_LENGTH),
   };
 }
 
@@ -99,12 +114,8 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY nicht konfiguriert" }, { status: 500 });
-
   const formData = await req.formData();
 
-  // Mehrere Dateien unterstuetzen: "files" (mehrere) oder "file" (einzeln, Rueckwaertskompatibel)
   const files: File[] = [];
   const multiFiles = formData.getAll("files");
   if (multiFiles.length > 0) {
@@ -124,7 +135,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Maximal ${MAX_FILES} Dateien gleichzeitig` }, { status: 400 });
   }
 
-  // Validierung
   for (const file of files) {
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       return NextResponse.json({ error: `"${file.name}" ist keine PDF-Datei` }, { status: 400 });
@@ -135,12 +145,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const client = new Anthropic({ apiKey });
-
     const results: PdfResult[] = [];
     for (const file of files) {
       try {
-        const result = await extractFromPdf(client, file);
+        const result = await extractFromPdf(file);
         results.push(result);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Unbekannter Fehler";

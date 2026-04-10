@@ -37,7 +37,7 @@ const LEAD_FIELDS = [
   { key: "website", label: "Website" },
   { key: "gewerbeart", label: "Gewerbeart" },
   { key: "branche", label: "Branche" },
-  { key: "unternehmensgroesse", label: "Unternehmensgr\u00f6\u00dfe" },
+  { key: "unternehmensgroesse", label: "Unternehmensgroesse" },
   { key: "umsatzklasse", label: "Umsatzklasse" },
   { key: "termin", label: "Termin" },
   { key: "eingangsdatum", label: "Eingangsdatum" },
@@ -57,7 +57,7 @@ const PDF_LEAD_FIELDS = [
   { key: "plz", label: "PLZ" },
   { key: "ort", label: "Ort" },
   { key: "branche", label: "Branche" },
-  { key: "unternehmensgroesse", label: "Unternehmensgr\u00f6\u00dfe" },
+  { key: "unternehmensgroesse", label: "Unternehmensgroesse" },
   { key: "umsatzklasse", label: "Umsatzklasse" },
   { key: "gewerbeart", label: "Gewerbeart" },
   { key: "notizen", label: "Notizen" },
@@ -166,7 +166,7 @@ export default function ImportPage() {
         complete: (res) => {
           const data = res.data as string[][];
           if (data.length < 2) {
-            toast.error("Datei enth\u00e4lt keine Daten");
+            toast.error("Datei enthaelt keine Daten");
             return;
           }
           setHeaders(data[0]);
@@ -188,7 +188,7 @@ export default function ImportPage() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
         if (data.length < 2) {
-          toast.error("Datei enth\u00e4lt keine Daten");
+          toast.error("Datei enthaelt keine Daten");
           return;
         }
         setHeaders(data[0].map(String));
@@ -204,7 +204,7 @@ export default function ImportPage() {
       };
       reader.readAsArrayBuffer(file);
     } else {
-      toast.error("Nur CSV und Excel (XLSX) Dateien werden unterst\u00fctzt");
+      toast.error("Nur CSV und Excel (XLSX) Dateien werden unterstuetzt");
     }
   }
 
@@ -506,7 +506,7 @@ export default function ImportPage() {
             <CardHeader>
               <CardTitle>CSV oder Excel hochladen</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Die erste Zeile wird als Spalten\u00fcberschrift verwendet
+                Die erste Zeile wird als Spaltenueberschrift verwendet
               </p>
             </CardHeader>
             <CardContent>
@@ -516,7 +516,7 @@ export default function ImportPage() {
               >
                 <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-sm font-medium">Datei hier ablegen oder klicken</p>
-                <p className="text-xs text-muted-foreground mt-1">CSV, XLSX unterst\u00fctzt</p>
+                <p className="text-xs text-muted-foreground mt-1">CSV, XLSX unterstuetzt</p>
               </div>
               <input
                 ref={fileInputRef}
@@ -538,7 +538,7 @@ export default function ImportPage() {
             <CardHeader>
               <CardTitle>PDFs mit KI analysieren</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Claude liest die PDFs und extrahiert automatisch Lead-Daten. Du kannst vor dem Import alles pr\u00fcfen und korrigieren.
+                Claude liest die PDFs und extrahiert automatisch Lead-Daten. Du kannst vor dem Import alles pruefen und korrigieren.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -557,7 +557,7 @@ export default function ImportPage() {
               >
                 <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-sm font-medium">PDFs hierher ziehen oder klicken</p>
-                <p className="text-xs text-muted-foreground mt-1">Max. 10 MB pro Datei, mehrere PDFs m\u00f6glich</p>
+                <p className="text-xs text-muted-foreground mt-1">Max. 10 MB pro Datei, mehrere PDFs moeglich</p>
               </div>
               <input
                 ref={pdfInputRef}
@@ -571,7 +571,7 @@ export default function ImportPage() {
               {/* Dateiliste */}
               {pdfFiles.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">{pdfFiles.length} Datei(en) ausgew\u00e4hlt:</p>
+                  <p className="text-sm font-medium">{pdfFiles.length} Datei(en) ausgewaehlt:</p>
                   {pdfFiles.map((f, i) => (
                     <div key={`${f.name}-${i}`} className="flex items-center justify-between rounded-lg border px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -615,9 +615,9 @@ export default function ImportPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Erkannte Leads pr\u00fcfen</CardTitle>
+                  <CardTitle>Erkannte Leads pruefen</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {fileName} \u2014 {pdfLeads.length} Lead(s) erkannt. Pr\u00fcfe und korrigiere die Daten vor dem Import.
+                    {fileName} —{pdfLeads.length} Lead(s) erkannt. Pruefe und korrigiere die Daten vor dem Import.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
