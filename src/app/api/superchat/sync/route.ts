@@ -200,27 +200,47 @@ export async function POST(req: NextRequest) {
   try {
     let contactId = lead.superchatContactId;
     let action: "create" | "update" = "create";
+    const warnings: string[] = [];
 
+    // 1. Wenn contactId vorhanden: Update versuchen, bei 404 ID verwerfen
     if (contactId) {
-      // Bestehenden Kontakt aktualisieren (ohne Handles — können durch Geister-Kontakte blockiert sein)
-      await updateContact(contactId, {
-        first_name,
-        last_name,
-        custom_attributes,
-      });
-      action = "update";
-    } else {
-      // Neuen Kontakt anlegen
+      try {
+        await updateContact(contactId, {
+          first_name,
+          last_name,
+          custom_attributes,
+        });
+        action = "update";
+      } catch (err: unknown) {
+        const e = err as Error & { status?: number };
+        if (e.status === 404) {
+          // Kontakt wurde in Superchat geloescht — ID verwerfen und neu anlegen
+          console.log(`[superchat-sync] Contact ${contactId} nicht mehr in Superchat, lege neu an`);
+          contactId = null;
+          // DB-Eintrag loeschen, damit spaeter die neue ID gespeichert wird
+          db.update(leads)
+            .set({ superchatContactId: null })
+            .where(eq(leads.id, leadId))
+            .run();
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // 2. Wenn keine contactId (oder gerade verworfen): Neu anlegen
+    if (!contactId) {
       if (!phone && !email) {
         return NextResponse.json(
-          { error: "Lead braucht Telefon oder E-Mail für Superchat-Übertragung" },
+          { error: "Lead braucht Telefon oder E-Mail fuer Superchat-Uebertragung" },
           { status: 400 }
         );
       }
+
       // Versuche Create mit verschiedenen Handle-Kombinationen bei 409
       const attempts: Array<{ phone?: string; email?: string }> = [
-        { phone, email },                          // 1. Beide Handles
-        ...(phone && email ? [{ phone }, { email }] : []),  // 2. Einzeln
+        { phone, email },
+        ...(phone && email ? [{ phone }, { email }] : []),
       ];
 
       let created = false;
@@ -241,12 +261,12 @@ export async function POST(req: NextRequest) {
         } catch (err: unknown) {
           const e = err as Error & { status?: number };
           if (e.status !== 409) throw err;
-          // 409 → nächsten Versuch probieren
+          // 409 → naechster Versuch
         }
       }
 
       if (!created) {
-        // Alle Handle-Kombinationen blockiert — Kontakt per API suchen
+        // Alle Handles blockiert → zuerst per API suchen
         const existing = (phone ? await findContactByHandle(phone) : null)
           || (email ? await findContactByHandle(email) : null);
         if (existing?.id) {
@@ -254,24 +274,46 @@ export async function POST(req: NextRequest) {
           await updateContact(contactId!, { first_name, last_name, custom_attributes });
           action = "update";
         } else {
-          // Handles existieren als Geister-Kontakte → mit Lead-spezifischer E-Mail anlegen
+          // Handles existieren als Geister-Kontakte (blockiert aber unsichtbar)
+          // Deterministische Fallback-Email: idempotent, damit derselbe Lead nicht doppelt angelegt wird
           const fallbackEmail = `lead-${leadId}@ve.voelkergroup.cloud`;
-          const result = await createContact({
-            first_name,
-            last_name,
-            email: fallbackEmail,
-            custom_attributes,
-          });
-          contactId = result.id;
-          action = "create";
+          try {
+            const result = await createContact({
+              first_name,
+              last_name,
+              email: fallbackEmail,
+              custom_attributes,
+            });
+            contactId = result.id;
+            action = "create";
+            warnings.push(`Echte Handles (${email ?? ""} ${phone ?? ""}) sind in Superchat blockiert. Fallback-Email verwendet: ${fallbackEmail}`);
+          } catch (err: unknown) {
+            const e = err as Error & { status?: number };
+            if (e.status === 409) {
+              // Fallback-Email existiert schon → den Kontakt suchen und updaten
+              const fallbackExisting = await findContactByHandle(fallbackEmail);
+              if (fallbackExisting?.id) {
+                contactId = fallbackExisting.id;
+                await updateContact(contactId!, { first_name, last_name, custom_attributes });
+                action = "update";
+                warnings.push(`Bestehender Fallback-Kontakt aktualisiert: ${fallbackEmail}`);
+              } else {
+                throw new Error(`Handles blockiert und Fallback-Kontakt nicht auffindbar`);
+              }
+            } else {
+              throw err;
+            }
+          }
         }
       }
 
-      // superchatContactId am Lead speichern
-      db.update(leads)
-        .set({ superchatContactId: contactId, updatedAt: new Date().toISOString() })
-        .where(eq(leads.id, leadId))
-        .run();
+      // Neue contactId am Lead speichern
+      if (contactId) {
+        db.update(leads)
+          .set({ superchatContactId: contactId, updatedAt: new Date().toISOString() })
+          .where(eq(leads.id, leadId))
+          .run();
+      }
     }
 
     const { userId, userName } = getAuditUser(session);
@@ -284,7 +326,19 @@ export async function POST(req: NextRequest) {
       entityName: `Superchat-Sync: ${lead.name}`,
     });
 
-    return NextResponse.json({ success: true, contactId, action });
+    return NextResponse.json({
+      success: true,
+      contactId,
+      action,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      transferred: {
+        first_name,
+        last_name,
+        phone,
+        email,
+        customAttributes: custom_attributes.length,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Superchat-Fehler";
     return NextResponse.json({ error: message }, { status: 502 });
