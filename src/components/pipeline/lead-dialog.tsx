@@ -348,27 +348,27 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
                 onChange={(e) => setForm({ ...form, termin: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Folgetermin</Label>
-              <Input
-                type="datetime-local"
-                value={form.folgetermin}
-                onChange={(e) => setForm({ ...form, folgetermin: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Folgetermin-Typ</Label>
-              <Select
-                value={form.folgeterminTyp}
-                onValueChange={(v) => setForm({ ...form, folgeterminTyp: v ?? "" })}
-              >
-                <SelectTrigger><SelectValue placeholder="Auswählen" /></SelectTrigger>
-                <SelectContent>
-                  {FOLGETERMIN_TYPEN.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-sm font-medium">Folgetermin</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="datetime-local"
+                  value={form.folgetermin}
+                  onChange={(e) => setForm({ ...form, folgetermin: e.target.value })}
+                  className="flex-1"
+                />
+                <Select
+                  value={form.folgeterminTyp}
+                  onValueChange={(v) => setForm({ ...form, folgeterminTyp: v ?? "" })}
+                >
+                  <SelectTrigger className="w-44"><SelectValue placeholder="Typ waehlen" /></SelectTrigger>
+                  <SelectContent>
+                    {FOLGETERMIN_TYPEN.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Termin-Kosten (€)</Label>
