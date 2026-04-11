@@ -425,14 +425,14 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
     ? sql`AND (${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`
     : sql``;
 
-  // Leads ohne Aktivitaet seit >7 Tagen (nicht abgeschlossen/verloren, nicht reklamiert)
+  // Leads ohne Aktivitaet seit >7 Tagen (letzte Aktivitaet zaehlt, nicht updated_at)
   const staleLeadsList = db
     .select({ id: leads.id, name: leads.name })
     .from(leads)
     .where(
       sql`${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
         AND ${leads.reklamiertAt} IS NULL
-        AND ${leads.updatedAt} < ${sevenDaysAgo}
+        AND COALESCE((SELECT MAX(a.datum) FROM activities a WHERE a.lead_id = ${leads.id}), ${leads.createdAt}) < ${sevenDaysAgo}
         ${uSql}`
     )
     .all();
@@ -449,7 +449,7 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
     });
   }
 
-  // Ueberfaellige Folgetermine
+  // Ueberfaellige Folgetermine (gleiche Logik wie Wiedervorlage: nur wenn keine Aktivitaet nach dem Folgetermin)
   const overdueList = db
     .select({ id: leads.id, name: leads.name })
     .from(leads)
@@ -458,6 +458,7 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
         AND ${leads.folgetermin} < ${nowIso}
         AND ${leads.phase} NOT IN ('Abgeschlossen', 'Verloren')
         AND ${leads.reklamiertAt} IS NULL
+        AND COALESCE((SELECT MAX(a.datum) FROM activities a WHERE a.lead_id = ${leads.id}), '') < ${leads.folgetermin}
         ${uSql}`
     )
     .all();
