@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag, Plus, CheckCircle2 } from "lucide-react";
+import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag, Plus, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
@@ -150,10 +150,15 @@ export function KanbanBoard({
   const renderLeadCard = (lead: Lead, phase: string) => {
     const now = new Date();
     const terminAbgelaufen = lead.termin && new Date(lead.termin) < now;
-    const nextDate = terminAbgelaufen && lead.folgetermin ? lead.folgetermin : lead.termin;
     const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
     const productName = lead.productId ? productMap[lead.productId] : null;
     const leadTyp = (lead as Lead & { leadTyp?: string }).leadTyp;
+
+    // Warnungen berechnen
+    const daysSinceCreated = Math.floor((now.getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceTermin = lead.termin ? Math.floor((now.getTime() - new Date(lead.termin).getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const keinTermin = !lead.termin && daysSinceCreated >= 3 && phase !== "Abgeschlossen" && phase !== "Verloren";
+    const terminOhneAktivitaet = terminAbgelaufen && daysSinceTermin !== null && daysSinceTermin >= 2 && phase !== "Abgeschlossen" && phase !== "Verloren";
 
     return (
       <Card
@@ -173,8 +178,7 @@ export function KanbanBoard({
           {lead.ansprechpartner && (
             <p className="text-xs text-muted-foreground mt-0.5 ml-4 truncate">{lead.ansprechpartner}</p>
           )}
-          {(productName || nextDate || !lead.folgetermin) && (
-            <div className="flex items-center gap-2 mt-2 ml-4 flex-wrap">
+          <div className="flex items-center gap-2 mt-2 ml-4 flex-wrap">
               {leadTyp && (
                 <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${leadTyp === "Gewerbe" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-green-300 text-green-700 bg-green-50"}`}>
                   {leadTyp}
@@ -186,11 +190,32 @@ export function KanbanBoard({
                   {productName}
                 </Badge>
               )}
-              {nextDate && (
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              {/* Termin anzeigen */}
+              {lead.termin && (
+                <span className={`flex items-center gap-1 text-[11px] ${terminAbgelaufen ? "text-muted-foreground" : "text-foreground font-medium"}`}>
                   <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                  {formatCompactDate(nextDate)}
+                  {formatCompactDate(lead.termin)}
+                </span>
+              )}
+              {/* Folgetermin separat */}
+              {lead.folgetermin && (
+                <span className="flex items-center gap-1 text-[11px] text-blue-600">
+                  <Clock className="h-3 w-3 flex-shrink-0" />
+                  {formatCompactDate(lead.folgetermin)}
                   {pushAktiv && <Bell className="h-3 w-3 text-amber-500 flex-shrink-0" />}
+                </span>
+              )}
+              {/* Warnungen */}
+              {keinTermin && (
+                <span className="flex items-center gap-0.5 text-[10px] text-amber-600" title={`Seit ${daysSinceCreated} Tagen ohne Termin`}>
+                  <AlertTriangle className="h-3 w-3" />
+                  Kein Termin
+                </span>
+              )}
+              {terminOhneAktivitaet && (
+                <span className="flex items-center gap-0.5 text-[10px] text-red-500" title={`Termin vor ${daysSinceTermin} Tagen — keine Aktivitaet`}>
+                  <AlertTriangle className="h-3 w-3" />
+                  {daysSinceTermin}d ohne Aktivitaet
                 </span>
               )}
               {/* Folgetermin Schnell-Aktionen */}
@@ -229,7 +254,6 @@ export function KanbanBoard({
                 )
               ) : null}
             </div>
-          )}
           <div className="flex items-center justify-end mt-2 -mb-0.5 -mr-1">
             <DropdownMenu>
               <DropdownMenuTrigger
