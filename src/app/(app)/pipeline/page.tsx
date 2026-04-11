@@ -324,6 +324,7 @@ function PipelineContent() {
           onPhaseChange={handlePhaseChange}
           onDelete={handleDelete}
           onArchive={handleArchive}
+          onLeadUpdate={fetchLeads}
         />
       </div>
       <LeadDialog

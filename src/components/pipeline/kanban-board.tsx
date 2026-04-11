@@ -13,7 +13,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag } from "lucide-react";
+import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag, Plus, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
 interface KanbanBoardProps {
@@ -23,6 +24,7 @@ interface KanbanBoardProps {
   onPhaseChange: (leadId: number, newPhase: string) => void;
   onDelete: (id: number) => void;
   onArchive?: (id: number) => void;
+  onLeadUpdate?: () => void;
 }
 
 const phaseColors: Record<string, string> = {
@@ -74,9 +76,32 @@ export function KanbanBoard({
   onPhaseChange,
   onDelete,
   onArchive,
+  onLeadUpdate,
 }: KanbanBoardProps) {
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [folgeterminEdit, setFolgeterminEdit] = useState<number | null>(null);
+
+  async function handleFolgeterminSet(leadId: number, datetime: string) {
+    await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: leadId, folgetermin: datetime }),
+    });
+    setFolgeterminEdit(null);
+    toast.success("Folgetermin gesetzt");
+    onLeadUpdate?.();
+  }
+
+  async function handleFolgeterminDone(leadId: number) {
+    await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: leadId, folgetermin: null, folgeterminNotified: 1 }),
+    });
+    toast.success("Folgetermin erledigt");
+    onLeadUpdate?.();
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollHint, setShowScrollHint] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -147,7 +172,7 @@ export function KanbanBoard({
           {lead.ansprechpartner && (
             <p className="text-xs text-muted-foreground mt-0.5 ml-4 truncate">{lead.ansprechpartner}</p>
           )}
-          {(productName || nextDate) && (
+          {(productName || nextDate || !lead.folgetermin) && (
             <div className="flex items-center gap-2 mt-2 ml-4 flex-wrap">
               {productName && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal">
@@ -162,6 +187,41 @@ export function KanbanBoard({
                   {pushAktiv && <Bell className="h-3 w-3 text-amber-500 flex-shrink-0" />}
                 </span>
               )}
+              {/* Folgetermin Schnell-Aktionen */}
+              {lead.folgetermin ? (
+                <button
+                  type="button"
+                  title="Folgetermin erledigt"
+                  className="flex items-center gap-0.5 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded px-1 py-0.5 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); handleFolgeterminDone(lead.id); }}
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span className="hidden sm:inline">Erledigt</span>
+                </button>
+              ) : phase !== "Abgeschlossen" && phase !== "Verloren" ? (
+                folgeterminEdit === lead.id ? (
+                  <input
+                    type="datetime-local"
+                    className="text-[11px] border rounded px-1 py-0.5 w-40"
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onBlur={() => setFolgeterminEdit(null)}
+                    onChange={(e) => {
+                      if (e.target.value) handleFolgeterminSet(lead.id, e.target.value);
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    title="Folgetermin setzen"
+                    className="flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-primary hover:bg-accent rounded px-1 py-0.5 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); setFolgeterminEdit(lead.id); }}
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span className="hidden sm:inline">Folgetermin</span>
+                  </button>
+                )
+              ) : null}
             </div>
           )}
           <div className="flex items-center justify-end mt-2 -mb-0.5 -mr-1">
