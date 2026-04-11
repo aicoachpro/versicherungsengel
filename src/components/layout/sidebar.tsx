@@ -186,14 +186,23 @@ export function Sidebar() {
           </div>
 
           {/* Overlay */}
-          {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setMobileOpen(false)} />}
+          <div
+            className={cn(
+              "fixed inset-0 z-40 bg-black/50 transition-opacity duration-200",
+              mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+            onClick={() => setMobileOpen(false)}
+          />
 
           {/* Sidebar Overlay */}
-          {mobileOpen && (
-            <aside className="fixed z-50 flex h-screen w-64 flex-col bg-sidebar backdrop-blur-xl text-sidebar-foreground border-r border-sidebar-border">
-              {sidebarContent}
-            </aside>
-          )}
+          <aside
+            className={cn(
+              "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col bg-sidebar backdrop-blur-xl text-sidebar-foreground border-r border-sidebar-border transition-transform duration-200 ease-in-out",
+              mobileOpen ? "translate-x-0" : "-translate-x-full"
+            )}
+          >
+            {sidebarContent}
+          </aside>
 
           {/* Bottom Nav */}
           <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground">
