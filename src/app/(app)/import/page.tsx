@@ -58,6 +58,7 @@ const PDF_LEAD_FIELDS = [
   { key: "plz", label: "PLZ" },
   { key: "ort", label: "Ort" },
   { key: "produkt", label: "Produkt / Sparte" },
+  { key: "leadTyp", label: "Lead-Typ (Gewerbe/Privat)" },
   { key: "branche", label: "Branche" },
   { key: "unternehmensgroesse", label: "Unternehmensgroesse" },
   { key: "umsatzklasse", label: "Umsatzklasse" },

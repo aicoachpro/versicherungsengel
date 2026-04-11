@@ -110,8 +110,9 @@ export default function WiedervorlagePage() {
     );
 
     for (const lead of activeLeads) {
+      // System-Aktivitaeten (Auto-Import) ignorieren fuer Wiedervorlage-Logik
       const leadActivities = allActivities
-        .filter((a) => a.leadId === lead.id)
+        .filter((a) => a.leadId === lead.id && a.kontaktart !== "System")
         .sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime());
       const lastActivity = leadActivities[0]?.datum || null;
       const daysSinceActivity = lastActivity
