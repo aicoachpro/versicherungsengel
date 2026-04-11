@@ -156,9 +156,7 @@ export function KanbanBoard({
 
     // Warnungen berechnen
     const daysSinceCreated = Math.floor((now.getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-    const daysSinceTermin = lead.termin ? Math.floor((now.getTime() - new Date(lead.termin).getTime()) / (1000 * 60 * 60 * 24)) : null;
     const keinTermin = !lead.termin && daysSinceCreated >= 3 && phase !== "Abgeschlossen" && phase !== "Verloren";
-    const terminOhneAktivitaet = terminAbgelaufen && daysSinceTermin !== null && daysSinceTermin >= 2 && phase !== "Abgeschlossen" && phase !== "Verloren";
 
     return (
       <Card
@@ -213,12 +211,6 @@ export function KanbanBoard({
                 <span className="flex items-center gap-0.5 text-[10px] text-amber-600" title={`Seit ${daysSinceCreated} Tagen ohne Termin`}>
                   <AlertTriangle className="h-3 w-3" />
                   Kein Termin
-                </span>
-              )}
-              {terminOhneAktivitaet && (
-                <span className="flex items-center gap-0.5 text-[10px] text-red-500" title={`Termin vor ${daysSinceTermin} Tagen`}>
-                  <AlertTriangle className="h-3 w-3" />
-                  {daysSinceTermin}d
                 </span>
               )}
               {/* Folgetermin Schnell-Aktionen */}
