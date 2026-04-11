@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, leadProducts } from "@/db/schema";
+import { leads, leadProducts, activities } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { parseTermin } from "@/lib/parse-termin";
@@ -90,6 +90,21 @@ export async function POST(req: NextRequest) {
         productId,
       };
       const result = db.insert(leads).values(values).returning().get();
+
+      // Automatische Aktivitaet erstellen
+      const quelle = row.providerId ? "Lead-Import (Provider)" : "Manueller Import";
+      const notizTeile = [
+        `Lead importiert via ${quelle}`,
+        row.produkt ? `Produkt: ${row.produkt}` : null,
+        row.notizen ? `KI-Notizen: ${row.notizen}` : null,
+      ].filter(Boolean);
+
+      db.insert(activities).values({
+        leadId: result.id,
+        datum: new Date().toISOString(),
+        kontaktart: "System",
+        notiz: notizTeile.join("\n"),
+      }).run();
 
       results.push({ row: i + 1, success: true, name: result.name });
     } catch (err) {
