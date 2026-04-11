@@ -36,6 +36,7 @@ export default function ArchivPage() {
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "Abgeschlossen" | "Verloren">("all");
   const [loading, setLoading] = useState(true);
 
   const fetchLeads = useCallback(async () => {
@@ -66,6 +67,7 @@ export default function ArchivPage() {
   };
 
   const filtered = leads.filter((l) => {
+    if (statusFilter !== "all" && l.phase !== statusFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -75,26 +77,56 @@ export default function ArchivPage() {
     );
   });
 
+  const countByPhase = (phase: string) => leads.filter((l) => l.phase === phase).length;
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Archiv" />
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Archive className="h-5 w-5 text-muted-foreground" />
                 <CardTitle>Archivierte Leads</CardTitle>
                 <Badge variant="secondary">{leads.length}</Badge>
               </div>
-              <div className="relative max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Suchen..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9"
-                />
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-md border overflow-hidden">
+                  <Button
+                    variant={statusFilter === "all" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-none h-8 text-xs"
+                    onClick={() => setStatusFilter("all")}
+                  >
+                    Alle
+                  </Button>
+                  <Button
+                    variant={statusFilter === "Abgeschlossen" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-none h-8 text-xs border-x"
+                    onClick={() => setStatusFilter("Abgeschlossen")}
+                  >
+                    Abgeschlossen ({countByPhase("Abgeschlossen")})
+                  </Button>
+                  <Button
+                    variant={statusFilter === "Verloren" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-none h-8 text-xs"
+                    onClick={() => setStatusFilter("Verloren")}
+                  >
+                    Kein Abschluss ({countByPhase("Verloren")})
+                  </Button>
+                </div>
+                <div className="relative max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Suchen..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -130,7 +162,7 @@ export default function ArchivPage() {
                       <TableCell>{lead.branche || "–"}</TableCell>
                       <TableCell>
                         <Badge className={phaseColors[lead.phase] || "bg-gray-100 text-gray-800"}>
-                          {lead.phase}
+                          {lead.phase === "Verloren" ? "Kein Abschluss" : lead.phase}
                         </Badge>
                       </TableCell>
                       <TableCell>
