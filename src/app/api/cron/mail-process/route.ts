@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, inboundEmails, leadProducts, emailAccounts, leadAssignmentRules, providerProducts, leadProviders } from "@/db/schema";
+import { leads, inboundEmails, leadProducts, emailAccounts, leadAssignmentRules, providerProducts, leadProviders, activities } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { extractLeadFromEmail } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
@@ -233,6 +233,22 @@ export async function GET(req: NextRequest) {
         })
         .returning()
         .get();
+
+      // Automatische Aktivitaet: Lead-Eingang per Mail
+      const providerName = providerId
+        ? db.select({ name: leadProviders.name }).from(leadProviders).where(eq(leadProviders.id, providerId)).get()?.name
+        : null;
+      db.insert(activities).values({
+        leadId: newLead.id,
+        datum: new Date().toISOString(),
+        kontaktart: "System",
+        notiz: [
+          `Lead eingegangen via E-Mail`,
+          providerName ? `Anbieter: ${providerName}` : null,
+          leadData.produkt ? `Produkt: ${leadData.produkt}` : null,
+          `Betreff: ${email.subject || "—"}`,
+        ].filter(Boolean).join("\n"),
+      }).run();
 
       // E-Mail als verarbeitet markieren
       db.update(inboundEmails)
