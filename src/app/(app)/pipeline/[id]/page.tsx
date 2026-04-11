@@ -161,7 +161,7 @@ const SPARTEN = [
 ];
 
 const KONTAKTARTEN = [
-  "Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "Sonstiges",
+  "Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "Onlinetermin", "LinkedIn", "Sonstiges",
 ];
 
 const DOKUMENT_TYPEN = ["Angebot", "Police", "Beratungsprotokoll", "Gesprächsleitfaden", "E-Mail", "Sonstiges"];
@@ -180,6 +180,7 @@ const kontaktartIcons: Record<string, string> = {
   "E-Mail": "📧",
   "WhatsApp": "💬",
   "Vor-Ort": "🏢",
+  "Onlinetermin": "🖥️",
   "LinkedIn": "💼",
   "Sonstiges": "📝",
 };

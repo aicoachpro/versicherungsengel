@@ -110,7 +110,7 @@ export const activities = sqliteTable("activities", {
   leadId: integer("lead_id").notNull().references(() => leads.id),
   datum: text("datum").notNull(),
   kontaktart: text("kontaktart", {
-    enum: ["Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "System", "Sonstiges"],
+    enum: ["Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "Onlinetermin", "LinkedIn", "System", "Sonstiges"],
   }).notNull(),
   notiz: text("notiz"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),

@@ -64,7 +64,7 @@ interface WiedervorlageItem {
   daysSinceActivity: number | null;
 }
 
-const KONTAKTARTEN = ["Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "LinkedIn", "Sonstiges"];
+const KONTAKTARTEN = ["Telefon", "E-Mail", "WhatsApp", "Vor-Ort", "Onlinetermin", "LinkedIn", "Sonstiges"];
 
 export default function WiedervorlagePage() {
   const router = useRouter();
