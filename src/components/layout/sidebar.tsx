@@ -68,7 +68,14 @@ export function Sidebar() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const branding = useBranding();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const check = () => setIsDesktop(window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -92,146 +99,127 @@ export function Sidebar() {
     );
   };
 
-  return (
+  const sidebarContent = (
     <>
-      {/* Mobile Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/80 backdrop-blur-xl px-4 text-sidebar-foreground lg:hidden">
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="rounded-md p-1.5 hover:bg-sidebar-accent"
-          aria-label="Menü öffnen"
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-        <Image src={branding.logo} alt="Logo" width={28} height={28} className="rounded" />
-        <span className="text-sm font-semibold tracking-tight">{branding.companyName}</span>
+      {/* Logo */}
+      <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
+        <Image src={branding.logo} alt={branding.companyName} width={36} height={36} className="rounded-[10px]" />
+        <div>
+          <p className="text-[13px] font-semibold leading-tight tracking-tight text-sidebar-foreground">{branding.companyName}</p>
+          {branding.subtitle && <p className="text-[11px] text-sidebar-foreground/40 font-medium">{branding.subtitle}</p>}
+        </div>
       </div>
 
-      {/* Overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed z-50 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground transition-transform duration-200 lg:relative lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-          !mobileOpen && "max-lg:invisible"
-        )}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
-          <Image
-            src={branding.logo}
-            alt={branding.companyName}
-            width={36}
-            height={36}
-            className="rounded-[10px]"
-          />
-          <div>
-            <p className="text-[13px] font-semibold leading-tight tracking-tight text-sidebar-foreground">{branding.companyName}</p>
-            {branding.subtitle && <p className="text-[11px] text-sidebar-foreground/40 font-medium">{branding.subtitle}</p>}
-          </div>
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="space-y-1">
+          {mainNav.map((item) => (
+            <NavLink key={item.href} {...item} />
+          ))}
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-1">
-            {mainNav.map((item) => (
-              <NavLink key={item.href} {...item} />
-            ))}
-          </div>
-
-          {isAdmin && (
-            <>
-              <div className="my-4 mx-3 border-t border-sidebar-border" />
-              <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/30">
-                Admin
-              </p>
-              <div className="space-y-1">
-                {adminNav.map((item) => (
-                  <NavLink key={item.href} {...item} />
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="my-4 mx-3 border-t border-sidebar-border" />
-          <div className="space-y-1">
-            {settingsNav.map((item) => (
-              <NavLink key={item.href} {...item} />
-            ))}
-          </div>
-        </nav>
-
-        {/* Theme Toggle — Light / Dark / System */}
-        {mounted && (
-          <div className="mx-3 mb-2 flex items-center rounded-xl bg-sidebar-accent/40 p-1">
-            {([
-              { value: "light", icon: Sun, label: "Hell" },
-              { value: "system", icon: Monitor, label: "Auto" },
-              { value: "dark", icon: Moon, label: "Dunkel" },
-            ] as const).map(({ value, icon: Icon, label }) => (
-              <button
-                key={value}
-                onClick={() => setTheme(value)}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all duration-200",
-                  theme === value
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            ))}
-          </div>
+        {isAdmin && (
+          <>
+            <div className="my-4 mx-3 border-t border-sidebar-border" />
+            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/30">Admin</p>
+            <div className="space-y-1">
+              {adminNav.map((item) => (
+                <NavLink key={item.href} {...item} />
+              ))}
+            </div>
+          </>
         )}
-
-        {/* Footer */}
-        <div className="border-t border-sidebar-border px-5 py-4">
-          <div className="flex items-center gap-2 text-[11px] text-sidebar-foreground/30 font-medium">
-            <Shield className="h-3.5 w-3.5" />
-            {branding.subtitle || branding.companyName}
-          </div>
+        <div className="my-4 mx-3 border-t border-sidebar-border" />
+        <div className="space-y-1">
+          {settingsNav.map((item) => (
+            <NavLink key={item.href} {...item} />
+          ))}
         </div>
-      </aside>
+      </nav>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground lg:hidden">
-        {mobileBottomNav.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
+      {/* Theme Toggle */}
+      {mounted && (
+        <div className="mx-3 mb-2 flex items-center rounded-xl bg-sidebar-accent/40 p-1">
+          {([
+            { value: "light", icon: Sun, label: "Hell" },
+            { value: "system", icon: Monitor, label: "Auto" },
+            { value: "dark", icon: Moon, label: "Dunkel" },
+          ] as const).map(({ value, icon: Icon, label }) => (
+            <button
+              key={value}
+              onClick={() => setTheme(value)}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors",
-                isActive
-                  ? "text-primary"
-                  : "text-sidebar-foreground/50"
+                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all duration-200",
+                theme === value
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-sidebar-foreground/50 hover:text-sidebar-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-3.5 w-3.5" />
               {label}
-            </Link>
-          );
-        })}
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className={cn(
-            "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors text-sidebar-foreground/50"
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="border-t border-sidebar-border px-5 py-4">
+        <div className="flex items-center gap-2 text-[11px] text-sidebar-foreground/30 font-medium">
+          <Shield className="h-3.5 w-3.5" />
+          {branding.subtitle || branding.companyName}
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* === MOBILE: Header + Overlay + Sidebar als Overlay === */}
+      {!isDesktop && (
+        <>
+          {/* Top Bar */}
+          <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/80 backdrop-blur-xl px-4 text-sidebar-foreground">
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="rounded-md p-1.5 hover:bg-sidebar-accent" aria-label="Menue">
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            <Image src={branding.logo} alt="Logo" width={28} height={28} className="rounded" />
+            <span className="text-sm font-semibold tracking-tight">{branding.companyName}</span>
+          </div>
+
+          {/* Overlay */}
+          {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setMobileOpen(false)} />}
+
+          {/* Sidebar Overlay */}
+          {mobileOpen && (
+            <aside className="fixed z-50 flex h-screen w-64 flex-col bg-sidebar backdrop-blur-xl text-sidebar-foreground border-r border-sidebar-border">
+              {sidebarContent}
+            </aside>
           )}
-        >
-          <MoreHorizontal className="h-5 w-5" />
-          Mehr
-        </button>
-      </nav>
+
+          {/* Bottom Nav */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground">
+            {mobileBottomNav.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href || pathname.startsWith(href + "/");
+              return (
+                <Link key={href} href={href} className={cn("flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors", isActive ? "text-primary" : "text-sidebar-foreground/50")}>
+                  <Icon className="h-5 w-5" />
+                  {label}
+                </Link>
+              );
+            })}
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium text-sidebar-foreground/50">
+              <MoreHorizontal className="h-5 w-5" />
+              Mehr
+            </button>
+          </nav>
+        </>
+      )}
+
+      {/* === DESKTOP: Sidebar fest im Layout === */}
+      {isDesktop && (
+        <aside className="relative flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground flex-shrink-0">
+          {sidebarContent}
+        </aside>
+      )}
     </>
   );
 }
