@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { SpeechInput } from "@/components/ui/speech-input";
 import {
   Dialog,
   DialogContent,
@@ -1256,7 +1257,10 @@ export default function LeadDetailPage() {
               Der Lead wird als reklamiert markiert. Sobald VersicherungsEngel die Genehmigung erteilt, werden die Terminkosten ({lead.terminKosten || 320}€) gutgeschrieben.
             </p>
             <div>
-              <Label>Begründung (optional)</Label>
+              <div className="flex items-center gap-1">
+                <Label>Begruendung (optional)</Label>
+                <SpeechInput onTranscript={(t) => setReklamationNotiz((v) => v ? v + " " + t : t)} />
+              </div>
               <Textarea
                 value={reklamationNotiz}
                 onChange={(e) => setReklamationNotiz(e.target.value)}
@@ -1314,7 +1318,10 @@ export default function LeadDetailPage() {
               </div>
             </div>
             <div>
-              <Label>Notiz</Label>
+              <div className="flex items-center gap-1">
+                <Label>Notiz</Label>
+                <SpeechInput onTranscript={(t) => setActivityForm((f) => ({ ...f, notiz: f.notiz ? f.notiz + " " + t : t }))} />
+              </div>
               <Textarea
                 value={activityForm.notiz}
                 onChange={(e) => setActivityForm({ ...activityForm, notiz: e.target.value })}

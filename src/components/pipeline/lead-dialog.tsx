@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SpeechInput } from "@/components/ui/speech-input";
 import {
   Select,
   SelectContent,
@@ -380,14 +381,20 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Nächster Schritt</Label>
+            <div className="flex items-center gap-1">
+              <Label>Naechster Schritt</Label>
+              <SpeechInput onTranscript={(t) => setForm((f) => ({ ...f, naechsterSchritt: f.naechsterSchritt ? f.naechsterSchritt + " " + t : t }))} />
+            </div>
             <Input
               value={form.naechsterSchritt}
               onChange={(e) => setForm({ ...form, naechsterSchritt: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label>Notizen</Label>
+            <div className="flex items-center gap-1">
+              <Label>Notizen</Label>
+              <SpeechInput onTranscript={(t) => setForm((f) => ({ ...f, notizen: f.notizen ? f.notizen + " " + t : t }))} />
+            </div>
             <Textarea
               value={form.notizen}
               onChange={(e) => setForm({ ...form, notizen: e.target.value })}
