@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users, leadProviders, providerProducts, leadProducts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { chat } from "@/lib/ai-client";
 
 async function requireAdmin() {
   const session = await auth();
@@ -152,6 +153,7 @@ export async function POST(
   let matched = 0;
   let skipped = 0;
   const results: { sparte: string; preis: number; matched: boolean }[] = [];
+  const unmatchedItems: { sparte: string; preis: number }[] = [];
 
   // Bestehende purchased-Flags merken bevor wir die Preise neu setzen
   const existingPurchased = db
@@ -232,7 +234,6 @@ export async function POST(
 
     const label = sparte || kuerzel;
     if (productId) {
-      // purchased-Flag aus alten Daten uebernehmen (standardmaessig false)
       db.insert(providerProducts)
         .values({
           providerId,
@@ -244,8 +245,67 @@ export async function POST(
       matched++;
       results.push({ sparte: label, preis, matched: true });
     } else {
-      skipped++;
-      results.push({ sparte: label, preis, matched: false });
+      unmatchedItems.push({ sparte: label, preis });
+    }
+  }
+
+  // KI-Fallback fuer nicht-gematchte Sparten (z.B. Allianz "Krankenzusatz und Pflege")
+  if (unmatchedItems.length > 0) {
+    try {
+      const productList = allProducts.map((p) => `${p.id}: ${p.kuerzel ? `[${p.kuerzel}] ` : ""}${p.name}`).join("\n");
+      const spartenList = unmatchedItems.map((u) => u.sparte).join("\n");
+
+      const aiResponse = await chat([
+        {
+          role: "system",
+          content: `Du bist Versicherungs-Experte. Ordne die folgenden Lead-Anbieter-Sparten den passenden Produkten zu.
+
+PRODUKTE (id: [kuerzel] name):
+${productList}
+
+Gib NUR ein JSON-Array zurueck. Fuer jede Sparte ein Objekt:
+{"sparte": "Krankenzusatz und Pflege", "productId": 11, "confidence": 0.9}
+
+Regeln:
+- Nur mappen bei echter Entsprechung (confidence >= 0.6)
+- Bei keinem passenden Produkt: productId = null
+- "Privat Sach" kann Hausrat ODER Wohngebaeude sein — nimm das uebergeordnetere
+- "Uebergreifende Beratung" = "Beratung"
+- NUR JSON, kein anderer Text`,
+        },
+        { role: "user", content: spartenList },
+      ]);
+
+      const aiMappings = JSON.parse(
+        aiResponse.content.replace(/```json?\s*/g, "").replace(/```/g, "").trim()
+      );
+
+      for (const mapping of aiMappings) {
+        const item = unmatchedItems.find((u) => u.sparte === mapping.sparte);
+        if (!item) continue;
+
+        if (mapping.productId && mapping.confidence >= 0.6) {
+          db.insert(providerProducts)
+            .values({
+              providerId,
+              productId: mapping.productId,
+              costPerLead: item.preis,
+              purchased: purchasedSet.has(mapping.productId),
+            })
+            .run();
+          matched++;
+          results.push({ sparte: item.sparte, preis: item.preis, matched: true });
+        } else {
+          skipped++;
+          results.push({ sparte: item.sparte, preis: item.preis, matched: false });
+        }
+      }
+    } catch {
+      // KI nicht erreichbar — alle als unmatched zaehlen
+      for (const item of unmatchedItems) {
+        skipped++;
+        results.push({ sparte: item.sparte, preis: item.preis, matched: false });
+      }
     }
   }
 

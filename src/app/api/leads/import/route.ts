@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, leadProducts, activities } from "@/db/schema";
+import { leads, leadProducts, activities, providerProducts } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { parseTermin } from "@/lib/parse-termin";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 interface ImportLead {
   name: string;
@@ -28,6 +28,15 @@ interface ImportLead {
   produkt?: string;
   leadTyp?: string;
   providerId?: number;
+}
+
+function lookupProviderPrice(providerId?: number, productId?: number | null): number | null {
+  if (!providerId || !productId) return null;
+  const pp = db.select({ costPerLead: providerProducts.costPerLead })
+    .from(providerProducts)
+    .where(sql`${providerProducts.providerId} = ${providerId} AND ${providerProducts.productId} = ${productId}`)
+    .get();
+  return pp?.costPerLead ?? null;
 }
 
 export async function POST(req: NextRequest) {
@@ -81,7 +90,7 @@ export async function POST(req: NextRequest) {
         umsatzklasse: row.umsatzklasse?.trim() || null,
         termin: parseTermin(row.termin?.trim()) || null,
         eingangsdatum: row.eingangsdatum?.trim() || new Date().toISOString().split("T")[0],
-        terminKosten: row.terminKosten ?? 320,
+        terminKosten: row.terminKosten ?? lookupProviderPrice(row.providerId, productId) ?? 320,
         umsatz: row.umsatz || null,
         notizen: row.notizen?.trim() || null,
         naechsterSchritt: row.naechsterSchritt?.trim() || null,
