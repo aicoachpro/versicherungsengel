@@ -67,7 +67,6 @@ const PHASES = [
   "Follow-up",
   "Angebot erstellt",
   "Abgeschlossen",
-  "Verloren",
 ] as const;
 
 const OPEN_PHASES = ["Termin eingegangen", "Termin stattgefunden", "Follow-up", "Angebot erstellt"];
@@ -202,6 +201,21 @@ function PipelineContent() {
     fetchLeads();
   };
 
+  const handleLost = async (id: number) => {
+    await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, phase: "Verloren", conversion: 0 }),
+    });
+    await fetch("/api/leads/archive", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    toast.success("Lead als verloren markiert und archiviert");
+    fetchLeads();
+  };
+
   const clearFilter = () => {
     setActiveFilter(null);
     window.history.replaceState(null, "", "/pipeline");
@@ -330,6 +344,7 @@ function PipelineContent() {
           onPhaseChange={handlePhaseChange}
           onDelete={handleDelete}
           onArchive={handleArchive}
+          onLost={handleLost}
           onLeadUpdate={fetchLeads}
         />
       </div>

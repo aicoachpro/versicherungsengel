@@ -24,6 +24,7 @@ interface KanbanBoardProps {
   onPhaseChange: (leadId: number, newPhase: string) => void;
   onDelete: (id: number) => void;
   onArchive?: (id: number) => void;
+  onLost?: (id: number) => void;
   onLeadUpdate?: () => void;
 }
 
@@ -76,6 +77,7 @@ export function KanbanBoard({
   onPhaseChange,
   onDelete,
   onArchive,
+  onLost,
   onLeadUpdate,
 }: KanbanBoardProps) {
   const router = useRouter();
@@ -156,7 +158,7 @@ export function KanbanBoard({
 
     // Warnungen berechnen
     const daysSinceCreated = Math.floor((now.getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-    const keinTermin = !lead.termin && daysSinceCreated >= 3 && phase !== "Abgeschlossen" && phase !== "Verloren";
+    const keinTermin = !lead.termin && daysSinceCreated >= 3 && phase !== "Abgeschlossen";
 
     return (
       <Card
@@ -224,7 +226,7 @@ export function KanbanBoard({
                   <CheckCircle2 className="h-3 w-3" />
                   <span className="hidden sm:inline">Erledigt</span>
                 </button>
-              ) : phase !== "Abgeschlossen" && phase !== "Verloren" ? (
+              ) : phase !== "Abgeschlossen" ? (
                 folgeterminEdit === lead.id ? (
                   <input
                     type="datetime-local"
@@ -259,11 +261,20 @@ export function KanbanBoard({
                 <MoreVertical className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
-                {onArchive && (phase === "Abgeschlossen" || phase === "Verloren") && (
+                {onArchive && phase === "Abgeschlossen" && (
                   <>
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}>
                       <Archive className="h-4 w-4" />
                       Archivieren
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {onLost && phase !== "Abgeschlossen" && (
+                  <>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLost(lead.id); }}>
+                      <Inbox className="h-4 w-4" />
+                      Kein Abschluss
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
