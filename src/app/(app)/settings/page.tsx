@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/header";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import {
   Smartphone,
   Building2,
   BookOpen,
+  FolderOpen,
   Bell,
   Send,
   Mail,
@@ -3553,14 +3554,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <SettingsSection
-              icon={<BookOpen className="h-5 w-5" />}
-              title="Obsidian"
-              description="Vault-Pfad für automatischen Report-Export. Ohne Pfad werden Reports als Download angeboten."
-              fields={OBSIDIAN_FIELDS}
-              settings={settings}
-              onSave={saveSection}
-            />
+            <ObsidianSettings settings={settings} onSave={saveSection} />
           </>
         )}
 
@@ -3799,5 +3793,146 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// === Obsidian Settings mit Ordner-Browser ===
+
+interface BrowseDir {
+  name: string;
+  path: string;
+  isObsidianVault: boolean;
+}
+
+function ObsidianSettings({
+  settings,
+  onSave,
+}: {
+  settings: SettingsMap;
+  onSave: (values: SettingsMap) => Promise<void>;
+}) {
+  const [vaultPath, setVaultPath] = useState(settings["obsidian.vaultPath"] || "");
+  const [reportFolder, setReportFolder] = useState(settings["obsidian.reportFolder"] || "");
+  const [saving, setSaving] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseDir, setBrowseDir] = useState("/");
+  const [browseDirs, setBrowseDirs] = useState<BrowseDir[]>([]);
+  const [browseParent, setBrowseParent] = useState<string | null>(null);
+  const [browseError, setBrowseError] = useState("");
+
+  useEffect(() => {
+    setVaultPath(settings["obsidian.vaultPath"] || "");
+    setReportFolder(settings["obsidian.reportFolder"] || "");
+  }, [settings]);
+
+  const loadDir = async (dir: string) => {
+    try {
+      setBrowseError("");
+      const res = await fetch(`/api/browse-dirs?path=${encodeURIComponent(dir)}`);
+      const data = await res.json();
+      if (!res.ok) { setBrowseError(data.error); return; }
+      setBrowseDir(data.current);
+      setBrowseDirs(data.dirs);
+      setBrowseParent(data.parent);
+      if (data.isObsidianVault) {
+        setVaultPath(data.current);
+      }
+    } catch {
+      setBrowseError("Verbindung fehlgeschlagen");
+    }
+  };
+
+  const startBrowsing = () => {
+    setBrowsing(true);
+    loadDir(vaultPath || "/");
+  };
+
+  const selectVault = (dir: string) => {
+    setVaultPath(dir);
+    setBrowsing(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ "obsidian.vaultPath": vaultPath, "obsidian.reportFolder": reportFolder });
+    setSaving(false);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5" />
+          <div>
+            <CardTitle className="text-base">Obsidian</CardTitle>
+            <p className="text-sm text-muted-foreground">Vault-Pfad für automatischen Report-Export. Ohne Pfad werden Reports als Download angeboten.</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Vault-Pfad</Label>
+          <div className="flex gap-2">
+            <Input
+              value={vaultPath}
+              onChange={(e) => setVaultPath(e.target.value)}
+              placeholder="/Users/name/Obsidian/MeinVault"
+              className="flex-1"
+            />
+            <Button variant="outline" size="sm" onClick={startBrowsing} className="whitespace-nowrap">
+              <FolderOpen className="h-4 w-4 mr-1" />
+              Durchsuchen
+            </Button>
+          </div>
+        </div>
+
+        {browsing && (
+          <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <FolderOpen className="h-3.5 w-3.5" />
+              <span className="font-mono truncate flex-1">{browseDir}</span>
+              {browseParent && (
+                <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => loadDir(browseParent)}>
+                  ↑ Hoch
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => setBrowsing(false)}>
+                ✕
+              </Button>
+            </div>
+            {browseError && <p className="text-xs text-destructive">{browseError}</p>}
+            <div className="max-h-48 overflow-y-auto space-y-0.5">
+              {browseDirs.length === 0 && !browseError && (
+                <p className="text-xs text-muted-foreground py-2 text-center">Keine Unterordner</p>
+              )}
+              {browseDirs.map((d) => (
+                <button
+                  key={d.path}
+                  className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent flex items-center gap-2 ${d.isObsidianVault ? "bg-primary/10 font-medium" : ""}`}
+                  onClick={() => d.isObsidianVault ? selectVault(d.path) : loadDir(d.path)}
+                >
+                  <FolderOpen className={`h-3.5 w-3.5 flex-shrink-0 ${d.isObsidianVault ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="truncate">{d.name}</span>
+                  {d.isObsidianVault && <Badge variant="default" className="text-[10px] ml-auto">Vault</Badge>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label>Report-Ordner im Vault</Label>
+          <Input
+            value={reportFolder}
+            onChange={(e) => setReportFolder(e.target.value)}
+            placeholder="Reports/Sales Hub"
+          />
+        </div>
+
+        <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90">
+          {saving ? "Speichern..." : "Speichern"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
