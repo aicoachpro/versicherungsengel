@@ -182,7 +182,12 @@ function PipelineContent() {
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`/api/leads?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/leads?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Löschen fehlgeschlagen");
+      return;
+    }
     toast.success("Lead gelöscht");
     fetchLeads();
   };
