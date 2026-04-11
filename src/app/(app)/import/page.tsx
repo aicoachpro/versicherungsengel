@@ -48,20 +48,22 @@ const LEAD_FIELDS = [
 
 // Alle editierbaren Lead-Felder fuer PDF-Preview
 const PDF_LEAD_FIELDS = [
-  { key: "name", label: "Firma *" },
+  { key: "name", label: "Firma / Name *" },
   { key: "ansprechpartner", label: "Ansprechpartner" },
   { key: "email", label: "E-Mail" },
   { key: "telefon", label: "Telefon" },
   { key: "website", label: "Website" },
-  { key: "strasse", label: "Stra\u00dfe" },
+  { key: "strasse", label: "Strasse" },
   { key: "plz", label: "PLZ" },
   { key: "ort", label: "Ort" },
+  { key: "produkt", label: "Produkt / Sparte" },
   { key: "branche", label: "Branche" },
   { key: "unternehmensgroesse", label: "Unternehmensgroesse" },
   { key: "umsatzklasse", label: "Umsatzklasse" },
   { key: "gewerbeart", label: "Gewerbeart" },
-  { key: "notizen", label: "Notizen" },
-];
+  { key: "naechsterSchritt", label: "Naechster Schritt" },
+  { key: "notizen", label: "Notizen", multiline: true },
+] as const;
 
 // Auto-Mapping: versuche Spaltenname auf Lead-Feld zu matchen
 function autoMap(header: string): string {
@@ -687,16 +689,27 @@ export default function ImportPage() {
                   </div>
                   {!lead._saved && (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {PDF_LEAD_FIELDS.map(({ key, label }) => (
-                        <div key={key} className="space-y-1">
-                          <Label className="text-xs">{label}</Label>
-                          <Input
-                            value={String(lead[key] || "")}
-                            onChange={(e) => updatePdfLead(i, key, e.target.value)}
-                            className={`h-8 text-sm ${
-                              isFieldUncertain(lead, key) ? "border-amber-400 bg-amber-50" : ""
-                            }`}
-                          />
+                      {PDF_LEAD_FIELDS.map((field) => (
+                        <div key={field.key} className={`space-y-1 ${"multiline" in field && field.multiline ? "sm:col-span-2 lg:col-span-3" : ""}`}>
+                          <Label className="text-xs">{field.label}</Label>
+                          {"multiline" in field && field.multiline ? (
+                            <textarea
+                              value={String(lead[field.key] || "")}
+                              onChange={(e) => updatePdfLead(i, field.key, e.target.value)}
+                              rows={2}
+                              className={`w-full rounded-md border px-3 py-1.5 text-sm resize-y ${
+                                isFieldUncertain(lead, field.key) ? "border-amber-400 bg-amber-50" : "border-input bg-background"
+                              }`}
+                            />
+                          ) : (
+                            <Input
+                              value={String(lead[field.key] || "")}
+                              onChange={(e) => updatePdfLead(i, field.key, e.target.value)}
+                              className={`h-8 text-sm ${
+                                isFieldUncertain(lead, field.key) ? "border-amber-400 bg-amber-50" : ""
+                              }`}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>

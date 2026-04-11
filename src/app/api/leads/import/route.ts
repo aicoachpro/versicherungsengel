@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads } from "@/db/schema";
+import { leads, leadProducts } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { parseTermin } from "@/lib/parse-termin";
+import { eq } from "drizzle-orm";
 
 interface ImportLead {
   name: string;
@@ -11,6 +12,9 @@ interface ImportLead {
   email?: string;
   telefon?: string;
   website?: string;
+  strasse?: string;
+  plz?: string;
+  ort?: string;
   gewerbeart?: string;
   branche?: string;
   unternehmensgroesse?: string;
@@ -20,6 +24,9 @@ interface ImportLead {
   terminKosten?: number;
   umsatz?: number;
   notizen?: string;
+  naechsterSchritt?: string;
+  produkt?: string;
+  providerId?: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -43,6 +50,19 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+      // Produkt-Name zu productId aufloesen
+      let productId: number | null = null;
+      if (row.produkt?.trim()) {
+        const produktName = row.produkt.trim().toLowerCase();
+        const allProducts = db.select().from(leadProducts).all();
+        const match = allProducts.find((p) =>
+          p.name.toLowerCase() === produktName ||
+          p.name.toLowerCase().includes(produktName) ||
+          produktName.includes(p.name.toLowerCase())
+        );
+        if (match) productId = match.id;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const values: any = {
         name: row.name.trim(),
@@ -51,6 +71,9 @@ export async function POST(req: NextRequest) {
         email: row.email?.trim() || null,
         telefon: row.telefon?.trim() || null,
         website: row.website?.trim() || null,
+        strasse: row.strasse?.trim() || null,
+        plz: row.plz?.trim() || null,
+        ort: row.ort?.trim() || null,
         gewerbeart: row.gewerbeart?.trim() || null,
         branche: row.branche?.trim() || null,
         unternehmensgroesse: row.unternehmensgroesse?.trim() || null,
@@ -60,6 +83,9 @@ export async function POST(req: NextRequest) {
         terminKosten: row.terminKosten ?? 320,
         umsatz: row.umsatz || null,
         notizen: row.notizen?.trim() || null,
+        naechsterSchritt: row.naechsterSchritt?.trim() || null,
+        providerId: row.providerId || null,
+        productId,
       };
       const result = db.insert(leads).values(values).returning().get();
 
