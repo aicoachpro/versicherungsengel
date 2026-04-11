@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads } from "@/db/schema";
+import { leads, activities, documents, insurances, provisions } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
@@ -113,11 +113,19 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const lead = db.select({ name: leads.name }).from(leads).where(eq(leads.id, Number(id))).get();
-  db.delete(leads).where(eq(leads.id, Number(id))).run();
+  const leadId = Number(id);
+  const lead = db.select({ name: leads.name }).from(leads).where(eq(leads.id, leadId)).get();
+  if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+
+  // Abhängige Daten kaskadierend löschen (Foreign Key Constraints)
+  db.delete(activities).where(eq(activities.leadId, leadId)).run();
+  db.delete(documents).where(eq(documents.leadId, leadId)).run();
+  db.update(insurances).set({ leadId: null }).where(eq(insurances.leadId, leadId)).run();
+  db.update(provisions).set({ leadId: null }).where(eq(provisions.leadId, leadId)).run();
+  db.delete(leads).where(eq(leads.id, leadId)).run();
 
   const { userId, userName } = getAuditUser(session);
-  logAudit({ userId, userName, action: "delete", entity: "lead", entityId: Number(id), entityName: lead?.name });
+  logAudit({ userId, userName, action: "delete", entity: "lead", entityId: leadId, entityName: lead?.name });
 
   return NextResponse.json({ success: true });
 }
