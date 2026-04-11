@@ -178,26 +178,30 @@ export function KanbanBoard({
           {lead.ansprechpartner && (
             <p className="text-xs text-muted-foreground mt-0.5 ml-4 truncate">{lead.ansprechpartner}</p>
           )}
-          <div className="flex items-center gap-2 mt-2 ml-4 flex-wrap">
+          {/* Badges: Typ + Produkt */}
+          {(leadTyp || productName) && (
+            <div className="flex items-center gap-1.5 mt-1.5 ml-4">
               {leadTyp && (
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${leadTyp === "Gewerbe" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-green-300 text-green-700 bg-green-50"}`}>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 font-normal ${leadTyp === "Gewerbe" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-green-300 text-green-700 bg-green-50"}`}>
                   {leadTyp}
                 </Badge>
               )}
               {productName && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal">
-                  <Tag className="h-2.5 w-2.5" />
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-1 font-normal truncate max-w-[140px]">
+                  <Tag className="h-2.5 w-2.5 flex-shrink-0" />
                   {productName}
                 </Badge>
               )}
-              {/* Termin anzeigen */}
+            </div>
+          )}
+          {/* Termine + Warnungen */}
+          <div className="flex items-center gap-2 mt-1.5 ml-4 flex-wrap">
               {lead.termin && (
-                <span className={`flex items-center gap-1 text-[11px] ${terminAbgelaufen ? "text-muted-foreground" : "text-foreground font-medium"}`}>
+                <span className={`flex items-center gap-1 text-[11px] ${terminAbgelaufen ? "text-muted-foreground line-through" : "text-foreground font-medium"}`}>
                   <CalendarDays className="h-3 w-3 flex-shrink-0" />
                   {formatCompactDate(lead.termin)}
                 </span>
               )}
-              {/* Folgetermin separat */}
               {lead.folgetermin && (
                 <span className="flex items-center gap-1 text-[11px] text-blue-600">
                   <Clock className="h-3 w-3 flex-shrink-0" />
@@ -205,7 +209,6 @@ export function KanbanBoard({
                   {pushAktiv && <Bell className="h-3 w-3 text-amber-500 flex-shrink-0" />}
                 </span>
               )}
-              {/* Warnungen */}
               {keinTermin && (
                 <span className="flex items-center gap-0.5 text-[10px] text-amber-600" title={`Seit ${daysSinceCreated} Tagen ohne Termin`}>
                   <AlertTriangle className="h-3 w-3" />
@@ -213,9 +216,9 @@ export function KanbanBoard({
                 </span>
               )}
               {terminOhneAktivitaet && (
-                <span className="flex items-center gap-0.5 text-[10px] text-red-500" title={`Termin vor ${daysSinceTermin} Tagen — keine Aktivitaet`}>
+                <span className="flex items-center gap-0.5 text-[10px] text-red-500" title={`Termin vor ${daysSinceTermin} Tagen`}>
                   <AlertTriangle className="h-3 w-3" />
-                  {daysSinceTermin}d ohne Aktivitaet
+                  {daysSinceTermin}d
                 </span>
               )}
               {/* Folgetermin Schnell-Aktionen */}
