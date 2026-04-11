@@ -25,6 +25,7 @@ import { Upload, FileSpreadsheet, FileText, CheckCircle2, XCircle, ArrowRight, R
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { SpeechInput } from "@/components/ui/speech-input";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -691,7 +692,18 @@ export default function ImportPage() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {PDF_LEAD_FIELDS.map((field) => (
                         <div key={field.key} className={`space-y-1 ${"multiline" in field && field.multiline ? "sm:col-span-2 lg:col-span-3" : ""}`}>
-                          <Label className="text-xs">{field.label}</Label>
+                          <div className="flex items-center gap-1">
+                            <Label className="text-xs">{field.label}</Label>
+                            {"multiline" in field && field.multiline && (
+                              <SpeechInput
+                                className="h-5 w-5"
+                                onTranscript={(t) => {
+                                  const cur = String(lead[field.key] || "");
+                                  updatePdfLead(i, field.key, cur ? cur + " " + t : t);
+                                }}
+                              />
+                            )}
+                          </div>
                           {"multiline" in field && field.multiline ? (
                             <textarea
                               value={String(lead[field.key] || "")}
