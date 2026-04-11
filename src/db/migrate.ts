@@ -609,6 +609,14 @@ sqlite.prepare(`
   )
 `).run();
 
+// Add lead_typ column to leads if not exists
+try {
+  sqlite.prepare("SELECT lead_typ FROM leads LIMIT 1").get();
+} catch {
+  sqlite.prepare("ALTER TABLE leads ADD COLUMN lead_typ TEXT").run();
+  console.log("Added 'lead_typ' column to leads table");
+}
+
 // Generate API key for n8n if none exists
 const existingKey = sqlite.prepare("SELECT id FROM api_keys LIMIT 1").get();
 if (!existingKey) {

@@ -110,6 +110,7 @@ export async function extractLeadFromEmail(emailText: string): Promise<string> {
           "- ansprechpartner (Person als Kontaktperson)\n" +
           "- email, telefon, website\n" +
           "- strasse, plz, ort\n" +
+          "- leadTyp (Gewerbe oder Privat - bestimme anhand des Kontexts ob es ein Firmenkunde oder Privatperson ist)\n" +
           "- gewerbeart (hauptberuflich/nebenberuflich, nur bei Gewerbe-Leads)\n" +
           "- branche (Bau, Handwerk, Dienstleistung, Produktion, IT, Gesundheit, Logistik, Handel, Gastronomie, Immobilien, Sonstiges)\n" +
           "- unternehmensgroesse (1–9, 10–49, 50–199, 200–999, 1000+)\n" +
@@ -172,6 +173,7 @@ Gib ein JSON-Array zurueck. Jeder Lead ist ein Objekt mit diesen Feldern:
 - unternehmensgroesse (1-9, 10-49, 50-199, 200-999, 1000+)
 - umsatzklasse (<1 Mio, 1-5 Mio, 5-20 Mio, 20-100 Mio, >100 Mio)
 - gewerbeart (hauptberuflich/nebenberuflich)
+- leadTyp (Gewerbe oder Privat - bestimme ob Firmenkunde oder Privatperson)
 - notizen (zusaetzliche relevante Infos wie Leadherkunft, Lead-ID, Reklamationsstatus, Historie)
 - produkt (Versicherungsart/-sparte die angefragt wird, z.B. "Zahnzusatzversicherung", "Betriebshaftpflicht", "KFZ-Versicherung")
 - termin (Datum im Format YYYY-MM-DDTHH:MM wenn ein Termin/Eingangsdatum genannt wird, sonst null)

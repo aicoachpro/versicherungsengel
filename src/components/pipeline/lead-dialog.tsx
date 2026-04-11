@@ -44,6 +44,7 @@ interface AppUser {
   name: string;
 }
 
+const LEAD_TYPEN = ["Gewerbe", "Privat"];
 const GEWERBEARTEN = ["hauptberuflich", "nebenberuflich"];
 const FOLGETERMIN_TYPEN = ["Nachfassen", "Cross-Selling", "Beratung", "Angebot nachfassen", "Sonstiges"];
 
@@ -68,6 +69,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
     plz: "",
     ort: "",
     gewerbeart: "",
+    leadTyp: "",
     branche: "",
     unternehmensgroesse: "",
     umsatzklasse: "",
@@ -110,6 +112,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
         plz: lead.plz || "",
         ort: lead.ort || "",
         gewerbeart: lead.gewerbeart || "",
+        leadTyp: (lead as Lead & { leadTyp?: string }).leadTyp || "",
         branche: lead.branche || "",
         unternehmensgroesse: lead.unternehmensgroesse || "",
         umsatzklasse: lead.umsatzklasse || "",
@@ -128,7 +131,7 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
       setForm({
         name: "", ansprechpartner: "", email: "", telefon: "",
         strasse: "", plz: "", ort: "",
-        gewerbeart: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
+        gewerbeart: "", leadTyp: "", branche: "", unternehmensgroesse: "", umsatzklasse: "",
         termin: "", folgetermin: "", folgeterminTyp: "",
         eingangsdatum: new Date().toISOString().split("T")[0],
         terminKosten: "320",
@@ -275,6 +278,20 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
                 value={form.ort}
                 onChange={(e) => setForm({ ...form, ort: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Lead-Typ</Label>
+              <Select
+                value={form.leadTyp}
+                onValueChange={(v) => setForm({ ...form, leadTyp: v ?? "" })}
+              >
+                <SelectTrigger><SelectValue placeholder="Auswählen" /></SelectTrigger>
+                <SelectContent>
+                  {LEAD_TYPEN.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Gewerbeart</Label>

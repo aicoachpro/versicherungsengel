@@ -32,6 +32,7 @@ export interface Lead {
   plz: string | null;
   ort: string | null;
   gewerbeart: string | null;
+  leadTyp: string | null;
   branche: string | null;
   unternehmensgroesse: string | null;
   umsatzklasse: string | null;
