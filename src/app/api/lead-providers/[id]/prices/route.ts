@@ -171,44 +171,50 @@ export async function POST(
   // Trenner erkennen (Semikolon oder Komma) aus der ersten Zeile
   const delimiter = detectDelimiter(lines[0] || "");
 
-  // Format erkennen: Hat die erste Datenzeile 3 Spalten? (Kuerzel;Name;Preis)
-  const firstDataLine = lines.find((l) => !/^(kuerzel|sparte|produkt|name)/i.test(l));
-  const firstParts = firstDataLine ? parseCsvLine(firstDataLine, delimiter) : [];
-  const isThreeCol = firstParts.length >= 3;
+  // Header-Zeile analysieren um Spalten-Indizes zu finden
+  const headerLine = lines[0] || "";
+  const headerParts = parseCsvLine(headerLine, delimiter).map((h) => normalize(h));
 
-  for (const line of lines) {
+  // Spalten-Indizes bestimmen (flexibel fuer verschiedene CSV-Formate)
+  let sparteIdx = headerParts.findIndex((h) => /^(abonnement|sparte|produkt|name)$/.test(h));
+  let kuerzelIdx = headerParts.findIndex((h) => /^(kuerzel|code|id)$/.test(h));
+  let preisIdx = headerParts.findIndex((h) => /^(preis|price|kosten|cost|preismittelwerteuro)$/.test(h));
+
+  // Fallback: Wenn kein Header erkannt, Format raten
+  const hasSmartHeader = sparteIdx >= 0 || preisIdx >= 0;
+
+  if (!hasSmartHeader) {
+    // Altes Verhalten: 3-Spalten = Kuerzel;Name;Preis, 2-Spalten = Sparte;Preis
+    const firstDataLine = lines.find((l) => !/^(kuerzel|sparte|produkt|name)/i.test(l));
+    const firstParts = firstDataLine ? parseCsvLine(firstDataLine, delimiter) : [];
+    if (firstParts.length >= 3) {
+      kuerzelIdx = 0; sparteIdx = 1; preisIdx = 2;
+    } else {
+      sparteIdx = 0; preisIdx = 1;
+    }
+  }
+
+  // Wenn Sparte nicht gefunden, erste Spalte verwenden
+  if (sparteIdx < 0) sparteIdx = 0;
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx];
     // Header-Zeile ueberspringen
-    if (/^(kuerzel|sparte|produkt|name)/i.test(line)) continue;
+    if (lineIdx === 0 && hasSmartHeader) continue;
+    if (/^(kuerzel|sparte|produkt|name|abonnement)/i.test(line)) continue;
 
     const parts = parseCsvLine(line, delimiter);
-    let kuerzel = "";
-    let sparte = "";
-    let preisRaw = "";
+    const kuerzel = kuerzelIdx >= 0 && kuerzelIdx < parts.length ? parts[kuerzelIdx].trim() : "";
+    const sparte = sparteIdx >= 0 && sparteIdx < parts.length ? parts[sparteIdx].trim() : "";
+    const preisRaw = preisIdx >= 0 && preisIdx < parts.length ? parts[preisIdx] : "";
 
-    if (isThreeCol && parts.length >= 3) {
-      // Format: Kuerzel;Name;Preis (Check-Direkt)
-      kuerzel = parts[0].trim();
-      sparte = parts[1].trim();
-      preisRaw = parts[2];
-    } else if (parts.length >= 2) {
-      // Format: Sparte;Preis
-      sparte = parts[0].trim();
-      preisRaw = parts[1];
-    } else {
-      continue;
-    }
+    if (!sparte && !kuerzel) continue;
 
     const preisNetto = parsePrice(preisRaw);
     // Bei netto-Upload: 19% MwSt aufschlagen und auf 2 Nachkommastellen runden
     const preis = applyVat
       ? Math.round(preisNetto * (1 + VAT_RATE) * 100) / 100
       : preisNetto;
-
-    if (!sparte && !kuerzel) {
-      results.push({ sparte: "(leer)", preis: 0, matched: false });
-      skipped++;
-      continue;
-    }
 
     // Matching-Reihenfolge (alle normalisiert):
     // 1. Exakt nach Kuerzel
