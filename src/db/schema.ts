@@ -39,6 +39,9 @@ export const leads = sqliteTable("leads", {
   gewerbeart: text("gewerbeart", {
     enum: ["hauptberuflich", "nebenberuflich"],
   }),
+  leadTyp: text("lead_typ", {
+    enum: ["Gewerbe", "Privat"],
+  }),
   terminKosten: real("termin_kosten").default(320),
   umsatz: real("umsatz"),
   conversion: integer("conversion"),

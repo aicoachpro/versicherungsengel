@@ -153,6 +153,7 @@ export function KanbanBoard({
     const nextDate = terminAbgelaufen && lead.folgetermin ? lead.folgetermin : lead.termin;
     const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
     const productName = lead.productId ? productMap[lead.productId] : null;
+    const leadTyp = (lead as Lead & { leadTyp?: string }).leadTyp;
 
     return (
       <Card
@@ -174,6 +175,11 @@ export function KanbanBoard({
           )}
           {(productName || nextDate || !lead.folgetermin) && (
             <div className="flex items-center gap-2 mt-2 ml-4 flex-wrap">
+              {leadTyp && (
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 font-normal ${leadTyp === "Gewerbe" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-green-300 text-green-700 bg-green-50"}`}>
+                  {leadTyp}
+                </Badge>
+              )}
               {productName && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal">
                   <Tag className="h-2.5 w-2.5" />

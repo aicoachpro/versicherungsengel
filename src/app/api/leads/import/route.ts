@@ -26,6 +26,7 @@ interface ImportLead {
   notizen?: string;
   naechsterSchritt?: string;
   produkt?: string;
+  leadTyp?: string;
   providerId?: number;
 }
 
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
         umsatz: row.umsatz || null,
         notizen: row.notizen?.trim() || null,
         naechsterSchritt: row.naechsterSchritt?.trim() || null,
+        leadTyp: row.leadTyp?.trim() || null,
         providerId: row.providerId || null,
         productId,
       };
