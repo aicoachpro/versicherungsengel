@@ -151,6 +151,7 @@ export default function ImportPage() {
 
   // WhatsApp nach Import
   const [whatsappPrompt, setWhatsappPrompt] = useState<{ leadName: string; leadId: number; phone: string } | null>(null);
+  const [whatsappPhone, setWhatsappPhone] = useState("");
   const [whatsappSending, setWhatsappSending] = useState(false);
 
   // Provider laden
@@ -385,11 +386,12 @@ export default function ImportPage() {
       if (data.imported > 0) {
         toast.success(`"${lead.name}" gespeichert`);
         setPdfLeads((prev) => prev.map((l, i) => i === index ? { ...l, _saved: true } : l));
-        // WhatsApp anbieten wenn Telefonnummer vorhanden
-        const phone = typeof lead.telefon === "string" ? lead.telefon.trim() : "";
+        // WhatsApp-Dialog anbieten
         const savedLeadId = data.details?.[0]?.id;
-        if (phone && savedLeadId) {
-          setWhatsappPrompt({ leadName: lead.name, leadId: savedLeadId, phone });
+        if (savedLeadId) {
+          const phone = typeof lead.telefon === "string" ? lead.telefon.trim() : "";
+          setWhatsappPhone(phone);
+          setWhatsappPrompt({ leadName: lead.name || "", leadId: savedLeadId, phone });
         }
       } else {
         toast.error(`Fehler beim Speichern von "${lead.name}"`);
@@ -926,44 +928,52 @@ export default function ImportPage() {
                 <MessageCircle className="h-5 w-5 text-emerald-600" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Per WhatsApp anschreiben?</p>
-                <p className="text-xs text-muted-foreground">{whatsappPrompt.leadName} ({whatsappPrompt.phone})</p>
+                <p className="font-semibold text-sm">Erstnachricht per WhatsApp?</p>
+                <p className="text-xs text-muted-foreground">{whatsappPrompt.leadName}</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Soll dem Lead die Begrüßungs-Vorlage per WhatsApp über Superchat gesendet werden?
-            </p>
+            <div className="space-y-2">
+              <Label className="text-xs">Handynummer</Label>
+              <Input
+                value={whatsappPhone}
+                onChange={(e) => setWhatsappPhone(e.target.value)}
+                placeholder="+49 176 1234567"
+              />
+              {whatsappPhone && !/^(\+?\d{1,3})?[\s-]?(01[567]\d|1[567]\d)\d{5,8}$/.test(whatsappPhone.replace(/[\s-]/g, "")) && (
+                <p className="text-xs text-amber-600">Das sieht nicht nach einer Handynummer aus</p>
+              )}
+            </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" size="sm" onClick={() => setWhatsappPrompt(null)} disabled={whatsappSending}>
-                Nein, danke
+                Überspringen
               </Button>
               <Button
                 size="sm"
                 className="bg-emerald-600 hover:bg-emerald-700"
-                disabled={whatsappSending}
+                disabled={whatsappSending || !whatsappPhone.trim()}
                 onClick={async () => {
                   setWhatsappSending(true);
                   try {
                     const res = await fetch("/api/leads/whatsapp", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ leadId: whatsappPrompt.leadId }),
+                      body: JSON.stringify({ leadId: whatsappPrompt.leadId, phone: whatsappPhone.trim() }),
                     });
                     if (res.ok) {
-                      toast.success(`WhatsApp an ${whatsappPrompt.leadName} gesendet`);
+                      toast.success(`Erstnachricht an ${whatsappPrompt.leadName} gesendet`);
                     } else {
                       const data = await res.json().catch(() => ({}));
-                      toast.error(data.error || "WhatsApp-Versand fehlgeschlagen");
+                      toast.error(data.error || "Versand fehlgeschlagen");
                     }
                   } catch {
-                    toast.error("WhatsApp-Versand fehlgeschlagen");
+                    toast.error("Versand fehlgeschlagen");
                   }
                   setWhatsappSending(false);
                   setWhatsappPrompt(null);
                 }}
               >
                 {whatsappSending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MessageCircle className="h-4 w-4 mr-1" />}
-                Ja, anschreiben
+                Erstnachricht senden
               </Button>
             </div>
           </div>

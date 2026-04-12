@@ -16,14 +16,21 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { leadId } = await req.json();
+  const body = await req.json();
+  const { leadId } = body;
   if (!leadId) return NextResponse.json({ error: "leadId fehlt" }, { status: 400 });
 
   const lead = db.select().from(leads).where(eq(leads.id, leadId)).get();
   if (!lead) return NextResponse.json({ error: "Lead nicht gefunden" }, { status: 404 });
 
-  const phone = lead.telefon?.trim();
-  if (!phone) return NextResponse.json({ error: "Keine Telefonnummer hinterlegt" }, { status: 400 });
+  // Phone aus Request oder vom Lead nehmen
+  const phone = (body.phone?.trim() || lead.telefon?.trim());
+  if (!phone) return NextResponse.json({ error: "Keine Telefonnummer" }, { status: 400 });
+
+  // Telefon am Lead updaten falls aus Request
+  if (body.phone && body.phone.trim() !== (lead.telefon || "").trim()) {
+    db.update(leads).set({ telefon: body.phone.trim(), updatedAt: new Date().toISOString() }).where(eq(leads.id, leadId)).run();
+  }
 
   const apiKey = getSetting("superchat.apiKey") || process.env.SUPERCHAT_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Superchat nicht konfiguriert" }, { status: 400 });
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest) {
       leadId,
       datum: new Date().toISOString(),
       kontaktart: "WhatsApp",
-      notiz: `WhatsApp-Vorlage gesendet: ${anrede} Produkt: ${produktName}`,
+      notiz: `Erstnachricht versendet per WhatsApp: ${anrede} Produkt: ${produktName}`,
     }).run();
 
     const { userId, userName } = getAuditUser(session);
