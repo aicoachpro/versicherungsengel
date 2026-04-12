@@ -432,6 +432,16 @@ export default function ImportPage() {
       setStep("result");
       if (data.imported > 0) toast.success(`${data.imported} Leads importiert`);
       if (data.failed > 0) toast.error(`${data.failed} fehlgeschlagen`);
+      // WhatsApp-Dialog für den ersten importierten Lead mit Telefonnummer
+      if (data.imported > 0 && data.details?.length) {
+        const firstSuccess = data.details.find((d: { success: boolean; id?: number }) => d.success && d.id);
+        if (firstSuccess) {
+          const matchingLead = validLeads.find((l) => l.name === firstSuccess.name);
+          const phone = matchingLead?.telefon ? String(matchingLead.telefon).trim() : "";
+          setWhatsappPhone(phone);
+          setWhatsappPrompt({ leadName: firstSuccess.name || "", leadId: firstSuccess.id, phone });
+        }
+      }
     } catch {
       toast.error("Import fehlgeschlagen");
     }
