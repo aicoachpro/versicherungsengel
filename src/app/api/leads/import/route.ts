@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Keine Leads zum Importieren" }, { status: 400 });
   }
 
-  const results: { row: number; success: boolean; error?: string; name?: string }[] = [];
+  const results: { row: number; success: boolean; error?: string; name?: string; id?: number }[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         notiz: notizTeile.join("\n"),
       }).run();
 
-      results.push({ row: i + 1, success: true, name: result.name });
+      results.push({ row: i + 1, success: true, name: result.name, id: result.id });
     } catch (err) {
       results.push({ row: i + 1, success: false, error: String(err), name: row.name });
     }

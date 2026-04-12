@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 
-type Action = "create" | "update" | "delete" | "archive" | "restore";
+type Action = "create" | "update" | "delete" | "archive" | "restore" | "whatsapp_send";
 type Entity = "lead" | "insurance" | "activity" | "document" | "user";
 
 interface AuditParams {

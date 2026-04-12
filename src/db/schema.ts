@@ -293,7 +293,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   userId: integer("user_id"),
   userName: text("user_name"),
   action: text("action", {
-    enum: ["create", "update", "delete", "archive", "restore"],
+    enum: ["create", "update", "delete", "archive", "restore", "whatsapp_send"],
   }).notNull(),
   entity: text("entity", {
     enum: ["lead", "insurance", "activity", "document", "user"],

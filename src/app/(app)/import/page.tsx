@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, FileText, CheckCircle2, XCircle, ArrowRight, RotateCcw, Loader2, AlertTriangle, Check, X, Trash2 } from "lucide-react";
+import { Upload, FileSpreadsheet, FileText, CheckCircle2, XCircle, ArrowRight, RotateCcw, Loader2, AlertTriangle, Check, X, Trash2, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -148,6 +148,10 @@ export default function ImportPage() {
   // Provider
   const [providers, setProviders] = useState<LeadProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
+
+  // WhatsApp nach Import
+  const [whatsappPrompt, setWhatsappPrompt] = useState<{ leadName: string; leadId: number; phone: string } | null>(null);
+  const [whatsappSending, setWhatsappSending] = useState(false);
 
   // Provider laden
   useEffect(() => {
@@ -381,6 +385,12 @@ export default function ImportPage() {
       if (data.imported > 0) {
         toast.success(`"${lead.name}" gespeichert`);
         setPdfLeads((prev) => prev.map((l, i) => i === index ? { ...l, _saved: true } : l));
+        // WhatsApp anbieten wenn Telefonnummer vorhanden
+        const phone = typeof lead.telefon === "string" ? lead.telefon.trim() : "";
+        const savedLeadId = data.results?.[0]?.id;
+        if (phone && savedLeadId) {
+          setWhatsappPrompt({ leadName: lead.name, leadId: savedLeadId, phone });
+        }
       } else {
         toast.error(`Fehler beim Speichern von "${lead.name}"`);
       }
@@ -906,6 +916,59 @@ export default function ImportPage() {
           </Card>
         )}
       </div>
+
+      {/* WhatsApp-Prompt nach Import */}
+      {whatsappPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setWhatsappPrompt(null)}>
+          <div className="bg-background rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <MessageCircle className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Per WhatsApp anschreiben?</p>
+                <p className="text-xs text-muted-foreground">{whatsappPrompt.leadName} ({whatsappPrompt.phone})</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Soll dem Lead die Begrüßungs-Vorlage per WhatsApp über Superchat gesendet werden?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setWhatsappPrompt(null)} disabled={whatsappSending}>
+                Nein, danke
+              </Button>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                disabled={whatsappSending}
+                onClick={async () => {
+                  setWhatsappSending(true);
+                  try {
+                    const res = await fetch("/api/leads/whatsapp", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ leadId: whatsappPrompt.leadId }),
+                    });
+                    if (res.ok) {
+                      toast.success(`WhatsApp an ${whatsappPrompt.leadName} gesendet`);
+                    } else {
+                      const data = await res.json().catch(() => ({}));
+                      toast.error(data.error || "WhatsApp-Versand fehlgeschlagen");
+                    }
+                  } catch {
+                    toast.error("WhatsApp-Versand fehlgeschlagen");
+                  }
+                  setWhatsappSending(false);
+                  setWhatsappPrompt(null);
+                }}
+              >
+                {whatsappSending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MessageCircle className="h-4 w-4 mr-1" />}
+                Ja, anschreiben
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
