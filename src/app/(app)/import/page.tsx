@@ -387,7 +387,7 @@ export default function ImportPage() {
         setPdfLeads((prev) => prev.map((l, i) => i === index ? { ...l, _saved: true } : l));
         // WhatsApp anbieten wenn Telefonnummer vorhanden
         const phone = typeof lead.telefon === "string" ? lead.telefon.trim() : "";
-        const savedLeadId = data.results?.[0]?.id;
+        const savedLeadId = data.details?.[0]?.id;
         if (phone && savedLeadId) {
           setWhatsappPrompt({ leadName: lead.name, leadId: savedLeadId, phone });
         }
