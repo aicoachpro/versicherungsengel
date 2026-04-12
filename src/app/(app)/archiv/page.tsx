@@ -44,7 +44,7 @@ export default function ArchivPage() {
     const res = await fetch("/api/leads");
     if (res.ok) {
       const all = await res.json();
-      setLeads(all.filter((l: Lead) => l.archivedAt));
+      setLeads(all.filter((l: Lead) => l.archivedAt || l.phase === "Abgeschlossen" || l.phase === "Verloren"));
     }
     setLoading(false);
   }, []);
