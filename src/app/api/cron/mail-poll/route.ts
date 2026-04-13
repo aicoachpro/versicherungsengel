@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
           pass: decrypt(account.password),
         },
         logger: false,
+        // Robustere Timeouts — IMAP-Server antworten gelegentlich verzoegert
+        socketTimeout: 60_000,
       });
 
       await client.connect();
@@ -79,46 +81,85 @@ export async function GET(req: NextRequest) {
           ? new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
           : new Date(baseTime);
         const searchCriteria: Record<string, unknown> = { since: sinceDate };
-        const messages = client.fetch(searchCriteria, {
+
+        // Phase 1: Nur Metadaten (envelope) holen — schnell, unabhaengig von Body-Groesse
+        const metadataMessages = client.fetch(searchCriteria, {
           uid: true,
           envelope: true,
-          source: true,
-          bodyStructure: true,
         });
 
-        for await (const msg of messages) {
+        const candidates: Array<{
+          uid: number;
+          messageId: string;
+          fromAddress: string;
+          fromName: string | null;
+          subject: string;
+          receivedAt: string;
+        }> = [];
+
+        for await (const msg of metadataMessages) {
           const messageId = msg.envelope?.messageId || `${account.id}-${msg.uid}`;
 
-          // Dedup: pruefen ob messageId bereits existiert
+          // Dedup: bereits vorhandene Mails ueberspringen — bevor wir die Source holen
           const existing = db
             .select({ id: inboundEmails.id })
             .from(inboundEmails)
             .where(eq(inboundEmails.messageId, messageId))
             .get();
-
           if (existing) continue;
 
-          // E-Mail-Inhalte extrahieren
-          const fromAddress = msg.envelope?.from?.[0]?.address || "unbekannt";
-          const fromName = msg.envelope?.from?.[0]?.name || null;
-          const subject = msg.envelope?.subject || "(kein Betreff)";
-          const receivedAt = msg.envelope?.date?.toISOString() || new Date().toISOString();
+          candidates.push({
+            uid: msg.uid,
+            messageId,
+            fromAddress: msg.envelope?.from?.[0]?.address || "unbekannt",
+            fromName: msg.envelope?.from?.[0]?.name || null,
+            subject: msg.envelope?.subject || "(kein Betreff)",
+            receivedAt: msg.envelope?.date?.toISOString() || new Date().toISOString(),
+          });
+        }
 
-          // Kalender-Einladungen überspringen (kein Lead-Content)
-          const source = msg.source?.toString() || "";
-          const isCalendarInvite =
-            /Content-Type:\s*text\/calendar/i.test(source) ||
-            /Content-Type:\s*application\/ics/i.test(source) ||
-            /^(Invitation|Einladung|Updated Invitation|Canceled):/i.test(subject) ||
-            /\.ics["']?\s*$/im.test(source);
-
-          if (isCalendarInvite) {
-            console.log(`[mail-poll] Kalender-Einladung übersprungen: "${subject}" von ${fromAddress}`);
-            await client.messageFlagsAdd({ uid: msg.uid }, ["\\Seen"], { uid: true });
+        // Phase 2: Nur fuer wirklich neue Mails die Source holen + speichern
+        for (const cand of candidates) {
+          let source = "";
+          try {
+            const fullMsg = await client.fetchOne(
+              String(cand.uid),
+              { source: true },
+              { uid: true },
+            );
+            if (fullMsg && typeof fullMsg === "object" && "source" in fullMsg && fullMsg.source) {
+              source = (fullMsg.source as Buffer | string).toString();
+            }
+          } catch (fetchErr) {
+            console.log(
+              `[mail-poll] Source-Fetch fehlgeschlagen fuer UID ${cand.uid}:`,
+              fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+            );
             continue;
           }
 
-          console.log(`[mail-poll] Neue Mail importiert: "${subject}" von ${fromAddress}`);
+          // Kalender-Einladungen ueberspringen
+          const isCalendarInvite =
+            /Content-Type:\s*text\/calendar/i.test(source) ||
+            /Content-Type:\s*application\/ics/i.test(source) ||
+            /^(Invitation|Einladung|Updated Invitation|Canceled):/i.test(cand.subject) ||
+            /\.ics["']?\s*$/im.test(source);
+
+          if (isCalendarInvite) {
+            console.log(
+              `[mail-poll] Kalender-Einladung übersprungen: "${cand.subject}" von ${cand.fromAddress}`,
+            );
+            try {
+              await client.messageFlagsAdd({ uid: cand.uid }, ["\\Seen"], { uid: true });
+            } catch {
+              /* nicht kritisch */
+            }
+            continue;
+          }
+
+          console.log(
+            `[mail-poll] Neue Mail importiert: "${cand.subject}" von ${cand.fromAddress}`,
+          );
 
           // Body aus Source extrahieren
           let body = "";
@@ -130,23 +171,25 @@ export async function GET(req: NextRequest) {
             htmlBody = extracted.html || null;
           }
 
-          // In DB speichern
           db.insert(inboundEmails)
             .values({
               accountId: account.id,
-              messageId,
-              fromAddress,
-              fromName,
-              subject,
+              messageId: cand.messageId,
+              fromAddress: cand.fromAddress,
+              fromName: cand.fromName,
+              subject: cand.subject,
               body: body || "(kein Inhalt)",
               htmlBody,
-              receivedAt,
+              receivedAt: cand.receivedAt,
               status: "pending",
             })
             .run();
 
-          // Als gelesen markieren
-          await client.messageFlagsAdd({ uid: msg.uid }, ["\\Seen"], { uid: true });
+          try {
+            await client.messageFlagsAdd({ uid: cand.uid }, ["\\Seen"], { uid: true });
+          } catch {
+            /* nicht kritisch */
+          }
 
           totalNew++;
         }
