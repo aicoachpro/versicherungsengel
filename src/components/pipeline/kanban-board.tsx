@@ -253,6 +253,25 @@ export function KanbanBoard({
                   Kein Termin
                 </span>
               )}
+              {/* WhatsApp-Erstnachricht */}
+              {phase !== "Abgeschlossen" && phase !== "Verloren" && (
+                <button
+                  type="button"
+                  title="WhatsApp-Erstnachricht senden"
+                  className="flex items-center gap-0.5 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded px-1 py-0.5 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWhatsappTarget({
+                      leadId: lead.id,
+                      name: lead.ansprechpartner || lead.name,
+                      phone: lead.telefon || "",
+                    });
+                  }}
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </button>
+              )}
               {/* Folgetermin Schnell-Aktionen */}
               {lead.folgetermin ? (
                 <button
@@ -299,20 +318,6 @@ export function KanbanBoard({
                 <MoreVertical className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setWhatsappTarget({
-                      leadId: lead.id,
-                      name: lead.ansprechpartner || lead.name,
-                      phone: lead.telefon || "",
-                    });
-                  }}
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  WhatsApp senden
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 {onArchive && phase === "Abgeschlossen" && (
                   <>
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onArchive(lead.id); }}>
