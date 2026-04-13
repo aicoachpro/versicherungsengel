@@ -90,6 +90,9 @@ interface Lead {
   reklamationStatus: string | null;
   reklamationNotiz: string | null;
   archivedAt: string | null;
+  providerId: number | null;
+  productId: number | null;
+  assignedTo: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -367,6 +370,8 @@ export default function LeadDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [lead, setLead] = useState<Lead | null>(null);
+  const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [savingAssignee, setSavingAssignee] = useState(false);
   const [vertraege, setVertraege] = useState<Fremdvertrag[]>([]);
   const [aktivitaeten, setAktivitaeten] = useState<Activity[]>([]);
   const [dokumente, setDokumente] = useState<Document[]>([]);
@@ -415,6 +420,35 @@ export default function LeadDetailPage() {
   useEffect(() => {
     loadData();
   }, [leadId]);
+
+  // Bearbeiter-Liste einmalig laden fuer Zuweisungs-Dropdown
+  useEffect(() => {
+    fetch("/api/users?simple=1")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: Array<{ id: number; name: string }>) => setUsers(list))
+      .catch(() => setUsers([]));
+  }, []);
+
+  async function handleAssigneeChange(newAssigneeId: number | null) {
+    if (!lead) return;
+    setSavingAssignee(true);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id, assignedTo: newAssigneeId }),
+      });
+      if (res.ok) {
+        setLead({ ...lead, assignedTo: newAssigneeId });
+        toast.success("Bearbeiter aktualisiert");
+      } else {
+        toast.error("Bearbeiter konnte nicht aktualisiert werden");
+      }
+    } catch {
+      toast.error("Bearbeiter konnte nicht aktualisiert werden");
+    }
+    setSavingAssignee(false);
+  }
 
   async function loadData() {
     setLoading(true);
@@ -762,6 +796,32 @@ export default function LeadDetailPage() {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="flex items-center gap-2 mb-4 p-2.5 rounded-md bg-muted/40 border border-border/50">
+              <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium">Bearbeiter:</span>
+              <Select
+                value={lead.assignedTo ? String(lead.assignedTo) : "_none"}
+                onValueChange={(v) => handleAssigneeChange(v === "_none" ? null : Number(v))}
+                disabled={savingAssignee}
+              >
+                <SelectTrigger className="h-8 w-auto min-w-[180px] flex-1 max-w-xs">
+                  <SelectValue placeholder="Nicht zugewiesen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Nicht zugewiesen</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={String(u.id)}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!lead.assignedTo && (
+                <span className="text-xs text-amber-600 hidden sm:inline">
+                  Keine Zuweisungsregel gematcht
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {lead.ansprechpartner && (
                 <div className="flex items-center gap-2 text-sm">

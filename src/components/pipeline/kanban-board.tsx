@@ -44,11 +44,21 @@ interface KanbanBoardProps {
   leads: Lead[];
   phases: string[];
   productMap?: Record<number, string>;
+  userMap?: Record<number, string>;
   onPhaseChange: (leadId: number, newPhase: string) => void;
   onDelete: (id: number) => void;
   onArchive?: (id: number) => void;
   onLost?: (id: number) => void;
   onLeadUpdate?: () => void;
+}
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .slice(0, 2)
+    .join("");
 }
 
 const phaseColors: Record<string, string> = {
@@ -97,6 +107,7 @@ export function KanbanBoard({
   leads,
   phases,
   productMap = {},
+  userMap = {},
   onPhaseChange,
   onDelete,
   onArchive,
@@ -235,6 +246,8 @@ export function KanbanBoard({
     const pushAktiv = lead.folgetermin && lead.folgeterminNotified === 0;
     const productName = lead.productId ? productMap[lead.productId] : null;
     const leadTyp = (lead as Lead & { leadTyp?: string }).leadTyp;
+    const assigneeName = lead.assignedTo ? userMap[lead.assignedTo] : null;
+    const assigneeInitials = assigneeName ? getInitials(assigneeName) : null;
 
     // Warnungen berechnen
     const daysSinceCreated = Math.floor((now.getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24));
@@ -253,6 +266,21 @@ export function KanbanBoard({
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full flex-shrink-0 ${phaseDotColors[phase]}`} />
             <p className="text-sm font-semibold flex-1 min-w-0 truncate">{lead.name}</p>
+            {assigneeInitials ? (
+              <span
+                title={`Bearbeiter: ${assigneeName}`}
+                className="flex-shrink-0 h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center border border-primary/30"
+              >
+                {assigneeInitials}
+              </span>
+            ) : (
+              <span
+                title="Nicht zugewiesen"
+                className="flex-shrink-0 h-5 w-5 rounded-full bg-muted text-muted-foreground/60 text-[10px] flex items-center justify-center border border-dashed border-muted-foreground/30"
+              >
+                ?
+              </span>
+            )}
             <GripVertical className="h-4 w-4 text-muted-foreground/30 flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity hidden md:block" />
           </div>
           {lead.ansprechpartner && (

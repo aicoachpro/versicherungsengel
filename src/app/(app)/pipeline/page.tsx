@@ -87,6 +87,7 @@ function PipelineContent() {
   const [showAll, setShowAll] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [productMap, setProductMap] = useState<Record<number, string>>({});
+  const [userMap, setUserMap] = useState<Record<number, string>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -154,6 +155,17 @@ function PipelineContent() {
         const map: Record<number, string> = {};
         products.forEach((p) => { map[p.id] = p.name; });
         setProductMap(map);
+      });
+  }, []);
+
+  // Users einmalig laden fuer Bearbeiter-Anzeige auf Kacheln
+  useEffect(() => {
+    fetch("/api/users?simple=1")
+      .then((r) => r.ok ? r.json() : [])
+      .then((list: Array<{ id: number; name: string }>) => {
+        const map: Record<number, string> = {};
+        list.forEach((u) => { map[u.id] = u.name; });
+        setUserMap(map);
       });
   }, []);
 
@@ -342,6 +354,7 @@ function PipelineContent() {
           leads={filteredLeads}
           phases={PHASES as unknown as string[]}
           productMap={productMap}
+          userMap={userMap}
           onPhaseChange={handlePhaseChange}
           onDelete={handleDelete}
           onArchive={handleArchive}

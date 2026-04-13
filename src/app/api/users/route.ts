@@ -20,9 +20,27 @@ async function requireAdmin() {
   return user;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // simple=1 liefert eine minimale Liste (id, name) fuer alle eingeloggten User
+  // — wird fuer Bearbeiter-Dropdowns o.ae. genutzt
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get("simple") === "1") {
+    const simple = db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .orderBy(sql`${users.name} ASC`)
+      .all();
+    return NextResponse.json(simple);
+  }
+
+  // Admin-Only: vollstaendige Liste
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const allUsers = db
     .select({
