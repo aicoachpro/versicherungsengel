@@ -11,6 +11,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Optionale Parameter: force=1 sucht nach Datum statt nach 'unseen'
+  // days=N legt das Zeitfenster fest (Default 2 Tage)
+  const url = new URL(req.url);
+  const forceMode = url.searchParams.get("force") === "1";
+  const days = Math.max(1, Math.min(30, parseInt(url.searchParams.get("days") || "2", 10)));
+
   // Aktive E-Mail-Konten laden
   const accounts = db
     .select()
@@ -49,8 +55,9 @@ export async function GET(req: NextRequest) {
 
       try {
         // Erster Durchlauf: nur als gelesen markieren, nicht importieren
+        // Im force-Modus auslassen — wir wollen tatsaechlich holen
         const isFirstPoll = !account.lastPolledAt;
-        if (isFirstPoll) {
+        if (isFirstPoll && !forceMode) {
           // Alle bestehenden ungelesenen Mails als gelesen markieren
           try {
             await client.messageFlagsAdd("1:*", ["\\Seen"]);
@@ -67,8 +74,10 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        // Ungelesene Mails holen (Dedup per messageId in DB)
-        const searchCriteria: Record<string, unknown> = { seen: false };
+        // Standard: nur Ungelesene. Force-Mode: alle seit N Tagen (unabhaengig vom Seen-Flag)
+        const searchCriteria: Record<string, unknown> = forceMode
+          ? { since: new Date(Date.now() - days * 24 * 60 * 60 * 1000) }
+          : { seen: false };
         const messages = client.fetch(searchCriteria, {
           uid: true,
           envelope: true,
