@@ -54,16 +54,9 @@ export async function GET(req: NextRequest) {
       const lock = await client.getMailboxLock(folder);
 
       try {
-        // Erster Durchlauf: nur als gelesen markieren, nicht importieren
-        // Im force-Modus auslassen — wir wollen tatsaechlich holen
+        // Erster Durchlauf: Ab jetzt tracken (kein Backfill alter Mails)
         const isFirstPoll = !account.lastPolledAt;
         if (isFirstPoll && !forceMode) {
-          // Alle bestehenden ungelesenen Mails als gelesen markieren
-          try {
-            await client.messageFlagsAdd("1:*", ["\\Seen"]);
-          } catch {
-            // Keine Nachrichten vorhanden — OK
-          }
           lock.release();
           db.update(emailAccounts)
             .set({ lastPolledAt: new Date().toISOString() })
@@ -74,10 +67,18 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        // Standard: nur Ungelesene. Force-Mode: alle seit N Tagen (unabhaengig vom Seen-Flag)
-        const searchCriteria: Record<string, unknown> = forceMode
-          ? { since: new Date(Date.now() - days * 24 * 60 * 60 * 1000) }
-          : { seen: false };
+        // Sucht Mails per Datum — UNABHAENGIG vom Seen-Flag.
+        // So werden auch Mails gefunden, die ein anderer Client bereits gelesen hat.
+        // Dedup per messageId verhindert Duplikate.
+        // Overlap von 5 Minuten, damit nichts zwischen zwei Polls durchrutscht.
+        const lookbackDays = forceMode ? days : 0;
+        const baseTime = account.lastPolledAt
+          ? new Date(account.lastPolledAt).getTime() - 5 * 60 * 1000
+          : Date.now() - 24 * 60 * 60 * 1000;
+        const sinceDate = forceMode
+          ? new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
+          : new Date(baseTime);
+        const searchCriteria: Record<string, unknown> = { since: sinceDate };
         const messages = client.fetch(searchCriteria, {
           uid: true,
           envelope: true,

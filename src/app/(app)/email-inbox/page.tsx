@@ -54,7 +54,6 @@ export default function EmailInboxPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const fetchEmails = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await fetch("/api/email-inbox");
       if (res.ok) {
@@ -64,8 +63,32 @@ export default function EmailInboxPage() {
     } catch {
       // API noch nicht verfuegbar
     }
-    setLoading(false);
   }, []);
+
+  const refreshEmails = useCallback(async () => {
+    setLoading(true);
+    try {
+      const refreshRes = await fetch("/api/email-inbox/refresh", { method: "POST" });
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        const newMails = (data?.poll?.newEmails as number | undefined) ?? 0;
+        const processed = (data?.process?.processed as number | undefined) ?? 0;
+        if (newMails > 0) {
+          toast.success(`${newMails} neue Mail${newMails === 1 ? "" : "s"} abgeholt, ${processed} verarbeitet`);
+        } else if (processed > 0) {
+          toast.success(`${processed} pendente Mail${processed === 1 ? "" : "s"} verarbeitet`);
+        } else {
+          toast.info("Keine neuen E-Mails");
+        }
+      } else {
+        toast.error("Abholung fehlgeschlagen");
+      }
+    } catch {
+      toast.error("Abholung fehlgeschlagen");
+    }
+    await fetchEmails();
+    setLoading(false);
+  }, [fetchEmails]);
 
   const deleteEmail = async (id: number) => {
     await fetch(`/api/email-inbox?id=${id}`, { method: "DELETE" });
@@ -74,7 +97,9 @@ export default function EmailInboxPage() {
   };
 
   useEffect(() => {
-    fetchEmails();
+    // Initial nur aus DB laden — ohne IMAP zu pollen
+    setLoading(true);
+    fetchEmails().finally(() => setLoading(false));
   }, [fetchEmails]);
 
   const filtered = filter === "all" ? emails : emails.filter((e) => e.status === filter);
@@ -95,9 +120,9 @@ export default function EmailInboxPage() {
       <Header
         title="E-Mail-Eingang"
         actions={
-          <Button variant="outline" size="sm" onClick={fetchEmails} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={refreshEmails} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Aktualisieren
+            {loading ? "Wird abgeholt..." : "Mails abholen"}
           </Button>
         }
       />
