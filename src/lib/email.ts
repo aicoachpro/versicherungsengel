@@ -17,7 +17,7 @@ export async function sendPasswordResetEmail(
 ) {
   const b = getBranding();
   const from = getFromEmail();
-  await getResend().emails.send({
+  const res = await getResend().emails.send({
     from: `${b.companyName} <${from}>`,
     to,
     subject: `Passwort zurücksetzen – ${b.companyName}`,
@@ -37,6 +37,13 @@ export async function sendPasswordResetEmail(
       </div>
     `,
   });
+  if (res.error) {
+    console.error("[email] Resend Passwort-Reset Fehler:", res.error);
+    throw new Error(
+      `Resend API: ${res.error.name ?? "error"}: ${res.error.message ?? JSON.stringify(res.error)}`,
+    );
+  }
+  return res.data;
 }
 
 export async function sendWelcomeEmail(
@@ -47,7 +54,7 @@ export async function sendWelcomeEmail(
 ) {
   const b = getBranding();
   const from = getFromEmail();
-  await getResend().emails.send({
+  const res = await getResend().emails.send({
     from: `${b.companyName} <${from}>`,
     to,
     subject: `Willkommen bei ${b.companyName}`,
@@ -67,4 +74,11 @@ export async function sendWelcomeEmail(
       </div>
     `,
   });
+  if (res.error) {
+    console.error("[email] Resend Welcome Fehler:", res.error);
+    throw new Error(
+      `Resend API: ${res.error.name ?? "error"}: ${res.error.message ?? JSON.stringify(res.error)}`,
+    );
+  }
+  return res.data;
 }
