@@ -15,6 +15,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -99,7 +106,13 @@ export function KanbanBoard({
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [folgeterminEdit, setFolgeterminEdit] = useState<number | null>(null);
-  const [whatsappTarget, setWhatsappTarget] = useState<{ leadId: number; name: string; phone: string } | null>(null);
+  const [whatsappTarget, setWhatsappTarget] = useState<{
+    leadId: number;
+    name: string;
+    phone: string;
+    productId: number | null;
+    originalProductId: number | null;
+  } | null>(null);
   const [whatsappSending, setWhatsappSending] = useState(false);
 
   async function handleWhatsappSend() {
@@ -109,8 +122,29 @@ export function KanbanBoard({
       toast.error("Bitte Handynummer eingeben");
       return;
     }
+    if (!whatsappTarget.productId) {
+      toast.error("Bitte Lead-Produkt auswaehlen");
+      return;
+    }
     setWhatsappSending(true);
     try {
+      // Produkt am Lead speichern, falls neu oder veraendert
+      if (whatsappTarget.productId !== whatsappTarget.originalProductId) {
+        const patchRes = await fetch("/api/leads", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: whatsappTarget.leadId,
+            productId: whatsappTarget.productId,
+          }),
+        });
+        if (!patchRes.ok) {
+          toast.error("Lead-Produkt konnte nicht gespeichert werden");
+          setWhatsappSending(false);
+          return;
+        }
+      }
+
       const res = await fetch("/api/leads/whatsapp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -321,6 +355,8 @@ export function KanbanBoard({
                       leadId: lead.id,
                       name: lead.ansprechpartner || lead.name,
                       phone: lead.telefon || "",
+                      productId: lead.productId || null,
+                      originalProductId: lead.productId || null,
                     });
                   }}
                 >
@@ -490,6 +526,36 @@ export function KanbanBoard({
                     </p>
                   )}
               </div>
+              <div className="space-y-2">
+                <Label className="text-xs">
+                  Lead-Produkt <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={whatsappTarget.productId ? String(whatsappTarget.productId) : ""}
+                  onValueChange={(v) =>
+                    setWhatsappTarget({
+                      ...whatsappTarget,
+                      productId: v ? Number(v) : null,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Produkt auswaehlen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(productMap).map(([id, name]) => (
+                      <SelectItem key={id} value={id}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!whatsappTarget.productId && (
+                  <p className="text-xs text-amber-600">
+                    Pflicht — die Superchat-Automation nutzt diesen Wert in der Vorlage
+                  </p>
+                )}
+              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button
                   variant="outline"
@@ -501,7 +567,11 @@ export function KanbanBoard({
                 <Button
                   className="bg-emerald-600 hover:bg-emerald-700"
                   onClick={handleWhatsappSend}
-                  disabled={whatsappSending || !whatsappTarget.phone.trim()}
+                  disabled={
+                    whatsappSending ||
+                    !whatsappTarget.phone.trim() ||
+                    !whatsappTarget.productId
+                  }
                 >
                   {whatsappSending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-1" />

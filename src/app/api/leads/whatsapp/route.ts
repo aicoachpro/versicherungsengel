@@ -87,17 +87,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Produkt ist Pflicht — die Superchat-Automation matcht darauf
+    if (!lead.productId) {
+      return NextResponse.json(
+        {
+          error:
+            "Bitte zuerst das Lead-Produkt am Lead eintragen — die Superchat-Automation braucht es fuer die Vorlagen-Variable.",
+          code: "missing_product",
+        },
+        { status: 400 },
+      );
+    }
+    const prod = db
+      .select({ name: leadProducts.name })
+      .from(leadProducts)
+      .where(eq(leadProducts.id, lead.productId))
+      .get();
+    if (!prod) {
+      return NextResponse.json(
+        { error: "Lead-Produkt nicht gefunden", code: "invalid_product" },
+        { status: 400 },
+      );
+    }
+    const produktName = prod.name;
+
     // Anrede zusammenbauen
     const anrede = lead.ansprechpartner
       ? `Hallo ${lead.ansprechpartner.split(" ")[0]},`
       : "Hallo,";
-
-    // Produkt-Name
-    let produktName = "Versicherung";
-    if (lead.productId) {
-      const prod = db.select({ name: leadProducts.name }).from(leadProducts).where(eq(leadProducts.id, lead.productId)).get();
-      if (prod) produktName = prod.name;
-    }
 
     // Template senden
     await sendTemplateMessage({
