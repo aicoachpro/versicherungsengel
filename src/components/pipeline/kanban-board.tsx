@@ -299,22 +299,35 @@ export function KanbanBoard({
             </div>
           <div className="flex items-center justify-between mt-2 -mb-0.5 -mr-1 ml-4">
             {phase !== "Abgeschlossen" && phase !== "Verloren" ? (
-              <button
-                type="button"
-                title="WhatsApp-Erstnachricht senden"
-                className="flex items-center gap-1 text-[11px] text-[#25D366] hover:text-white hover:bg-[#25D366] border border-[#25D366]/40 hover:border-[#25D366] rounded px-1.5 py-0.5 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setWhatsappTarget({
-                    leadId: lead.id,
-                    name: lead.ansprechpartner || lead.name,
-                    phone: lead.telefon || "",
-                  });
-                }}
-              >
-                <WhatsAppIcon className="h-3 w-3" />
-                Erstnachricht
-              </button>
+              lead.whatsappSent ? (
+                <button
+                  type="button"
+                  title="Erstnachricht wurde bereits gesendet"
+                  disabled
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground/60 border border-border rounded px-1.5 py-0.5 cursor-not-allowed"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <WhatsAppIcon className="h-3 w-3" />
+                  Erstnachricht gesendet
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  title="WhatsApp-Erstnachricht senden"
+                  className="flex items-center gap-1 text-[11px] text-[#25D366] hover:text-white hover:bg-[#25D366] border border-[#25D366]/40 hover:border-[#25D366] rounded px-1.5 py-0.5 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWhatsappTarget({
+                      leadId: lead.id,
+                      name: lead.ansprechpartner || lead.name,
+                      phone: lead.telefon || "",
+                    });
+                  }}
+                >
+                  <WhatsAppIcon className="h-3 w-3" />
+                  Erstnachricht
+                </button>
+              )
             ) : (
               <span />
             )}

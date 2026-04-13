@@ -30,7 +30,24 @@ export async function GET(req: NextRequest) {
   } else {
     allLeads = db.select().from(leads).orderBy(sql`${leads.updatedAt} DESC`).all();
   }
-  return NextResponse.json(allLeads);
+
+  // Pro Lead markieren, ob bereits WhatsApp-Kontakt stattgefunden hat
+  const whatsappLeadIds = new Set<number>(
+    db
+      .select({ leadId: activities.leadId })
+      .from(activities)
+      .where(eq(activities.kontaktart, "WhatsApp"))
+      .all()
+      .map((r) => r.leadId)
+      .filter((id): id is number => id !== null),
+  );
+
+  const leadsWithFlags = allLeads.map((lead) => ({
+    ...lead,
+    whatsappSent: whatsappLeadIds.has(lead.id),
+  }));
+
+  return NextResponse.json(leadsWithFlags);
 }
 
 export async function POST(req: NextRequest) {

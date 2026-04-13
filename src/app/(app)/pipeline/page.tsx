@@ -52,6 +52,7 @@ export interface Lead {
   productId: number | null;
   createdAt: string;
   updatedAt: string;
+  whatsappSent?: boolean;
 }
 
 export interface LeadProduct {
