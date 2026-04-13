@@ -7,13 +7,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag, Plus, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { GripVertical, CalendarDays, Bell, Archive, Inbox, MoreVertical, Trash2, Tag, Plus, CheckCircle2, AlertTriangle, Clock, MessageCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Lead } from "@/app/(app)/pipeline/page";
 
@@ -83,6 +91,36 @@ export function KanbanBoard({
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [folgeterminEdit, setFolgeterminEdit] = useState<number | null>(null);
+  const [whatsappTarget, setWhatsappTarget] = useState<{ leadId: number; name: string; phone: string } | null>(null);
+  const [whatsappSending, setWhatsappSending] = useState(false);
+
+  async function handleWhatsappSend() {
+    if (!whatsappTarget) return;
+    const phone = whatsappTarget.phone.trim();
+    if (!phone) {
+      toast.error("Bitte Handynummer eingeben");
+      return;
+    }
+    setWhatsappSending(true);
+    try {
+      const res = await fetch("/api/leads/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: whatsappTarget.leadId, phone }),
+      });
+      if (res.ok) {
+        toast.success(`Erstnachricht an ${whatsappTarget.name} gesendet`);
+        setWhatsappTarget(null);
+        onLeadUpdate?.();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Versand fehlgeschlagen");
+      }
+    } catch {
+      toast.error("Versand fehlgeschlagen");
+    }
+    setWhatsappSending(false);
+  }
 
   async function handleFolgeterminSet(leadId: number, datetime: string) {
     await fetch("/api/leads", {
@@ -214,6 +252,25 @@ export function KanbanBoard({
                   <AlertTriangle className="h-3 w-3" />
                   Kein Termin
                 </span>
+              )}
+              {/* WhatsApp-Erstnachricht */}
+              {phase !== "Abgeschlossen" && phase !== "Verloren" && (
+                <button
+                  type="button"
+                  title="WhatsApp-Erstnachricht senden"
+                  className="flex items-center gap-0.5 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded px-1 py-0.5 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWhatsappTarget({
+                      leadId: lead.id,
+                      name: lead.ansprechpartner || lead.name,
+                      phone: lead.telefon || "",
+                    });
+                  }}
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </button>
               )}
               {/* Folgetermin Schnell-Aktionen */}
               {lead.folgetermin ? (
@@ -375,6 +432,67 @@ export function KanbanBoard({
           setDeleteTarget(null);
         }}
       />
+
+      <Dialog
+        open={!!whatsappTarget}
+        onOpenChange={(open) => !open && !whatsappSending && setWhatsappTarget(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-emerald-600" />
+              WhatsApp-Erstnachricht senden
+            </DialogTitle>
+          </DialogHeader>
+          {whatsappTarget && (
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">
+                An <span className="font-medium text-foreground">{whatsappTarget.name}</span>
+              </p>
+              <div className="space-y-2">
+                <Label className="text-xs">Handynummer</Label>
+                <Input
+                  value={whatsappTarget.phone}
+                  onChange={(e) =>
+                    setWhatsappTarget({ ...whatsappTarget, phone: e.target.value })
+                  }
+                  placeholder="+49 176 1234567"
+                  autoFocus
+                />
+                {whatsappTarget.phone &&
+                  !/^(\+?\d{1,3})?[\s-]?(01[567]\d|1[567]\d)\d{5,8}$/.test(
+                    whatsappTarget.phone.replace(/[\s-]/g, ""),
+                  ) && (
+                    <p className="text-xs text-amber-600">
+                      Das sieht nicht nach einer Handynummer aus
+                    </p>
+                  )}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setWhatsappTarget(null)}
+                  disabled={whatsappSending}
+                >
+                  Abbrechen
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleWhatsappSend}
+                  disabled={whatsappSending || !whatsappTarget.phone.trim()}
+                >
+                  {whatsappSending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <MessageCircle className="h-4 w-4 mr-1" />
+                  )}
+                  Senden
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

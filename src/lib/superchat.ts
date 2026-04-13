@@ -29,6 +29,24 @@ export async function getConversations(contactId: string) {
   return superchatFetch(`/contacts/${contactId}/conversations`);
 }
 
+export async function getConversationMessages(conversationId: string) {
+  // Paginiert ueber alle Seiten, damit wir den kompletten Verlauf erhalten
+  const limit = 100;
+  const all: Array<Record<string, unknown>> = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const url: string = cursor
+      ? `/conversations/${conversationId}/messages?limit=${limit}&after=${cursor}`
+      : `/conversations/${conversationId}/messages?limit=${limit}`;
+    const result = await superchatFetch(url);
+    const messages = result?.results || result?.data || [];
+    all.push(...messages);
+    cursor = result?.pagination?.next_cursor || null;
+    if (!cursor || messages.length < limit) break;
+  }
+  return all;
+}
+
 export async function createContact(data: {
   first_name?: string;
   last_name?: string;
