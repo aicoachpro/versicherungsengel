@@ -59,6 +59,7 @@ import {
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { LeadDialog } from "@/components/pipeline/lead-dialog";
 import { toast } from "sonner";
 
@@ -871,7 +872,7 @@ export default function LeadDetailPage() {
                           })}
                         </span>
                       </div>
-                      {a.notiz && <p className="text-sm mt-1 whitespace-pre-wrap">{a.notiz}</p>}
+                      {a.notiz && <ExpandableText text={a.notiz} className="text-sm mt-1" />}
                     </div>
                     <Button
                       variant="ghost"
@@ -1117,9 +1118,10 @@ export default function LeadDetailPage() {
                               </span>
                             </div>
                             {a.notiz && (
-                              <p className="text-sm text-foreground/80 mt-1 whitespace-pre-wrap leading-relaxed">
-                                {a.notiz}
-                              </p>
+                              <ExpandableText
+                                text={a.notiz}
+                                className="text-sm text-foreground/80 mt-1 leading-relaxed"
+                              />
                             )}
                           </div>
                         </div>
