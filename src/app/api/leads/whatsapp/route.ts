@@ -4,7 +4,7 @@ import { leads, leadProducts, activities } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
-import { sendTemplateMessage, createContact, findContactByHandle } from "@/lib/superchat";
+import { sendTemplateMessage, createContact, findContactByHandle, updateContact } from "@/lib/superchat";
 import { getSetting } from "@/lib/settings";
 
 /**
@@ -36,29 +36,73 @@ export async function POST(req: NextRequest) {
   if (!apiKey) return NextResponse.json({ error: "Superchat nicht konfiguriert" }, { status: 400 });
 
   try {
+    const nameParts = (lead.ansprechpartner || lead.name || "").split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
     // Superchat-Kontakt finden oder anlegen
     let contactId = lead.superchatContactId;
+    let contactWasExisting = false;
+
     if (!contactId) {
+      // 1. Zuerst versuchen, den Kontakt anhand der Telefonnummer zu finden
       const existing = await findContactByHandle(phone);
       if (existing) {
         contactId = existing.id;
+        contactWasExisting = true;
       } else {
-        const nameParts = (lead.ansprechpartner || lead.name || "").split(" ");
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        const newContact = await createContact({
-          first_name: firstName,
-          last_name: lastName,
-          phone,
-          email: lead.email || undefined,
-        });
-        contactId = newContact.id;
+        // 2. Versuchen, neu anzulegen — bei 409 fallback auf nochmalige Suche
+        try {
+          const newContact = await createContact({
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            email: lead.email || undefined,
+          });
+          contactId = newContact.id;
+        } catch (err) {
+          const isConflict = err instanceof Error && /409/.test(err.message);
+          if (!isConflict) throw err;
+
+          // Kontakt existiert laut Superchat bereits — erneut suchen (evtl. neue Kontakte)
+          const retry = await findContactByHandle(phone);
+          if (!retry) {
+            throw new Error(
+              "Superchat meldet: Kontakt existiert bereits, konnte aber nicht gefunden werden. Bitte Nummer pruefen oder Kontakt manuell im Superchat zuordnen.",
+            );
+          }
+          contactId = retry.id;
+          contactWasExisting = true;
+        }
       }
       // Kontakt-ID am Lead speichern
       db.update(leads)
         .set({ superchatContactId: contactId, updatedAt: new Date().toISOString() })
         .where(eq(leads.id, leadId))
         .run();
+    } else {
+      // Lead hatte bereits eine gespeicherte Kontakt-ID
+      contactWasExisting = true;
+    }
+
+    if (!contactId) {
+      return NextResponse.json({ error: "Kein Superchat-Kontakt ermittelt" }, { status: 500 });
+    }
+
+    // Bei bereits existierenden Kontakten: Name/E-Mail aktualisieren (best effort)
+    if (contactWasExisting) {
+      try {
+        await updateContact(contactId, {
+          first_name: firstName || undefined,
+          last_name: lastName || undefined,
+          email: lead.email || undefined,
+        });
+      } catch (updateErr) {
+        console.log(
+          `[whatsapp] Kontakt-Update fehlgeschlagen fuer ${contactId}:`,
+          updateErr instanceof Error ? updateErr.message : String(updateErr),
+        );
+      }
     }
 
     // Anrede zusammenbauen

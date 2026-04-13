@@ -71,11 +71,37 @@ export async function createContact(data: {
   });
 }
 
+/**
+ * Normalisiert eine Telefonnummer fuer den Vergleich:
+ * - Entfernt alles ausser Ziffern
+ * - Entfernt fuehrende Nullen
+ * - Entfernt Laenderpraefix '49' (DE)
+ * So werden '+49 172 7755335', '01727755335' und '491727755335' alle zu '1727755335'.
+ */
+function normalizePhoneForCompare(value: string): string {
+  return value
+    .replace(/\D/g, "")
+    .replace(/^0+/, "")
+    .replace(/^49/, "");
+}
+
+function normalizeEmailForCompare(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isPhoneHandle(value: string): boolean {
+  return /^[\d\s+\-()]+$/.test(value);
+}
+
 export async function findContactByHandle(handle: string): Promise<{ id: string } | null> {
-  // Superchat API hat keine Suchfunktion — Cursor-basiert paginieren, max 10 Seiten
+  // Superchat API hat keine Suchfunktion — Cursor-basiert paginieren
   const limit = 100;
-  const maxPages = 10;
-  const normalizedHandle = handle.replace(/[^0-9a-zA-Z@.+]/g, "").toLowerCase();
+  const maxPages = 30;
+  const isPhone = isPhoneHandle(handle);
+  const normalizedHandle = isPhone
+    ? normalizePhoneForCompare(handle)
+    : normalizeEmailForCompare(handle);
+
   let cursor: string | null = null;
 
   for (let page = 0; page < maxPages; page++) {
@@ -87,9 +113,14 @@ export async function findContactByHandle(handle: string): Promise<{ id: string 
 
     for (const contact of contacts) {
       const handles: Array<{ type: string; value: string }> = contact.handles || [];
-      const match = handles.some((h) =>
-        h.value.replace(/[^0-9a-zA-Z@.+]/g, "").toLowerCase() === normalizedHandle
-      );
+      const match = handles.some((h) => {
+        if (!h.value) return false;
+        if (isPhone) {
+          // Phone: Vergleich ueber normalisierte Ziffern (ohne +/Leerzeichen/Laenderpraefix)
+          return normalizePhoneForCompare(h.value) === normalizedHandle;
+        }
+        return normalizeEmailForCompare(h.value) === normalizedHandle;
+      });
       if (match) return contact;
     }
 
