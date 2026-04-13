@@ -253,25 +253,6 @@ export function KanbanBoard({
                   Kein Termin
                 </span>
               )}
-              {/* WhatsApp-Erstnachricht */}
-              {phase !== "Abgeschlossen" && phase !== "Verloren" && (
-                <button
-                  type="button"
-                  title="WhatsApp-Erstnachricht senden"
-                  className="flex items-center gap-0.5 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded px-1 py-0.5 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setWhatsappTarget({
-                      leadId: lead.id,
-                      name: lead.ansprechpartner || lead.name,
-                      phone: lead.telefon || "",
-                    });
-                  }}
-                >
-                  <MessageCircle className="h-3 w-3" />
-                  <span className="hidden sm:inline">WhatsApp</span>
-                </button>
-              )}
               {/* Folgetermin Schnell-Aktionen */}
               {lead.folgetermin ? (
                 <button
@@ -308,7 +289,27 @@ export function KanbanBoard({
                 )
               ) : null}
             </div>
-          <div className="flex items-center justify-end mt-2 -mb-0.5 -mr-1">
+          <div className="flex items-center justify-between mt-2 -mb-0.5 -mr-1 ml-4">
+            {phase !== "Abgeschlossen" && phase !== "Verloren" ? (
+              <button
+                type="button"
+                title="WhatsApp-Erstnachricht senden"
+                className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-white hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 rounded px-1.5 py-0.5 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWhatsappTarget({
+                    leadId: lead.id,
+                    name: lead.ansprechpartner || lead.name,
+                    phone: lead.telefon || "",
+                  });
+                }}
+              >
+                <MessageCircle className="h-3 w-3" />
+                WhatsApp
+              </button>
+            ) : (
+              <span />
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger
                 className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-accent md:opacity-0 md:group-hover/card:opacity-100 transition-opacity"
