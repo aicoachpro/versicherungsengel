@@ -273,7 +273,9 @@ export const productMappings = sqliteTable("product_mappings", {
 
 export const leadAssignmentRules = sqliteTable("lead_assignment_rules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  providerId: integer("provider_id").notNull(),
+  // Entweder providerId oder productId (oder beides) muss gesetzt sein.
+  // Beide NULL = ungueltige Regel und wird ignoriert.
+  providerId: integer("provider_id"),
   productId: integer("product_id"),
   userId: integer("user_id").notNull(),
   active: integer("active", { mode: "boolean" }).notNull().default(true),

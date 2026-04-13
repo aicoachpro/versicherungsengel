@@ -601,13 +601,44 @@ sqlite.prepare(`
 sqlite.prepare(`
   CREATE TABLE IF NOT EXISTS lead_assignment_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    provider_id INTEGER NOT NULL,
+    provider_id INTEGER,
     product_id INTEGER,
     user_id INTEGER NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `).run();
+
+// Migration: provider_id auf nullable umstellen (SQLite braucht table rebuild).
+// Wir erkennen den Zustand ueber einen NULL-Insert-Test: wenn fehlschlaegt → umbauen.
+try {
+  const pragma = sqlite
+    .prepare("PRAGMA table_info(lead_assignment_rules)")
+    .all() as Array<{ name: string; notnull: number }>;
+  const providerCol = pragma.find((c) => c.name === "provider_id");
+  if (providerCol && providerCol.notnull === 1) {
+    console.log("Migration: lead_assignment_rules.provider_id wird nullable gemacht...");
+    sqlite.exec(`
+      BEGIN;
+      CREATE TABLE lead_assignment_rules_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        provider_id INTEGER,
+        product_id INTEGER,
+        user_id INTEGER NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO lead_assignment_rules_new (id, provider_id, product_id, user_id, active, created_at)
+        SELECT id, provider_id, product_id, user_id, active, created_at FROM lead_assignment_rules;
+      DROP TABLE lead_assignment_rules;
+      ALTER TABLE lead_assignment_rules_new RENAME TO lead_assignment_rules;
+      COMMIT;
+    `);
+    console.log("Migration abgeschlossen: provider_id ist jetzt nullable.");
+  }
+} catch (err) {
+  console.error("Migration lead_assignment_rules fehlgeschlagen:", err);
+}
 
 // Add lead_typ column to leads if not exists
 try {

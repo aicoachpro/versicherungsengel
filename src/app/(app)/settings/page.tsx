@@ -2738,10 +2738,25 @@ function AssignmentRuleDialog({
     }
   }, [open, initialData]);
 
+  // Modus: provider (an Anbieter binden) oder product (nur an Leadart)
+  const [mode, setMode] = useState<"provider" | "product">(
+    initialData.providerId ? "provider" : "product",
+  );
+
+  useEffect(() => {
+    if (open) {
+      setMode(initialData.providerId ? "provider" : "product");
+    }
+  }, [open, initialData]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.providerId) {
+    if (mode === "provider" && !form.providerId) {
       setError("Anbieter ist erforderlich");
+      return;
+    }
+    if (mode === "product" && form.productIds.length === 0) {
+      setError("Mindestens eine Leadart auswaehlen");
       return;
     }
     if (!form.userId) {
@@ -2751,7 +2766,11 @@ function AssignmentRuleDialog({
     setSaving(true);
     setError("");
     try {
-      await onSave(form);
+      // Im product-Mode wird providerId auf 0 gesetzt — API interpretiert das als NULL
+      await onSave({
+        ...form,
+        providerId: mode === "product" ? 0 : form.providerId,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern");
     } finally {
@@ -2763,9 +2782,14 @@ function AssignmentRuleDialog({
 
   const selectedProvider = providers.find((p) => p.id === form.providerId);
   const activePurchasedIds = selectedProvider?.productIds || [];
-  const availableProducts = form.providerId
-    ? products.filter((p) => activePurchasedIds.includes(p.id))
-    : [];
+  // provider-Mode: nur Produkte des gewaehlten Anbieters
+  // product-Mode: alle Produkte
+  const availableProducts =
+    mode === "product"
+      ? products
+      : form.providerId
+      ? products.filter((p) => activePurchasedIds.includes(p.id))
+      : [];
   const q = productSearch.toLowerCase().trim();
   const filteredProducts = q
     ? availableProducts.filter(
@@ -2802,40 +2826,83 @@ function AssignmentRuleDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
-            <Label>Lead-Anbieter *</Label>
-            <select
-              className={selectClass}
-              value={form.providerId}
-              onChange={(e) => {
-                const newProviderId = parseInt(e.target.value) || 0;
-                const newProvider = providers.find((p) => p.id === newProviderId);
-                const newPurchased = newProvider?.productIds || [];
-                setForm((prev) => ({
-                  ...prev,
-                  providerId: newProviderId,
-                  // Nur behalten was beim neuen Provider auch existiert
-                  productIds: prev.productIds.filter((id) => id !== null && newPurchased.includes(id)),
-                }));
-              }}
-              required
-            >
-              <option value={0}>-- Anbieter waehlen --</option>
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            <Label>Regel-Typ *</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={`rounded-md border p-2 text-xs text-left transition-colors ${
+                  mode === "provider"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:bg-accent"
+                }`}
+                onClick={() => setMode("provider")}
+              >
+                <div className="font-semibold">Pro Anbieter</div>
+                <div className="text-muted-foreground mt-0.5">
+                  z.B. alle Leads von LeadCloser → User X
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`rounded-md border p-2 text-xs text-left transition-colors ${
+                  mode === "product"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:bg-accent"
+                }`}
+                onClick={() =>
+                  setMode((prev) => {
+                    if (prev === "product") return prev;
+                    // Provider-Einschraenkung loeschen, damit alle Produkte sichtbar sind
+                    setForm((f) => ({ ...f, providerId: 0 }));
+                    return "product";
+                  })
+                }
+              >
+                <div className="font-semibold">Pro Leadart</div>
+                <div className="text-muted-foreground mt-0.5">
+                  z.B. Rente (egal welcher Anbieter) → User X
+                </div>
+              </button>
+            </div>
           </div>
+
+          {mode === "provider" && (
+            <div className="space-y-2">
+              <Label>Lead-Anbieter *</Label>
+              <select
+                className={selectClass}
+                value={form.providerId}
+                onChange={(e) => {
+                  const newProviderId = parseInt(e.target.value) || 0;
+                  const newProvider = providers.find((p) => p.id === newProviderId);
+                  const newPurchased = newProvider?.productIds || [];
+                  setForm((prev) => ({
+                    ...prev,
+                    providerId: newProviderId,
+                    productIds: prev.productIds.filter((id) => id !== null && newPurchased.includes(id)),
+                  }));
+                }}
+              >
+                <option value={0}>-- Anbieter waehlen --</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Leadarten (optional)</Label>
+              <Label>
+                Leadarten {mode === "product" ? "*" : "(optional)"}
+              </Label>
               {form.productIds.length > 0 && (
                 <span className="text-xs text-muted-foreground">
                   {form.productIds.length} ausgewaehlt
                 </span>
               )}
             </div>
-            {!form.providerId ? (
+            {mode === "provider" && !form.providerId ? (
               <p className="text-xs text-muted-foreground">Zuerst Anbieter waehlen</p>
             ) : availableProducts.length === 0 ? (
               <p className="text-xs text-muted-foreground">

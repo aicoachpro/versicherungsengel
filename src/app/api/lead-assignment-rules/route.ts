@@ -46,9 +46,15 @@ export async function POST(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const body = await req.json();
-  if (!body.providerId || !body.userId) {
+  if (!body.userId) {
     return NextResponse.json(
-      { error: "Anbieter und Bearbeiter sind erforderlich" },
+      { error: "Bearbeiter ist erforderlich" },
+      { status: 400 }
+    );
+  }
+  if (!body.providerId && !body.productId) {
+    return NextResponse.json(
+      { error: "Mindestens Anbieter ODER Leadart angeben" },
       { status: 400 }
     );
   }
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
   const result = db
     .insert(leadAssignmentRules)
     .values({
-      providerId: body.providerId,
+      providerId: body.providerId || null,
       productId: body.productId || null,
       userId: body.userId,
       active: body.active ?? true,

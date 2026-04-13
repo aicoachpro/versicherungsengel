@@ -37,13 +37,23 @@ export async function PATCH(
   const body = await req.json();
   const updates: Record<string, unknown> = {};
 
-  if (body.providerId !== undefined) updates.providerId = body.providerId;
+  if (body.providerId !== undefined) updates.providerId = body.providerId || null;
   if (body.productId !== undefined) updates.productId = body.productId || null;
   if (body.userId !== undefined) updates.userId = body.userId;
   if (body.active !== undefined) updates.active = body.active;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Keine Aenderungen" }, { status: 400 });
+  }
+
+  // Sicherstellen, dass mind. eins von providerId/productId gesetzt ist
+  const finalProvider = "providerId" in updates ? updates.providerId : existing.providerId;
+  const finalProduct = "productId" in updates ? updates.productId : existing.productId;
+  if (!finalProvider && !finalProduct) {
+    return NextResponse.json(
+      { error: "Mindestens Anbieter ODER Leadart angeben" },
+      { status: 400 },
+    );
   }
 
   const result = db

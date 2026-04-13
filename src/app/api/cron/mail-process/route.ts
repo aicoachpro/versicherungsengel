@@ -128,38 +128,55 @@ export async function GET(req: NextRequest) {
           .get();
         if (account?.providerId) {
           providerId = account.providerId;
+        }
 
-          // Zuweisungsregel suchen: erst spezifisch (Anbieter + Produkt), dann pauschal (Anbieter)
-          if (productId) {
-            const specificRule = db
-              .select({ userId: leadAssignmentRules.userId })
-              .from(leadAssignmentRules)
-              .where(
-                and(
-                  eq(leadAssignmentRules.providerId, providerId),
-                  eq(leadAssignmentRules.productId, productId),
-                  eq(leadAssignmentRules.active, true)
-                )
-              )
-              .get();
-            if (specificRule) assignedTo = specificRule.userId;
-          }
+        // Matching-Reihenfolge von spezifisch → unspezifisch:
+        // 1. Provider + Produkt (exakt)
+        // 2. Provider pauschal (Provider gesetzt, Produkt NULL)
+        // 3. Produkt pauschal (Provider NULL, Produkt gesetzt) — NEU
+        if (providerId && productId) {
+          const specificRule = db
+            .select({ userId: leadAssignmentRules.userId })
+            .from(leadAssignmentRules)
+            .where(
+              and(
+                eq(leadAssignmentRules.providerId, providerId),
+                eq(leadAssignmentRules.productId, productId),
+                eq(leadAssignmentRules.active, true),
+              ),
+            )
+            .get();
+          if (specificRule) assignedTo = specificRule.userId;
+        }
 
-          // Fallback: Pauschalregel (ohne Produkt)
-          if (!assignedTo) {
-            const defaultRule = db
-              .select({ userId: leadAssignmentRules.userId })
-              .from(leadAssignmentRules)
-              .where(
-                and(
-                  eq(leadAssignmentRules.providerId, providerId),
-                  isNull(leadAssignmentRules.productId),
-                  eq(leadAssignmentRules.active, true)
-                )
-              )
-              .get();
-            if (defaultRule) assignedTo = defaultRule.userId;
-          }
+        if (!assignedTo && providerId) {
+          const providerRule = db
+            .select({ userId: leadAssignmentRules.userId })
+            .from(leadAssignmentRules)
+            .where(
+              and(
+                eq(leadAssignmentRules.providerId, providerId),
+                isNull(leadAssignmentRules.productId),
+                eq(leadAssignmentRules.active, true),
+              ),
+            )
+            .get();
+          if (providerRule) assignedTo = providerRule.userId;
+        }
+
+        if (!assignedTo && productId) {
+          const productRule = db
+            .select({ userId: leadAssignmentRules.userId })
+            .from(leadAssignmentRules)
+            .where(
+              and(
+                isNull(leadAssignmentRules.providerId),
+                eq(leadAssignmentRules.productId, productId),
+                eq(leadAssignmentRules.active, true),
+              ),
+            )
+            .get();
+          if (productRule) assignedTo = productRule.userId;
         }
       } catch {
         // Tabellen existieren evtl. noch nicht
