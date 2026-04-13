@@ -10,7 +10,15 @@ export async function middleware(req: NextRequest) {
   const isSearchApi = pathname.startsWith("/api/leads/search");
   const isCronApi = pathname.startsWith("/api/cron");
 
-  if (isWebhook || isAuthApi || isIngestApi || isSearchApi || isCronApi) return NextResponse.next();
+  // API-Aufrufe mit gueltigem Cron-Secret duerfen die Middleware umgehen
+  // (mail-process ruft /api/superchat/sync intern auf)
+  const cronSecret = req.headers.get("x-cron-secret");
+  const expected = process.env.CRON_SECRET || "vf-cron-2024-secure";
+  const isInternalCronCall = pathname.startsWith("/api/") && cronSecret === expected;
+
+  if (isWebhook || isAuthApi || isIngestApi || isSearchApi || isCronApi || isInternalCronCall) {
+    return NextResponse.next();
+  }
 
   const secureCookie = req.nextUrl.protocol === "https:";
   const token = await getToken({
