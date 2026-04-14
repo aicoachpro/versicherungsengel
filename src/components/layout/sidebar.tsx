@@ -13,8 +13,6 @@ import {
   Settings,
   Shield,
   Users,
-  Menu,
-  X,
   Archive,
   AlertTriangle,
   CalendarClock,
@@ -23,7 +21,6 @@ import {
   Upload,
   Mail,
   Coins,
-  MoreHorizontal,
   Sun,
   Moon,
   Monitor,
@@ -57,14 +54,14 @@ const mobileBottomNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/kalender", label: "Kalender", icon: CalendarDays },
-  { href: "/wiedervorlage", label: "Wiedervorlage", icon: CalendarClock },
+  { href: "/wiedervorlage", label: "Wiedervorl.", icon: CalendarClock },
+  { href: "/settings", label: "Einstell.", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   const branding = useBranding();
   const [mounted, setMounted] = useState(false);
@@ -76,10 +73,6 @@ export function Sidebar() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }) => {
     const isActive = pathname === href || pathname.startsWith(href + "/");
@@ -173,39 +166,16 @@ export function Sidebar() {
 
   return (
     <>
-      {/* === MOBILE: Header + Overlay + Sidebar als Overlay === */}
+      {/* === MOBILE: Top-Bar + Bottom-Nav, KEINE Slide-In-Sidebar === */}
       {!isDesktop && (
         <>
-          {/* Top Bar */}
+          {/* Top Bar — nur Logo + Firmenname, kein Menue-Toggle */}
           <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/80 backdrop-blur-xl px-4 text-sidebar-foreground">
-            <button onClick={() => setMobileOpen(!mobileOpen)} className="rounded-md p-1.5 hover:bg-sidebar-accent" aria-label="Menue">
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
             <Image src={branding.logo} alt="Logo" width={28} height={28} className="rounded" />
             <span className="text-sm font-semibold tracking-tight">{branding.companyName}</span>
           </div>
 
-          {/* Overlay */}
-          {mobileOpen && (
-            <div
-              className="fixed inset-0 z-40 bg-black/50"
-              onClick={() => setMobileOpen(false)}
-            />
-          )}
-
-          {/* Sidebar Overlay */}
-          <aside
-            className="fixed left-0 top-0 z-50 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border"
-            style={{
-              transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
-              visibility: mobileOpen ? "visible" : "hidden",
-              transition: "transform 0.2s ease-in-out, visibility 0.2s",
-            }}
-          >
-            {sidebarContent}
-          </aside>
-
-          {/* Bottom Nav */}
+          {/* Bottom Nav — einzige Navigation auf Mobile */}
           <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground">
             {mobileBottomNav.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href || pathname.startsWith(href + "/");
@@ -216,10 +186,6 @@ export function Sidebar() {
                 </Link>
               );
             })}
-            <button onClick={() => setMobileOpen(!mobileOpen)} className="flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium text-sidebar-foreground/50">
-              <MoreHorizontal className="h-5 w-5" />
-              Mehr
-            </button>
           </nav>
         </>
       )}
