@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { LeadDeliveryModal } from "@/components/dashboard/lead-delivery-modal";
 import {
   Target,
   DollarSign,
@@ -25,7 +26,9 @@ interface LeadBudgetMonth {
   outstanding: number;
 }
 
-interface LeadBudgetData {
+export interface ProviderBudget {
+  providerId: number;
+  providerName: string;
   budget: number;
   costPerLead: number;
   months: LeadBudgetMonth[];
@@ -37,7 +40,7 @@ interface KpiCardsProps {
   revenue: number;
   costs: number;
   roi: number;
-  leadBudget: LeadBudgetData;
+  providerBudgets: ProviderBudget[];
 }
 
 const MONTH_NAMES: Record<string, string> = {
@@ -129,9 +132,10 @@ function CycleCard({ revenue, costs, roi }: { revenue: number; costs: number; ro
   );
 }
 
-function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
+function ProviderBudgetCard({ data }: { data: ProviderBudget }) {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(getMonthKey(now));
+  const [modalOpen, setModalOpen] = useState(false);
 
   const navigate = (direction: -1 | 1) => {
     const [y, m] = selectedMonth.split("-").map(Number);
@@ -147,72 +151,102 @@ function LeadBudgetCard({ data }: { data: LeadBudgetData }) {
   const outstanding = monthData?.outstanding ?? 0;
 
   return (
-    <Card className="shadow-sm">
-      <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-6">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 bg-cyan-50 dark:bg-cyan-950/30">
-          <Package className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-600" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => navigate(-1)}
-              className="rounded p-0.5 hover:bg-accent transition-colors"
-              aria-label="Vorheriger Monat"
-            >
-              <ChevronLeft className="h-3 w-3 text-muted-foreground" />
-            </button>
-            <p className="text-[10px] text-muted-foreground sm:text-xs font-medium">
-              {formatMonth(selectedMonth)}
-            </p>
-            <button
-              onClick={() => navigate(1)}
-              className="rounded p-0.5 hover:bg-accent transition-colors"
-              aria-label="Nächster Monat"
-            >
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            </button>
+    <>
+      <Card
+        className="shadow-sm cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
+        onClick={() => setModalOpen(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setModalOpen(true);
+          }
+        }}
+      >
+        <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-6">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 bg-cyan-50 dark:bg-cyan-950/30">
+            <Package className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-600" />
           </div>
-          {(() => {
-            const ratio = expected > 0 ? netto / expected : 0;
-            const pct = Math.min(ratio * 100, 100);
-            const barColor =
-              ratio >= 1
-                ? "bg-emerald-500"
-                : ratio > 0.7
-                  ? "bg-amber-500"
-                  : "bg-red-500";
-            return (
-              <>
-                <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
-                  {netto} von {expected} erwartet
-                  {reklamiert > 0 && ` · ${reklamiert} reklamiert`}
-                </p>
-                {carryOver > 0 && (
-                  <p className="text-[10px] text-muted-foreground sm:text-xs">
-                    inkl. {carryOver} Guthaben aus Vormonaten
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold sm:text-sm" title={data.providerName}>
+              {data.providerName}
+            </p>
+            <div className="mt-0.5 flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(-1);
+                }}
+                className="rounded p-0.5 hover:bg-accent transition-colors"
+                aria-label="Vorheriger Monat"
+              >
+                <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+              </button>
+              <p className="text-[10px] text-muted-foreground sm:text-xs font-medium">
+                {formatMonth(selectedMonth)}
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(1);
+                }}
+                className="rounded p-0.5 hover:bg-accent transition-colors"
+                aria-label="Nächster Monat"
+              >
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              </button>
+            </div>
+            {(() => {
+              const ratio = expected > 0 ? netto / expected : 0;
+              const pct = Math.min(ratio * 100, 100);
+              const barColor =
+                ratio >= 1
+                  ? "bg-emerald-500"
+                  : ratio > 0.7
+                    ? "bg-amber-500"
+                    : "bg-red-500";
+              return (
+                <>
+                  <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+                    {netto} von {expected} erwartet
+                    {reklamiert > 0 && ` · ${reklamiert} reklamiert`}
                   </p>
-                )}
-                {outstanding > 0 && (
-                  <p className="text-[10px] text-amber-600 sm:text-xs font-medium">
-                    {outstanding} Leads ausstehend
-                  </p>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      </CardContent>
-    </Card>
+                  {carryOver > 0 && (
+                    <p className="text-[10px] text-muted-foreground sm:text-xs">
+                      inkl. {carryOver} Guthaben aus Vormonaten
+                    </p>
+                  )}
+                  {outstanding > 0 && (
+                    <p className="text-[10px] text-amber-600 sm:text-xs font-medium">
+                      {outstanding} Leads ausstehend
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </CardContent>
+      </Card>
+      <LeadDeliveryModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        providerId={data.providerId}
+        providerName={data.providerName}
+        budget={data.budget}
+        initialMonth={selectedMonth}
+      />
+    </>
   );
 }
 
-export function KpiCards({ wonLeads, openLeads, revenue, costs, roi, leadBudget }: KpiCardsProps) {
+export function KpiCards({ wonLeads, openLeads, revenue, costs, roi, providerBudgets }: KpiCardsProps) {
   const allZero = wonLeads === 0 && openLeads === 0 && revenue === 0 && costs === 0;
 
   if (allZero) {
@@ -276,7 +310,9 @@ export function KpiCards({ wonLeads, openLeads, revenue, costs, roi, leadBudget 
         </Link>
       ))}
       <CycleCard revenue={revenue} costs={costs} roi={roi} />
-      {leadBudget.budget > 0 && <LeadBudgetCard data={leadBudget} />}
+      {providerBudgets.map((pb) => (
+        <ProviderBudgetCard key={pb.providerId} data={pb} />
+      ))}
     </div>
   );
 }

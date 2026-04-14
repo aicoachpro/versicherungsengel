@@ -176,6 +176,125 @@ function getLeadBudget() {
   return { budget: minPerMonth, costPerLead, months };
 }
 
+// Pro-Provider-Budgets — nur Provider mit fester Abnahme + Vorauszahlung
+// Wird fuer die Lead-Lieferung-Kachel auf dem Dashboard verwendet
+function getProviderBudgets() {
+  let providers: Array<{
+    id: number;
+    name: string;
+    minPerMonth: number;
+    costPerLead: number;
+    carryOver: boolean;
+    startMonth: string;
+    billingModel: string;
+    active: boolean;
+  }> = [];
+
+  try {
+    providers = db
+      .select()
+      .from(leadProviders)
+      .where(
+        and(
+          eq(leadProviders.active, true),
+          eq(leadProviders.billingModel, "prepaid"),
+          sql`${leadProviders.minPerMonth} > 0`,
+        ),
+      )
+      .all();
+  } catch {
+    return [];
+  }
+
+  return providers.map((p) => {
+    const minPerMonth = p.minPerMonth || 0;
+    const carryOverEnabled = !!p.carryOver;
+    const startMonth = p.startMonth || "";
+    const costPerLead = p.costPerLead || 0;
+
+    const result = db
+      .select({
+        month: sql<string>`strftime('%Y-%m', ${leads.eingangsdatum})`,
+        total: sql<number>`count(*)`,
+        reklamiert: sql<number>`sum(CASE WHEN ${leads.reklamationStatus} = 'genehmigt' THEN 1 ELSE 0 END)`,
+      })
+      .from(leads)
+      .where(eq(leads.providerId, p.id))
+      .groupBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
+      .orderBy(sql`strftime('%Y-%m', ${leads.eingangsdatum})`)
+      .all();
+
+    const monthsRaw = result
+      .filter((r) => r.month != null)
+      .map((r) => ({
+        month: r.month,
+        total: r.total,
+        reklamiert: r.reklamiert || 0,
+        netto: r.total - (r.reklamiert || 0),
+      }));
+
+    const monthLookup = new Map(monthsRaw.map((m) => [m.month, m]));
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const effectiveStart = startMonth || monthsRaw[0]?.month || currentMonthKey;
+
+    const allMonthKeys: string[] = [];
+    {
+      const [sy, sm] = effectiveStart.split("-").map(Number);
+      const d = new Date(sy, sm - 1, 1);
+      while (d <= now) {
+        allMonthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        d.setMonth(d.getMonth() + 1);
+      }
+    }
+
+    let accumulatedCarryOver = 0;
+    const monthsWithCarryOver = allMonthKeys.map((key) => {
+      const data = monthLookup.get(key);
+      const delivered = data?.netto ?? 0;
+      const total = data?.total ?? 0;
+      const reklamiert = data?.reklamiert ?? 0;
+      const expected = minPerMonth + (carryOverEnabled ? accumulatedCarryOver : 0);
+      const carryOverForThisMonth = carryOverEnabled ? accumulatedCarryOver : 0;
+      const outstanding = Math.max(0, expected - delivered);
+      const shortfall = Math.max(0, minPerMonth - delivered);
+      if (carryOverEnabled) {
+        accumulatedCarryOver = accumulatedCarryOver + shortfall;
+        if (delivered > minPerMonth) {
+          const excess = delivered - minPerMonth;
+          accumulatedCarryOver = Math.max(0, accumulatedCarryOver - excess);
+        }
+      }
+      return {
+        month: key,
+        total,
+        reklamiert,
+        netto: delivered,
+        expected,
+        carryOver: carryOverForThisMonth,
+        outstanding,
+      };
+    });
+
+    const beforeStart = monthsRaw
+      .filter((m) => m.month < effectiveStart)
+      .map((m) => ({
+        ...m,
+        expected: minPerMonth,
+        carryOver: 0,
+        outstanding: Math.max(0, minPerMonth - m.netto),
+      }));
+
+    return {
+      providerId: p.id,
+      providerName: p.name,
+      budget: minPerMonth,
+      costPerLead,
+      months: [...beforeStart, ...monthsWithCarryOver],
+    };
+  });
+}
+
 function getWonLeadsCount(range: DateRange, userId: number | null = null) {
   const filter = dateFilter(range);
   const uFilter = assignedFilter(userId);
@@ -662,6 +781,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const kpis = getKpis(range, filterUserId);
   const wonLeads = getWonLeadsCount(range, filterUserId);
   const leadBudget = getLeadBudget();
+  const providerBudgets = getProviderBudgets();
   const insights = getSmartInsights(leadBudget, filterUserId);
   const pipelineData = getPipelineData(range, filterUserId);
   const revenueData = getRevenueByMonth(filterUserId);
@@ -680,7 +800,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           revenue={kpis.revenue}
           costs={kpis.costs}
           roi={kpis.roi}
-          leadBudget={leadBudget}
+          providerBudgets={providerBudgets}
         />
         <SmartInsights insights={insights} />
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
