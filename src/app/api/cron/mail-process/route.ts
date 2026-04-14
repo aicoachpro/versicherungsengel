@@ -302,7 +302,8 @@ export async function GET(req: NextRequest) {
       }
 
       // Auto-WhatsApp fuer LeadCloser-Leads ausserhalb Geschaeftszeiten
-      if (superchatContactPhone && providerId) {
+      // VOE-138: Nur wenn productId gesetzt — sonst kein Versand mit Fallback-Text
+      if (superchatContactPhone && providerId && productId) {
         try {
           const provRow = db
             .select({ name: leadProviders.name, superchatListId: leadProviders.superchatListId })
@@ -323,28 +324,37 @@ export async function GET(req: NextRequest) {
             const isOffHours = day === 0 || hour >= 20 || hour < 8;
 
             if (isOffHours) {
-              const { sendTemplateMessage } = await import("@/lib/superchat");
+              // Produkt-Name hart pruefen — ohne echten Namen kein Versand
+              const produktRow = db
+                .select({ name: leadProducts.name })
+                .from(leadProducts)
+                .where(eq(leadProducts.id, productId))
+                .get();
+              const produktName = produktRow?.name;
 
-              // Grussformel zusammenbauen
-              const anrede = leadData.ansprechpartner
-                ? `Hallo ${leadData.ansprechpartner.split(" ")[0]},`
-                : "Hallo,";
+              if (!produktName) {
+                console.log(
+                  `[mail-process] Auto-WhatsApp uebersprungen (Produkt-Name nicht auffindbar) fuer Lead #${newLead.id}`,
+                );
+              } else {
+                const { sendTemplateMessage } = await import("@/lib/superchat");
 
-              // Produkt-Name fuer Variable 2
-              const produktName = productId
-                ? (db.select({ name: leadProducts.name }).from(leadProducts).where(eq(leadProducts.id, productId)).get()?.name || "Versicherung")
-                : "Versicherung";
+                // Grussformel zusammenbauen
+                const anrede = leadData.ansprechpartner
+                  ? `Hallo ${leadData.ansprechpartner.split(" ")[0]},`
+                  : "Hallo,";
 
-              await sendTemplateMessage({
-                phone: superchatContactPhone,
-                channelId: "mc_93p5ySMwRlwDycW7PBvTX",
-                templateId: "tn_RjcDqQy2JuiapRhtM16w5",
-                variables: [
-                  { position: 1, value: anrede },
-                  { position: 2, value: produktName },
-                ],
-              });
-              console.log(`[mail-process] Auto-WhatsApp gesendet an ${superchatContactPhone} fuer Lead #${newLead.id}`);
+                await sendTemplateMessage({
+                  phone: superchatContactPhone,
+                  channelId: "mc_93p5ySMwRlwDycW7PBvTX",
+                  templateId: "tn_RjcDqQy2JuiapRhtM16w5",
+                  variables: [
+                    { position: 1, value: anrede },
+                    { position: 2, value: produktName },
+                  ],
+                });
+                console.log(`[mail-process] Auto-WhatsApp gesendet an ${superchatContactPhone} fuer Lead #${newLead.id}`);
+              }
             } else {
               console.log(`[mail-process] Auto-WhatsApp uebersprungen (Geschaeftszeiten) fuer Lead #${newLead.id}`);
             }
@@ -352,6 +362,10 @@ export async function GET(req: NextRequest) {
         } catch (waErr) {
           console.log(`[mail-process] Auto-WhatsApp Fehler fuer Lead #${newLead.id}:`, waErr instanceof Error ? waErr.message : String(waErr));
         }
+      } else if (!productId && superchatContactPhone) {
+        console.log(
+          `[mail-process] Auto-WhatsApp uebersprungen (kein Lead-Produkt zugeordnet) fuer Lead #${newLead.id}`,
+        );
       }
 
       processed++;

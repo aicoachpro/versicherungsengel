@@ -255,7 +255,9 @@ export async function POST(req: NextRequest) {
   // Custom Attributes dynamisch zusammenbauen
   const custom_attributes: Array<{ id: string; value: string | string[] }> = [];
   pushAttr(custom_attributes, "Leadquelle", leadquelleMatched);
-  pushAttr(custom_attributes, "Kundentyp", ["Lead"]);
+  // Kundentyp ist immer "Lead" — Superchat-Attribut als String (nicht Array),
+  // weil Array-Form bei Single-Select verworfen wurde und das Feld dann leer blieb.
+  pushAttr(custom_attributes, "Kundentyp", "Lead");
   pushAttr(custom_attributes, "Lead Conversion", "Offen");
   if (lead.eingangsdatum) {
     pushAttr(custom_attributes, "Lead Eingangsdatum", lead.eingangsdatum.split("T")[0]);
@@ -269,7 +271,11 @@ export async function POST(req: NextRequest) {
   pushAttr(custom_attributes, "Branche", brancheMatched);
 
   // Kontaktliste(n) basierend auf Lead-Anbieter
-  const contact_list_ids = superchatListId ? [superchatListId] : undefined;
+  // WICHTIG: Bei fehlendem Lead-Produkt keine Contact-List setzen, damit die
+  // Superchat-Automation nicht anspringt und eine Erstnachricht mit leerer
+  // Produkt-Variable versendet (siehe VOE-138).
+  const missingProduct = !lead.productId;
+  const contact_list_ids = (superchatListId && !missingProduct) ? [superchatListId] : undefined;
 
   try {
     let contactId = lead.superchatContactId;
@@ -414,10 +420,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (missingProduct) {
+      warnings.push(
+        "Lead-Produkt fehlt — Kontakt wurde NICHT in die Automation-Liste aufgenommen, damit keine fehlerhafte Erstnachricht versendet wird.",
+      );
+    }
+
     return NextResponse.json({
       success: true,
       contactId,
       action,
+      missingProduct,
       warnings: warnings.length > 0 ? warnings : undefined,
       transferred: {
         first_name,
