@@ -72,7 +72,10 @@ async function chatOpenAI(messages: ChatMessage[]): Promise<AIResponse> {
 }
 
 // Lead-Extraktion mit JSON-Modus (Mistral-optimiert, wie n8n-Workflow)
-export async function extractLeadFromEmail(emailText: string): Promise<string> {
+export async function extractLeadFromEmail(
+  emailText: string,
+  availableProducts?: string[],
+): Promise<string> {
   const backend = getSetting("ai.backend");
   const baseURL =
     backend === "localai"
@@ -89,6 +92,12 @@ export async function extractLeadFromEmail(emailText: string): Promise<string> {
     baseURL: baseURL.replace(/\/+$/, "") + "/v1",
     apiKey,
   });
+
+  // Produkt-Regel: Wenn DB-Liste uebergeben wurde, muss die KI aus der Liste waehlen.
+  // Sonst Fallback auf Beispiele.
+  const produktRule = availableProducts && availableProducts.length > 0
+    ? `- produkt (waehle GENAU EINEN Wert aus dieser Liste — nimm den semantisch naechsten Treffer, auch wenn in der Mail eine andere Bezeichnung steht):\n${availableProducts.map((p) => `  * ${p}`).join("\n")}`
+    : "- produkt (die Versicherungsart/Sparte nach der gefragt wird, z.B. 'Betriebshaftpflicht', 'KFZ-Versicherung', 'Private Krankenversicherung', 'Lebensversicherung', 'Rechtsschutz' etc.)";
 
   const response = await client.chat.completions.create({
     model,
@@ -118,12 +127,12 @@ export async function extractLeadFromEmail(emailText: string): Promise<string> {
           "- notizen (alle zusaetzlichen relevanten Infos aus der Mail)\n" +
           "- naechsterSchritt (was der Interessent als naechstes wuenscht)\n" +
           "- termin (Datum + Uhrzeit im Format TT.MM.JJJJ HH:MM, oder null falls kein Termin genannt)\n" +
-          "- produkt (die Versicherungsart/Sparte nach der gefragt wird, z.B. 'Betriebshaftpflicht', 'KFZ-Versicherung', 'Private Krankenversicherung', 'Lebensversicherung', 'Rechtsschutz' etc.)\n\n" +
+          produktRule + "\n\n" +
           "WICHTIGE REGELN:\n" +
           "1. Felder die nicht gefunden werden auf \"\" setzen (bzw. null bei termin)\n" +
           "2. Bei Freitext-Mails: Lies die Mail genau und extrahiere semantisch, auch wenn keine Labels vorhanden sind\n" +
           "3. Bei mehreren moeglichen Werten: nimm den spezifischsten\n" +
-          "4. Das 'produkt'-Feld ist wichtig - versuche IMMER eine Sparte zu identifizieren\n" +
+          "4. Das 'produkt'-Feld ist wichtig — auch wenn die Mail einen anderen Begriff nennt (z.B. 'Hunde-Krankenversicherung'), waehle den semantisch naechsten Treffer aus der Liste (z.B. 'Hundeversicherung')\n" +
           "5. Bei Privatpersonen (keine Firma) setze 'name' auf den vollen Namen der Person\n\n" +
           "E-Mail-Inhalt:\n" + emailText,
       },

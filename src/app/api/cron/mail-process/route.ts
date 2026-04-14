@@ -63,8 +63,22 @@ export async function GET(req: NextRequest) {
         email.body,
       ].join("\n");
 
+      // Verfuegbare Lead-Produkte aus DB laden — die KI muss aus dieser Liste waehlen,
+      // damit unser exaktes Matching spaeter einen Treffer hat (VOE-138).
+      let availableProducts: string[] = [];
+      try {
+        availableProducts = db
+          .select({ name: leadProducts.name })
+          .from(leadProducts)
+          .where(eq(leadProducts.active, true))
+          .all()
+          .map((p) => p.name);
+      } catch {
+        // lead_products Tabelle existiert evtl. noch nicht
+      }
+
       // KI-Extraktion (Mistral JSON-Modus, wie n8n-Workflow)
-      const aiResponse = await extractLeadFromEmail(extractionText);
+      const aiResponse = await extractLeadFromEmail(extractionText, availableProducts);
 
       // JSON parsen (mit leadDaten-Wrapper-Handling wie n8n)
       let leadData: Record<string, string>;
@@ -102,16 +116,45 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Produkt-ID aus lead_products-Tabelle ermitteln
+      // Produkt-ID aus lead_products-Tabelle ermitteln.
+      // 1. Exakter Name-Match (wie die KI aus der Liste gewaehlt hat)
+      // 2. Fuzzy-Fallback: normalisiert + partial, falls die KI doch was abweichendes liefert
       let productId: number | null = null;
       if (leadData.produkt) {
         try {
-          const product = db
-            .select({ id: leadProducts.id })
+          const allProducts = db
+            .select({ id: leadProducts.id, name: leadProducts.name })
             .from(leadProducts)
-            .where(eq(leadProducts.name, leadData.produkt))
-            .get();
-          if (product) productId = product.id;
+            .all();
+
+          const normalize = (s: string) =>
+            s
+              .toLowerCase()
+              .replace(/ä/g, "ae")
+              .replace(/ö/g, "oe")
+              .replace(/ü/g, "ue")
+              .replace(/ß/g, "ss")
+              .replace(/[^a-z0-9]/g, "");
+
+          const target = normalize(leadData.produkt);
+
+          // 1. Exakt (case-insensitive)
+          let match = allProducts.find(
+            (p) => p.name.toLowerCase() === leadData.produkt.toLowerCase(),
+          );
+          // 2. Normalisiert
+          if (!match) {
+            match = allProducts.find((p) => normalize(p.name) === target);
+          }
+          // 3. Partial (KI-Wert enthaelt Produkt-Name oder umgekehrt)
+          if (!match) {
+            match = allProducts.find((p) => {
+              const pn = normalize(p.name);
+              return pn.length > 3 && (target.includes(pn) || pn.includes(target));
+            });
+          }
+
+          if (match) productId = match.id;
         } catch {
           // lead_products Tabelle existiert evtl. noch nicht
         }
