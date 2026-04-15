@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
@@ -13,6 +13,7 @@ import {
   Settings,
   Shield,
   Users,
+  Menu,
   Archive,
   AlertTriangle,
   CalendarClock,
@@ -27,6 +28,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBranding } from "@/hooks/use-branding";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -55,11 +62,11 @@ const mobileBottomNav = [
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/kalender", label: "Kalender", icon: CalendarDays },
   { href: "/wiedervorlage", label: "Wiedervorl.", icon: CalendarClock },
-  { href: "/settings", label: "Einstell.", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -166,16 +173,41 @@ export function Sidebar() {
 
   return (
     <>
-      {/* === MOBILE: Top-Bar + Bottom-Nav, KEINE Slide-In-Sidebar === */}
+      {/* === MOBILE: Top-Bar mit Dropdown-Menue + Bottom-Nav === */}
       {!isDesktop && (
         <>
-          {/* Top Bar — nur Logo + Firmenname, kein Menue-Toggle */}
+          {/* Top Bar — Logo, Firmenname, rechts Menue-Button als Dropdown */}
           <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/80 backdrop-blur-xl px-4 text-sidebar-foreground">
             <Image src={branding.logo} alt="Logo" width={28} height={28} className="rounded" />
-            <span className="text-sm font-semibold tracking-tight">{branding.companyName}</span>
+            <span className="text-sm font-semibold tracking-tight truncate">{branding.companyName}</span>
+            <div className="ml-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label="Menue oeffnen"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-sidebar-accent outline-none"
+                >
+                  <Menu className="h-5 w-5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={8} className="w-56 max-h-[70vh]">
+                  {[...mainNav, ...(isAdmin ? adminNav : []), ...settingsNav].map(({ href, label, icon: Icon }) => {
+                    const isActive = pathname === href || pathname.startsWith(href + "/");
+                    return (
+                      <DropdownMenuItem
+                        key={href}
+                        onClick={() => router.push(href)}
+                        className={cn("gap-2.5 py-2", isActive && "bg-sidebar-accent text-sidebar-accent-foreground")}
+                      >
+                        <Icon className={cn("h-4 w-4", isActive && "text-primary")} />
+                        <span className="text-[13px] font-medium">{label}</span>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
-          {/* Bottom Nav — einzige Navigation auf Mobile */}
+          {/* Bottom Nav — schneller Zugriff auf die 4 wichtigsten Seiten */}
           <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl text-sidebar-foreground">
             {mobileBottomNav.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href || pathname.startsWith(href + "/");
