@@ -16,6 +16,7 @@ Lead-Management & Versicherungs-CRM fuer Versicherungsvermittler. Fullstack-Weba
 - **Archiv** — Soft-Delete mit Wiederherstellung
 - **API-Ingest** — Externe Lead-Erfassung (n8n, Webhooks) mit Rate-Limiting
 - **MCP-Server** — Claude AI Integration via Model Context Protocol
+- **Hedy-Integration** — Gespraechsnotizen aus Hedy-Sitzungen landen automatisch als Aktivitaeten am passenden Lead (Matching ueber Termin-Zeitfenster + Teilnehmer, manuelle Zuordnung fallback, VOE-156)
 
 ## Tech Stack
 
