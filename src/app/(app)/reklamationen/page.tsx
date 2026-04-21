@@ -166,7 +166,7 @@ export default function ReklamationenPage() {
                             <p className="text-xs text-muted-foreground">{lead.ansprechpartner}</p>
                           )}
                         </div>
-                        <span className="text-sm font-medium whitespace-nowrap">{lead.terminKosten || 320}€</span>
+                        <span className="text-sm font-medium whitespace-nowrap">{lead.terminKosten ?? 320}€</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>Reklamiert: {lead.reklamiertAt ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE") : "—"}</span>
@@ -220,7 +220,7 @@ export default function ReklamationenPage() {
                             </button>
                           </TableCell>
                           <TableCell>{lead.ansprechpartner || "—"}</TableCell>
-                          <TableCell>{lead.terminKosten || 320}€</TableCell>
+                          <TableCell>{lead.terminKosten ?? 320}€</TableCell>
                           <TableCell>
                             {lead.reklamiertAt
                               ? new Date(lead.reklamiertAt).toLocaleDateString("de-DE")
