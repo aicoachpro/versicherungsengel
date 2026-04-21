@@ -55,6 +55,7 @@ import {
   Linkedin,
   MoreHorizontal,
   Coins,
+  Mic,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -400,6 +401,9 @@ export default function LeadDetailPage() {
     notiz: "",
   });
 
+  // Hedy-Import State
+  const [hedyFetching, setHedyFetching] = useState(false);
+
   // Dokument-Upload State
   const [uploadTyp, setUploadTyp] = useState("Sonstiges");
 
@@ -598,6 +602,39 @@ export default function LeadDetailPage() {
     await fetch(`/api/activities?id=${id}`, { method: "DELETE" });
     setDeleteConfirm(null);
     loadData();
+  }
+
+  async function handleHedyFetch() {
+    setHedyFetching(true);
+    try {
+      const res = await fetch("/api/hedy/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 50 }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        toast.error(`Hedy-Import fehlgeschlagen: ${data.error || "Fehler"}`);
+        return;
+      }
+      const matchedForLead = Array.isArray(data.results)
+        ? data.results.filter((r: { status: string; leadId?: number }) => r.status === "matched" && r.leadId === leadId).length
+        : 0;
+      if (matchedForLead > 0) {
+        toast.success(`${matchedForLead} Hedy-Notiz${matchedForLead === 1 ? "" : "en"} importiert`);
+      } else if (data.matched > 0) {
+        toast.success(`${data.matched} Session${data.matched === 1 ? "" : "s"} zugeordnet (nicht diesem Lead)`);
+      } else if (data.unmatched > 0) {
+        toast.info(`${data.unmatched} unmatched Sessions - in Einstellungen &rarr; Integrationen zuordnen`);
+      } else {
+        toast.info("Keine neuen Hedy-Sessions gefunden");
+      }
+      loadData();
+    } catch (err) {
+      toast.error(`Hedy-Fehler: ${(err as Error).message}`);
+    } finally {
+      setHedyFetching(false);
+    }
   }
 
   // Dokumente
@@ -898,16 +935,28 @@ export default function LeadDetailPage() {
                 <CardTitle className="text-lg">Aktivitäten</CardTitle>
                 <Badge variant="secondary" className="text-xs">{aktivitaeten.length}</Badge>
               </div>
-              <Button
-                onClick={() => {
-                  setActivityForm({ datum: new Date().toISOString().slice(0, 16), kontaktart: "Telefon", notiz: "" });
-                  setActivityDialogOpen(true);
-                }}
-                size="sm"
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" /> Neue Aktivität
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleHedyFetch}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  disabled={hedyFetching}
+                  title="Hedy-Gespraechsnotizen fuer diesen Lead pruefen und importieren"
+                >
+                  <Mic className="h-4 w-4" /> {hedyFetching ? "Hedy..." : "Hedy"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setActivityForm({ datum: new Date().toISOString().slice(0, 16), kontaktart: "Telefon", notiz: "" });
+                    setActivityDialogOpen(true);
+                  }}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" /> Neue Aktivität
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
