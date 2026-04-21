@@ -46,6 +46,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Image from "next/image";
+import { HedySection } from "@/components/settings/hedy-section";
 
 type SettingsMap = Record<string, string>;
 
@@ -3689,6 +3690,7 @@ export default function SettingsPage() {
               onSave={saveSection}
             />
             <SuperchatAttributesSection />
+            <HedySection settings={settings} onSave={saveSection} />
           </>
         )}
 

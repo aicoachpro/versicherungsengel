@@ -290,6 +290,27 @@ export const superchatAttributes = sqliteTable("superchat_attributes", {
   syncedAt: text("synced_at").notNull().default(sql`(datetime('now'))`),
 });
 
+export const hedySessions = sqliteTable("hedy_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: text("session_id").notNull().unique(),
+  title: text("title"),
+  startedAt: text("started_at"),
+  endedAt: text("ended_at"),
+  participants: text("participants"), // JSON: [{name, email}]
+  summary: text("summary"), // formatierter Markdown fuer Activity/Lead
+  raw: text("raw"), // full JSON aus Hedy API
+  leadId: integer("lead_id"),
+  activityId: integer("activity_id"),
+  matchStatus: text("match_status", {
+    enum: ["pending", "matched", "unmatched", "manual", "ignored", "error"],
+  }).notNull().default("pending"),
+  matchConfidence: real("match_confidence"),
+  matchReason: text("match_reason"),
+  errorMessage: text("error_message"),
+  importedAt: text("imported_at").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),

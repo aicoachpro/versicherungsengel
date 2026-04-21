@@ -31,6 +31,13 @@ const ENV_FALLBACKS: Record<string, () => string> = {
   "ai.customUrl": () => process.env.AI_CUSTOM_URL || "",
   "ai.customApiKey": () => process.env.AI_CUSTOM_API_KEY || "",
   "ai.model": () => process.env.AI_MODEL || "",
+  "hedy.apiKey": () => process.env.HEDY_API_KEY || "",
+  "hedy.region": () => process.env.HEDY_REGION || "eu", // "eu" | "us"
+  "hedy.autoImport": () => "true",
+  "hedy.matchWindowMinutes": () => "240", // +/- 4h Matching-Fenster
+  "hedy.lastImportAt": () => "",
+  "hedy.lastImportStatus": () => "",
+  "hedy.lastImportMessage": () => "",
 };
 
 // Keys that contain secrets — masked on GET
@@ -41,6 +48,7 @@ const SECRET_KEYS = new Set([
   "email.resendApiKey",
   "superchat.apiKey",
   "ai.customApiKey",
+  "hedy.apiKey",
 ]);
 
 export function getSetting(key: string): string {
