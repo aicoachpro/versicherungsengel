@@ -1317,7 +1317,7 @@ export default function LeadDetailPage() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              Der Lead wird als reklamiert markiert. Sobald VersicherungsEngel die Genehmigung erteilt, werden die Terminkosten ({lead.terminKosten || 320}€) gutgeschrieben.
+              Der Lead wird als reklamiert markiert. Sobald VersicherungsEngel die Genehmigung erteilt, werden die Terminkosten ({lead.terminKosten ?? 320}€) gutgeschrieben.
             </p>
             <div>
               <div className="flex items-center gap-1">
