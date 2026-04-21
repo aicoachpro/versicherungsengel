@@ -335,7 +335,7 @@ function LeadProviderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Anbieter bearbeiten" : "Anbieter hinzufügen"}</DialogTitle>
           <DialogDescription>
@@ -344,7 +344,7 @@ function LeadProviderDialog({
               : "Konfiguriere einen neuen Lead-Anbieter."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto overflow-x-hidden flex-1 min-w-0 pr-1">
           <div className="space-y-2">
             <Label>Anbieter-Name *</Label>
             <Input
@@ -512,34 +512,31 @@ function LeadProviderDialog({
                             {product.name}
                           </span>
                         </label>
-                        {isChecked && (
-                          <>
-                            <Input
-                              type="number"
-                              min={0}
-                              step={0.01}
-                              placeholder="EUR"
-                              className="w-20 h-7 text-xs shrink-0"
-                              value={form.productPrices[product.id] ?? ""}
-                              onChange={(e) => setProductPrice(product.id, e.target.value)}
-                            />
-                            {scOptions.length > 0 && (
-                              <select
-                                className="h-7 text-[10px] rounded border border-input bg-transparent px-1 w-28 shrink-0"
-                                value={form.superchatMappings[product.id] ?? ""}
-                                onChange={(e) => setForm((prev) => ({
-                                  ...prev,
-                                  superchatMappings: { ...prev.superchatMappings, [product.id]: e.target.value || undefined } as Record<number, string>,
-                                }))}
-                                title="Superchat Lead-Produkt"
-                              >
-                                <option value="">SC: --</option>
-                                {scOptions.map((o) => (
-                                  <option key={o} value={o}>{o}</option>
-                                ))}
-                              </select>
-                            )}
-                          </>
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          placeholder="EUR"
+                          className={`w-20 h-7 text-xs shrink-0 ${isChecked ? "" : "opacity-60"}`}
+                          value={form.productPrices[product.id] ?? ""}
+                          onChange={(e) => setProductPrice(product.id, e.target.value)}
+                          title={isChecked ? "Preis pro Lead" : "Preis ohne Bezug-Status setzen (Produkt nicht als bezogen markiert)"}
+                        />
+                        {isChecked && scOptions.length > 0 && (
+                          <select
+                            className="h-7 text-[10px] rounded border border-input bg-transparent px-1 w-28 shrink-0"
+                            value={form.superchatMappings[product.id] ?? ""}
+                            onChange={(e) => setForm((prev) => ({
+                              ...prev,
+                              superchatMappings: { ...prev.superchatMappings, [product.id]: e.target.value || undefined } as Record<number, string>,
+                            }))}
+                            title="Superchat Lead-Produkt"
+                          >
+                            <option value="">SC: --</option>
+                            {scOptions.map((o) => (
+                              <option key={o} value={o}>{o}</option>
+                            ))}
+                          </select>
                         )}
                       </div>
                     );
@@ -2815,7 +2812,7 @@ function AssignmentRuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Regel bearbeiten" : "Zuweisungsregel hinzufuegen"}</DialogTitle>
           <DialogDescription>
@@ -2824,7 +2821,7 @@ function AssignmentRuleDialog({
               : "Waehle einen Anbieter und eine oder mehrere Leadarten. Ohne Auswahl gilt die Regel pauschal fuer alle Leads."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto overflow-x-hidden flex-1 min-w-0 pr-1">
           <div className="space-y-2">
             <Label>Regel-Typ *</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -2929,7 +2926,7 @@ function AssignmentRuleDialog({
                     </Button>
                   )}
                 </div>
-                <div className="rounded-md border p-2 max-h-48 overflow-y-auto space-y-1">
+                <div className="rounded-md border p-2 max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                   {isPauschal && (
                     <div className="text-xs text-muted-foreground italic px-1 py-0.5">
                       Keine Auswahl = Pauschalregel fuer alle Leads
