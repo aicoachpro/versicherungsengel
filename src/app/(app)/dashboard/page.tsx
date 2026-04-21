@@ -30,6 +30,7 @@ import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
 import { ReportButton } from "@/components/dashboard/report-button";
 import { MonthFilter } from "@/components/dashboard/month-filter";
 import { UserFilter } from "@/components/dashboard/user-filter";
+import { ProviderFilter } from "@/components/dashboard/provider-filter";
 import { SmartInsights, type Insight } from "@/components/dashboard/smart-insights";
 
 type DateRange = { from: string; to: string } | null;
@@ -51,6 +52,36 @@ function assignedFilter(userId: number | null) {
   if (userId === null) return undefined;
   // NULL assignedTo = unassigned = visible to everyone
   return sql`(${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`;
+}
+
+function providerFilter(providerId: number | null) {
+  if (providerId === null) return undefined;
+  return eq(leads.providerId, providerId);
+}
+
+// Für provisions-Queries: Subquery auf leads für User+Provider-Filter
+function buildLeadSubquery(userId: number | null, providerId: number | null) {
+  if (userId === null && providerId === null) return undefined;
+  const userClause =
+    userId !== null
+      ? sql`(assigned_to = ${userId} OR assigned_to IS NULL)`
+      : sql`1=1`;
+  const providerClause =
+    providerId !== null ? sql`AND provider_id = ${providerId}` : sql``;
+  return sql`${provisions.leadId} IN (SELECT id FROM leads WHERE ${userClause} ${providerClause})`;
+}
+
+// SQL-Snippet für Raw-SQL-Kontexte (template literals mit uSql-Pattern)
+function buildUserProviderSql(userId: number | null, providerId: number | null) {
+  const userPart =
+    userId !== null
+      ? sql`AND (${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`
+      : sql``;
+  const providerPart =
+    providerId !== null
+      ? sql`AND ${leads.providerId} = ${providerId}`
+      : sql``;
+  return sql`${userPart} ${providerPart}`;
 }
 
 // Genehmigte Reklamationen aus allen KPIs ausschließen — Kosten wurden gutgeschrieben
@@ -295,13 +326,15 @@ function getProviderBudgets() {
   });
 }
 
-function getWonLeadsCount(range: DateRange, userId: number | null = null) {
+function getWonLeadsCount(range: DateRange, userId: number | null = null, providerId: number | null = null) {
   const filter = dateFilter(range);
   const uFilter = assignedFilter(userId);
+  const pFilter = providerFilter(providerId);
   const baseFilter = and(
     sql`(${leads.reklamiertAt} IS NULL OR ${leads.reklamationStatus} != 'genehmigt')`,
     filter ?? undefined,
     uFilter ?? undefined,
+    pFilter ?? undefined,
   );
 
   const result = db
@@ -313,10 +346,11 @@ function getWonLeadsCount(range: DateRange, userId: number | null = null) {
   return result?.count || 0;
 }
 
-function getKpis(range: DateRange, userId: number | null = null) {
+function getKpis(range: DateRange, userId: number | null = null, providerId: number | null = null) {
   const filter = dateFilter(range);
   const uFilter = assignedFilter(userId);
-  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined);
+  const pFilter = providerFilter(providerId);
+  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined, pFilter ?? undefined);
 
   const openLeads = db
     .select({ count: sql<number>`count(*)` })
@@ -327,11 +361,10 @@ function getKpis(range: DateRange, userId: number | null = null) {
   // Umsatz = Summe aller bestaetigten Provisionen (statt leads.umsatz)
   let revenue = 0;
   try {
+    const leadSubFilter = buildLeadSubquery(userId, providerId);
     const provisionFilter = and(
       eq(provisions.confirmed, true),
-      userId !== null
-        ? sql`${provisions.leadId} IN (SELECT id FROM leads WHERE assigned_to = ${userId} OR assigned_to IS NULL)`
-        : undefined,
+      leadSubFilter ?? undefined,
     );
     const totalRevenue = db
       .select({ total: sql<number>`coalesce(sum(${provisions.betrag}), 0)` })
@@ -359,7 +392,7 @@ function getKpis(range: DateRange, userId: number | null = null) {
   };
 }
 
-function getPipelineData(range: DateRange, userId: number | null = null) {
+function getPipelineData(range: DateRange, userId: number | null = null, providerId: number | null = null) {
   const phases = [
     "Termin eingegangen",
     "Termin stattgefunden",
@@ -370,7 +403,8 @@ function getPipelineData(range: DateRange, userId: number | null = null) {
   ] as const;
   const filter = dateFilter(range);
   const uFilter = assignedFilter(userId);
-  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined);
+  const pFilter = providerFilter(providerId);
+  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined, pFilter ?? undefined);
 
   return phases.map((phase) => {
     const result = db
@@ -382,9 +416,10 @@ function getPipelineData(range: DateRange, userId: number | null = null) {
   });
 }
 
-function getRevenueByMonth(userId: number | null = null) {
+function getRevenueByMonth(userId: number | null = null, providerId: number | null = null) {
   const uFilter = assignedFilter(userId);
-  const baseFilter = and(notGenehmigtReklamiert, uFilter ?? undefined);
+  const pFilter = providerFilter(providerId);
+  const baseFilter = and(notGenehmigtReklamiert, uFilter ?? undefined, pFilter ?? undefined);
 
   // Kosten aus leads (nach createdAt gruppiert)
   const costsResult = db
@@ -402,11 +437,10 @@ function getRevenueByMonth(userId: number | null = null) {
   // Umsatz aus bestaetigten Provisionen (nach buchungsDatum gruppiert)
   let revenueByMonth = new Map<string, number>();
   try {
+    const leadSubFilter = buildLeadSubquery(userId, providerId);
     const provisionFilter = and(
       eq(provisions.confirmed, true),
-      userId !== null
-        ? sql`${provisions.leadId} IN (SELECT id FROM leads WHERE assigned_to = ${userId} OR assigned_to IS NULL)`
-        : undefined,
+      leadSubFilter ?? undefined,
     );
     const provResult = db
       .select({
@@ -445,10 +479,11 @@ function getRevenueByMonth(userId: number | null = null) {
   });
 }
 
-function getGewerbeartData(range: DateRange, userId: number | null = null) {
+function getGewerbeartData(range: DateRange, userId: number | null = null, providerId: number | null = null) {
   const filter = dateFilter(range);
   const uFilter = assignedFilter(userId);
-  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined);
+  const pFilter = providerFilter(providerId);
+  const baseFilter = and(notGenehmigtReklamiert, filter ?? undefined, uFilter ?? undefined, pFilter ?? undefined);
   const result = db
     .select({
       gewerbeart: sql<string>`coalesce(${leads.gewerbeart}, 'Nicht angegeben')`,
@@ -474,7 +509,7 @@ function getGewerbeartData(range: DateRange, userId: number | null = null) {
   }));
 }
 
-function getUpcomingAppointments(userId: number | null = null) {
+function getUpcomingAppointments(userId: number | null = null, providerId: number | null = null) {
   const now = new Date().toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM für exakten Zeitvergleich
   const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
@@ -482,6 +517,7 @@ function getUpcomingAppointments(userId: number | null = null) {
 
   const notReklamiert = sql`${leads.reklamiertAt} IS NULL`;
   const uFilter = assignedFilter(userId);
+  const pFilter = providerFilter(providerId);
 
   // Ersttermine
   const termine = db
@@ -493,7 +529,7 @@ function getUpcomingAppointments(userId: number | null = null) {
       phase: leads.phase,
     })
     .from(leads)
-    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater), notReklamiert, uFilter ?? undefined))
+    .where(and(gte(leads.termin, now), lte(leads.termin, weekLater), notReklamiert, uFilter ?? undefined, pFilter ?? undefined))
     .all()
     .map((t) => ({ ...t, typ: "Termin" as const }));
 
@@ -508,7 +544,7 @@ function getUpcomingAppointments(userId: number | null = null) {
       folgeterminTyp: leads.folgeterminTyp,
     })
     .from(leads)
-    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater), notReklamiert, uFilter ?? undefined))
+    .where(and(gte(leads.folgetermin, now), lte(leads.folgetermin, weekLater), notReklamiert, uFilter ?? undefined, pFilter ?? undefined))
     .all()
     .map((t) => ({ ...t, typ: "Folgetermin" as const }));
 
@@ -517,8 +553,9 @@ function getUpcomingAppointments(userId: number | null = null) {
     .slice(0, 5);
 }
 
-function getRecentActivity(userId: number | null) {
+function getRecentActivity(userId: number | null, providerId: number | null = null) {
   const uFilter = assignedFilter(userId);
+  const pFilter = providerFilter(providerId);
   return db
     .select({
       id: leads.id,
@@ -528,21 +565,18 @@ function getRecentActivity(userId: number | null) {
       reklamiertAt: leads.reklamiertAt,
     })
     .from(leads)
-    .where(and(sql`${leads.reklamiertAt} IS NULL`, uFilter ?? undefined))
+    .where(and(sql`${leads.reklamiertAt} IS NULL`, uFilter ?? undefined, pFilter ?? undefined))
     .orderBy(sql`${leads.updatedAt} DESC`)
     .limit(8)
     .all();
 }
 
-function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: number | null): Insight[] {
+function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: number | null, providerId: number | null = null): Insight[] {
   const insights: Insight[] = [];
   const now = new Date();
   const nowIso = now.toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const uFilter = assignedFilter(userId);
-  const uSql = userId !== null
-    ? sql`AND (${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`
-    : sql``;
+  const uSql = buildUserProviderSql(userId, providerId);
 
   // Leads ohne Aktivitaet seit >7 Tagen (letzte Aktivitaet zaehlt, nicht updated_at)
   const staleLeadsList = db
@@ -616,8 +650,12 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
   let revenueByMonthData: { month: string; revenue: number }[] = [];
 
   try {
-    const provUserFilter = userId !== null
-      ? sql`AND ${provisions.leadId} IN (SELECT id FROM leads WHERE assigned_to = ${userId} OR assigned_to IS NULL)`
+    const provUserFilter = (userId !== null || providerId !== null)
+      ? (() => {
+          const userPart = userId !== null ? sql`(assigned_to = ${userId} OR assigned_to IS NULL)` : sql`1=1`;
+          const providerPart = providerId !== null ? sql`AND provider_id = ${providerId}` : sql``;
+          return sql`AND ${provisions.leadId} IN (SELECT id FROM leads WHERE ${userPart} ${providerPart})`;
+        })()
       : sql``;
 
     const revenueThisMonth = db
@@ -735,11 +773,9 @@ function getSmartInsights(leadBudget: ReturnType<typeof getLeadBudget>, userId: 
   return insights.slice(0, 4);
 }
 
-function getLeadTrend(userId: number | null) {
+function getLeadTrend(userId: number | null, providerId: number | null = null) {
   // Leads pro Woche der letzten 8 Wochen
-  const uSql = userId !== null
-    ? sql`AND (${leads.assignedTo} = ${userId} OR ${leads.assignedTo} IS NULL)`
-    : sql``;
+  const uSql = buildUserProviderSql(userId, providerId);
   const result = db
     .select({
       week: sql<string>`strftime('%Y-W%W', ${leads.createdAt})`,
@@ -759,7 +795,7 @@ function getLeadTrend(userId: number | null) {
   });
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; all?: string; showAll?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ month?: string; year?: string; all?: string; showAll?: string; providerId?: string }> }) {
   const params = await searchParams;
   const session = await auth();
   const userRole = (session?.user as { role?: string })?.role || "user";
@@ -771,6 +807,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const showAll = isAdmin && params.showAll !== "0";
   const filterUserId = showAll ? null : currentUserId;
 
+  const providerIdRaw = params.providerId ? parseInt(params.providerId) : NaN;
+  const filterProviderId = Number.isFinite(providerIdRaw) && providerIdRaw > 0 ? providerIdRaw : null;
+
   const now = new Date();
   const hasFilter = params.month && params.year;
   const isAllMonths = !hasFilter || params.all === "1";
@@ -778,21 +817,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const year = isAllMonths ? undefined : parseInt(params.year!);
   const range = month && year ? getDateRange(month, year) : null;
 
-  const kpis = getKpis(range, filterUserId);
-  const wonLeads = getWonLeadsCount(range, filterUserId);
+  const kpis = getKpis(range, filterUserId, filterProviderId);
+  const wonLeads = getWonLeadsCount(range, filterUserId, filterProviderId);
   const leadBudget = getLeadBudget();
-  const providerBudgets = getProviderBudgets();
-  const insights = getSmartInsights(leadBudget, filterUserId);
-  const pipelineData = getPipelineData(range, filterUserId);
-  const revenueData = getRevenueByMonth(filterUserId);
-  const gewerbeartData = getGewerbeartData(range, filterUserId);
-  const leadTrend = getLeadTrend(filterUserId);
-  const appointments = getUpcomingAppointments(filterUserId);
-  const recentActivity = getRecentActivity(filterUserId);
+  const allProviderBudgets = getProviderBudgets();
+  const providerBudgets = filterProviderId !== null
+    ? allProviderBudgets.filter((p) => p.providerId === filterProviderId)
+    : allProviderBudgets;
+  const insights = getSmartInsights(leadBudget, filterUserId, filterProviderId);
+  const pipelineData = getPipelineData(range, filterUserId, filterProviderId);
+  const revenueData = getRevenueByMonth(filterUserId, filterProviderId);
+  const gewerbeartData = getGewerbeartData(range, filterUserId, filterProviderId);
+  const leadTrend = getLeadTrend(filterUserId, filterProviderId);
+  const appointments = getUpcomingAppointments(filterUserId, filterProviderId);
+  const recentActivity = getRecentActivity(filterUserId, filterProviderId);
 
   return (
     <div className="flex flex-col overflow-x-hidden">
-      <Header title="Dashboard" actions={<div className="flex items-center gap-2"><UserFilter isAdmin={isAdmin} showAll={showAll} /><MonthFilter /><ReportButton /></div>} />
+      <Header title="Dashboard" actions={<div className="flex items-center gap-2"><UserFilter isAdmin={isAdmin} showAll={showAll} /><ProviderFilter /><MonthFilter /><ReportButton /></div>} />
       <div className="flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6 overflow-x-hidden">
         <KpiCards
           wonLeads={wonLeads}

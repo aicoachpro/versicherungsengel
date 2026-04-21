@@ -16,8 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, X, Users, User } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { UserFilter } from "@/components/dashboard/user-filter";
+import { ProviderFilter } from "@/components/dashboard/provider-filter";
 
 export interface Lead {
   id: number;
@@ -84,7 +86,10 @@ function PipelineContent() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
-  const [showAll, setShowAll] = useState(true);
+  // showAll synchronisiert mit URL-Param (Dashboard nutzt denselben Param → konsistent per sessionStorage)
+  const showAll = searchParams.get("showAll") !== "0";
+  const providerIdParam = searchParams.get("providerId");
+  const providerIdFilter = providerIdParam ? parseInt(providerIdParam) : null;
   const [leads, setLeads] = useState<Lead[]>([]);
   const [productMap, setProductMap] = useState<Record<number, string>>({});
   const [userMap, setUserMap] = useState<Record<number, string>>({});
@@ -234,9 +239,10 @@ function PipelineContent() {
     window.history.replaceState(null, "", "/pipeline");
   };
 
-  // Filter: nicht-archivierte Leads + Suchfilter + Dashboard-Filter
+  // Filter: nicht-archivierte Leads + Suchfilter + Dashboard-Filter + Provider-Filter
   const filteredLeads = leads
     .filter((l) => !l.archivedAt && !l.reklamiertAt)
+    .filter((l) => providerIdFilter === null || l.providerId === providerIdFilter)
     .filter((l) => {
       if (!activeFilter) return true;
       const [type, value] = activeFilter.split(":");
@@ -279,17 +285,8 @@ function PipelineContent() {
       <Header title="Sales Pipeline" />
       <div className="flex items-center justify-between px-6 py-4 gap-4">
         <div className="flex items-center gap-4 flex-1">
-          {isAdmin && (
-            <Button
-              variant={showAll ? "outline" : "default"}
-              size="sm"
-              className="gap-1 h-9"
-              onClick={() => setShowAll((v) => !v)}
-            >
-              {showAll ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
-              {showAll ? "Alle" : "Meine"}
-            </Button>
-          )}
+          <UserFilter isAdmin={isAdmin} showAll={showAll} />
+          <ProviderFilter />
           <p className="text-sm text-muted-foreground whitespace-nowrap">
             {activeFilter ? `${filteredLeads.length} von ${activeCount}` : `${activeCount}`} Leads aktiv
           </p>
