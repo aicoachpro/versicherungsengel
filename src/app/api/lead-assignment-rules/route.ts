@@ -33,7 +33,8 @@ export async function GET() {
 
   const enriched = rules.map((r) => ({
     ...r,
-    providerName: allProviders.find((p) => p.id === r.providerId)?.name || "Unbekannt",
+    // null = Regel gilt fuer alle Anbieter (Pauschal-Leadart-Regel)
+    providerName: r.providerId ? allProviders.find((p) => p.id === r.providerId)?.name || "Unbekannt" : null,
     productName: r.productId ? allProducts.find((p) => p.id === r.productId)?.name || "Unbekannt" : null,
     userName: allUsers.find((u) => u.id === r.userId)?.name || "Unbekannt",
   }));
