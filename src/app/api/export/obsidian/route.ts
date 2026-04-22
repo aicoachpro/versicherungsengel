@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { leads, activities, insurances, leadProducts, leadProviders, users } from "@/db/schema";
+import { leads, activities, insurances, leadProducts, leadProviders, users, hedySessions } from "@/db/schema";
 import { desc, eq, isNull } from "drizzle-orm";
 import { validateApiRequest } from "@/lib/api-auth";
 
@@ -108,6 +108,39 @@ export async function GET(req: NextRequest) {
       naechsterSchritt: l.naechsterSchritt,
     }));
 
+  // Hedy-ToDos: aus summary-Markdown die "- [ ] ..."-Zeilen unter "## Offene To-Dos" extrahieren
+  const allHedy = db.select().from(hedySessions).all();
+  const hedyTodos: Array<{
+    leadId: number | null;
+    leadName: string | null;
+    sessionId: string;
+    sessionTitle: string | null;
+    sessionDate: string | null;
+    todo: string;
+  }> = [];
+  for (const session of allHedy) {
+    if (!session.summary || session.matchStatus === "ignored") continue;
+    const lead = session.leadId ? enriched.find((l) => l.id === session.leadId) : null;
+    // "## Offene To-Dos"-Sektion finden und Checkbox-Zeilen extrahieren
+    const match = session.summary.match(/##\s+Offene To-Dos\s*\n([\s\S]*?)(?:\n##\s|\n_Importiert|$)/i);
+    if (!match) continue;
+    const todoLines = match[1]
+      .split("\n")
+      .map((l) => l.match(/^-\s*\[\s*\]\s*(.+)$/))
+      .filter((m): m is RegExpMatchArray => m !== null)
+      .map((m) => m[1].trim());
+    for (const todo of todoLines) {
+      hedyTodos.push({
+        leadId: session.leadId,
+        leadName: lead?.name ?? null,
+        sessionId: session.sessionId,
+        sessionTitle: session.title,
+        sessionDate: session.startedAt,
+        todo,
+      });
+    }
+  }
+
   return NextResponse.json({
     exportedAt: new Date().toISOString(),
     apiKeyName: auth.apiKeyName,
@@ -115,9 +148,11 @@ export async function GET(req: NextRequest) {
       leads: enriched.length,
       openFolgetermine: openFolgetermine.length,
       overdueFolgetermine: overdueFolgetermine.length,
+      hedyTodos: hedyTodos.length,
     },
     leads: enriched,
     openFolgetermine,
     overdueFolgetermine,
+    hedyTodos,
   });
 }
