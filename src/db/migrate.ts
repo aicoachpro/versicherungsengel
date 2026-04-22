@@ -658,30 +658,9 @@ if (!existingKey) {
   console.log(`n8n API Key created: ${apiKey}`);
 }
 
-// Create hedy_sessions table if not exists (VOE-156)
-sqlite.prepare(`
-  CREATE TABLE IF NOT EXISTS hedy_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    session_id TEXT NOT NULL UNIQUE,
-    title TEXT,
-    started_at TEXT,
-    ended_at TEXT,
-    participants TEXT,
-    summary TEXT,
-    raw TEXT,
-    lead_id INTEGER,
-    activity_id INTEGER,
-    match_status TEXT NOT NULL DEFAULT 'pending',
-    match_confidence REAL,
-    match_reason TEXT,
-    error_message TEXT,
-    imported_at TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
-`).run();
-sqlite.prepare(`CREATE INDEX IF NOT EXISTS idx_hedy_sessions_lead_id ON hedy_sessions(lead_id)`).run();
-sqlite.prepare(`CREATE INDEX IF NOT EXISTS idx_hedy_sessions_match_status ON hedy_sessions(match_status)`).run();
-sqlite.prepare(`CREATE INDEX IF NOT EXISTS idx_hedy_sessions_started_at ON hedy_sessions(started_at)`).run();
+// Runtime-Schema-Migrations (werden auch beim Container-Start automatisch ausgefuehrt)
+import { applyRuntimeMigrations } from "./runtime-migrations";
+applyRuntimeMigrations(sqlite);
 
 // Demo-Modus: Fake-Daten einfügen wenn DEMO_MODE=true und DB leer
 if (process.env.DEMO_MODE === "true") {

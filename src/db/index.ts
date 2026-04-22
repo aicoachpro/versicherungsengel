@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
+import { applyRuntimeMigrations } from "./runtime-migrations";
 import path from "path";
 import fs from "fs";
 
@@ -13,5 +14,13 @@ const dbPath = path.join(dataDir, "versicherungsengel.db");
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
+
+// Idempotente Schema-Ensure beim Container-Start.
+// Verhindert, dass neue Tabellen bei Deploy manuell angelegt werden muessen.
+try {
+  applyRuntimeMigrations(sqlite);
+} catch (err) {
+  console.error("Runtime migrations failed:", err);
+}
 
 export const db = drizzle(sqlite, { schema });
