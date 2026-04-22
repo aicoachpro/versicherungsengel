@@ -2437,11 +2437,11 @@ function InsuranceCompanyDialog({
 
 interface AssignmentRule {
   id: number;
-  providerId: number;
+  providerId: number | null;
   productId: number | null;
   userId: number;
   active: boolean;
-  providerName: string;
+  providerName: string | null;
   productName: string | null;
   userName: string;
 }
@@ -2609,7 +2609,11 @@ function LeadAssignmentSection() {
                 >
                   <div className="space-y-0.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{rule.providerName}</span>
+                      {rule.providerName ? (
+                        <span className="font-medium text-sm">{rule.providerName}</span>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">Alle Anbieter</Badge>
+                      )}
                       {rule.productName ? (
                         <Badge variant="outline" className="text-xs">{rule.productName}</Badge>
                       ) : (
@@ -2668,7 +2672,7 @@ function LeadAssignmentSection() {
             setEditRule(null);
           }
         }}
-        initialData={editRule ? { providerId: editRule.providerId, productIds: editRule.productId ? [editRule.productId] : [], userId: editRule.userId } : { providerId: 0, productIds: [], userId: 0 }}
+        initialData={editRule ? { providerId: editRule.providerId ?? 0, productIds: editRule.productId ? [editRule.productId] : [], userId: editRule.userId } : { providerId: 0, productIds: [], userId: 0 }}
         providers={providers}
         products={products}
         users={allUsers}
@@ -2930,7 +2934,7 @@ function AssignmentRuleDialog({
                     </Button>
                   )}
                 </div>
-                <div className="rounded-md border p-2 max-h-48 overflow-y-auto space-y-1">
+                <div className="rounded-md border p-2 space-y-1">
                   {isPauschal && (
                     <div className="text-xs text-muted-foreground italic px-1 py-0.5">
                       Keine Auswahl = Pauschalregel fuer alle Leads
