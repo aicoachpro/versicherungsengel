@@ -80,6 +80,34 @@ describe("HedyClient", () => {
     expect(s.title).toBe("Meeting");
   });
 
+  it("normalisiert Hedy-Felder: sessionId->id, startTime->startedAt, duration Minuten->Sekunden, endedAt berechnet, topic->participant", async () => {
+    const fetchImpl = mockFetch([{
+      status: 200,
+      body: {
+        success: true,
+        data: [{
+          sessionId: "abc123",
+          title: "Marcel Voss - Termin",
+          startTime: "2026-04-21T12:58:32.247Z",
+          duration: 36, // Minuten
+          topic: { id: "t1", name: "Marcel Voss" },
+        }],
+      },
+    }]);
+    const client = new HedyClient({ apiKey: "k", fetchImpl });
+    const sessions = await client.listSessions();
+    expect(sessions).toHaveLength(1);
+    const s = sessions[0];
+    expect(s.id).toBe("abc123");
+    expect(s.startedAt).toBe("2026-04-21T12:58:32.247Z");
+    // endedAt = startTime + 36min
+    expect(s.endedAt).toBe("2026-04-21T13:34:32.247Z");
+    // duration intern in Sekunden
+    expect(s.duration).toBe(2160);
+    // Topic als Teilnehmer
+    expect(s.participants).toEqual([{ name: "Marcel Voss" }]);
+  });
+
   it("getBundle toleriert fehlende Highlights/Todos", async () => {
     // session.ok, highlights 404, todos 500 -> highlights/todos = []
     const responses = [
