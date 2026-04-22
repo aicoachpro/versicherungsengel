@@ -42,10 +42,12 @@ export interface HedyHighlight {
 export interface HedyTodo {
   id: string;
   sessionId?: string;
-  title?: string;
-  description?: string;
+  text?: string; // Haupttext des ToDos (Hedy-Feldname)
+  title?: string; // Fallback
+  description?: string; // Fallback
   assignee?: string;
-  dueDate?: string;
+  dueDate?: string; // Freitext ("heute", "morgen", ...), NICHT ISO
+  completed?: boolean;
   status?: string;
   [key: string]: unknown;
 }

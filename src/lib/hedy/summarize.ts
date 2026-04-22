@@ -57,10 +57,13 @@ function formatHighlight(h: HedyHighlight): string {
 }
 
 function formatTodo(t: HedyTodo): string {
-  const title = t.title || t.description || "ToDo";
+  // Hedy nutzt `text` als primaeres Feld. title/description sind Fallbacks.
+  const raw = t as HedyTodo & { text?: string };
+  const title = raw.text || t.title || t.description || "ToDo";
   const meta: string[] = [];
   if (t.assignee) meta.push(`@${t.assignee}`);
-  if (t.dueDate) meta.push(`faellig ${formatDate(t.dueDate)}`);
+  // Hedy liefert dueDate als Freitext ("heute", "morgen", "in 3 Tagen"), nicht als ISO
+  if (t.dueDate) meta.push(`faellig ${t.dueDate}`);
   const suffix = meta.length > 0 ? ` (${meta.join(", ")})` : "";
   return `- [ ] ${title}${suffix}`;
 }
