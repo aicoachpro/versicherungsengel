@@ -2743,24 +2743,36 @@ function AssignmentRuleDialog({
     }
   }, [open, initialData]);
 
-  // Modus: provider (an Anbieter binden) oder product (nur an Leadart)
-  const [mode, setMode] = useState<"provider" | "product">(
-    initialData.providerId ? "provider" : "product",
-  );
+  // Drei Modi:
+  // - provider-only: nur Anbieter (alle Leadarten von diesem Anbieter)
+  // - provider-product: Anbieter + bestimmte Leadart(en)
+  // - product-only: nur Leadart (egal welcher Anbieter)
+  type RuleMode = "provider-only" | "provider-product" | "product-only";
+  const initialMode: RuleMode = initialData.providerId
+    ? initialData.productIds.length > 0
+      ? "provider-product"
+      : "provider-only"
+    : "product-only";
+  const [mode, setMode] = useState<RuleMode>(initialMode);
 
   useEffect(() => {
     if (open) {
-      setMode(initialData.providerId ? "provider" : "product");
+      const m: RuleMode = initialData.providerId
+        ? initialData.productIds.length > 0
+          ? "provider-product"
+          : "provider-only"
+        : "product-only";
+      setMode(m);
     }
   }, [open, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === "provider" && !form.providerId) {
+    if ((mode === "provider-only" || mode === "provider-product") && !form.providerId) {
       setError("Anbieter ist erforderlich");
       return;
     }
-    if (mode === "product" && form.productIds.length === 0) {
+    if ((mode === "provider-product" || mode === "product-only") && form.productIds.length === 0) {
       setError("Mindestens eine Leadart auswaehlen");
       return;
     }
@@ -2771,10 +2783,12 @@ function AssignmentRuleDialog({
     setSaving(true);
     setError("");
     try {
-      // Im product-Mode wird providerId auf 0 gesetzt — API interpretiert das als NULL
       await onSave({
         ...form,
-        providerId: mode === "product" ? 0 : form.providerId,
+        // product-only: providerId auf 0 -> API speichert NULL
+        providerId: mode === "product-only" ? 0 : form.providerId,
+        // provider-only: Leadarten leeren -> Regel gilt pauschal fuer alle Sparten des Anbieters
+        productIds: mode === "provider-only" ? [] : form.productIds,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern");
@@ -2787,10 +2801,9 @@ function AssignmentRuleDialog({
 
   const selectedProvider = providers.find((p) => p.id === form.providerId);
   const activePurchasedIds = selectedProvider?.productIds || [];
-  // provider-Mode: nur Produkte des gewaehlten Anbieters
-  // product-Mode: alle Produkte
+  // product-only: alle Produkte; provider-* : nur Produkte des Anbieters
   const availableProducts =
-    mode === "product"
+    mode === "product-only"
       ? products
       : form.providerId
       ? products.filter((p) => activePurchasedIds.includes(p.id))
@@ -2832,46 +2845,65 @@ function AssignmentRuleDialog({
         <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label>Regel-Typ *</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 className={`rounded-md border p-2 text-xs text-left transition-colors ${
-                  mode === "provider"
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-border hover:bg-accent"
-                }`}
-                onClick={() => setMode("provider")}
-              >
-                <div className="font-semibold">Pro Anbieter</div>
-                <div className="text-muted-foreground mt-0.5">
-                  z.B. alle Leads von LeadCloser → User X
-                </div>
-              </button>
-              <button
-                type="button"
-                className={`rounded-md border p-2 text-xs text-left transition-colors ${
-                  mode === "product"
+                  mode === "provider-only"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border hover:bg-accent"
                 }`}
                 onClick={() =>
                   setMode((prev) => {
-                    if (prev === "product") return prev;
-                    // Provider-Einschraenkung loeschen, damit alle Produkte sichtbar sind
-                    setForm((f) => ({ ...f, providerId: 0 }));
-                    return "product";
+                    if (prev === "provider-only") return prev;
+                    setForm((f) => ({ ...f, productIds: [] }));
+                    return "provider-only";
                   })
                 }
               >
-                <div className="font-semibold">Pro Leadart</div>
+                <div className="font-semibold">Nur Anbieter</div>
                 <div className="text-muted-foreground mt-0.5">
-                  z.B. Rente (egal welcher Anbieter) → User X
+                  Alle Leads von Anbieter X → User
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`rounded-md border p-2 text-xs text-left transition-colors ${
+                  mode === "provider-product"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:bg-accent"
+                }`}
+                onClick={() => setMode("provider-product")}
+              >
+                <div className="font-semibold">Anbieter + Leadart</div>
+                <div className="text-muted-foreground mt-0.5">
+                  z.B. Allianz + Zahnzusatz → User
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`rounded-md border p-2 text-xs text-left transition-colors ${
+                  mode === "product-only"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border hover:bg-accent"
+                }`}
+                onClick={() =>
+                  setMode((prev) => {
+                    if (prev === "product-only") return prev;
+                    setForm((f) => ({ ...f, providerId: 0 }));
+                    return "product-only";
+                  })
+                }
+              >
+                <div className="font-semibold">Nur Leadart</div>
+                <div className="text-muted-foreground mt-0.5">
+                  Alle Anbieter fuer Leadart Y → User
                 </div>
               </button>
             </div>
           </div>
 
-          {mode === "provider" && (
+          {(mode === "provider-only" || mode === "provider-product") && (
             <div className="space-y-2">
               <Label>Lead-Anbieter *</Label>
               <select
@@ -2896,18 +2928,17 @@ function AssignmentRuleDialog({
             </div>
           )}
 
+          {mode !== "provider-only" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>
-                Leadarten {mode === "product" ? "*" : "(optional)"}
-              </Label>
+              <Label>Leadarten *</Label>
               {form.productIds.length > 0 && (
                 <span className="text-xs text-muted-foreground">
                   {form.productIds.length} ausgewaehlt
                 </span>
               )}
             </div>
-            {mode === "provider" && !form.providerId ? (
+            {mode === "provider-product" && !form.providerId ? (
               <p className="text-xs text-muted-foreground">Zuerst Anbieter waehlen</p>
             ) : availableProducts.length === 0 ? (
               <p className="text-xs text-muted-foreground">
@@ -2975,6 +3006,7 @@ function AssignmentRuleDialog({
               </>
             )}
           </div>
+          )}
           <div className="space-y-2">
             <Label>Bearbeiter *</Label>
             <select
