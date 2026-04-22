@@ -8,6 +8,7 @@ export async function middleware(req: NextRequest) {
   const isAuthApi = pathname.startsWith("/api/auth");
   const isIngestApi = pathname.startsWith("/api/leads/ingest") || pathname.startsWith("/api/activities/ingest");
   const isSearchApi = pathname.startsWith("/api/leads/search");
+  const isExportApi = pathname.startsWith("/api/export");
   const isCronApi = pathname.startsWith("/api/cron");
 
   // API-Aufrufe mit gueltigem Cron-Secret duerfen die Middleware umgehen
@@ -16,7 +17,7 @@ export async function middleware(req: NextRequest) {
   const expected = process.env.CRON_SECRET || "vf-cron-2024-secure";
   const isInternalCronCall = pathname.startsWith("/api/") && cronSecret === expected;
 
-  if (isWebhook || isAuthApi || isIngestApi || isSearchApi || isCronApi || isInternalCronCall) {
+  if (isWebhook || isAuthApi || isIngestApi || isSearchApi || isExportApi || isCronApi || isInternalCronCall) {
     return NextResponse.next();
   }
 
