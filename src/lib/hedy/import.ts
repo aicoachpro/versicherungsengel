@@ -89,11 +89,14 @@ export async function runImport(opts: { limit?: number } = {}): Promise<ImportRu
   result.checked = sessions.length;
 
   for (const session of sessions) {
-    if (!session.id) continue;
-    // Nur Sessions mit endedAt bearbeiten — noch laufende ueberspringen
-    if (!session.endedAt) {
+    if (!session.id) {
       result.skipped++;
-      result.results.push({ sessionId: session.id, status: "skipped", reason: "Session noch nicht beendet" });
+      continue;
+    }
+    // Sessions ohne Startzeit ueberspringen (kann nicht gematched werden)
+    if (!session.startedAt) {
+      result.skipped++;
+      result.results.push({ sessionId: session.id, status: "skipped", reason: "Session ohne Startzeit" });
       continue;
     }
 

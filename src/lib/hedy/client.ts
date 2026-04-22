@@ -98,14 +98,14 @@ export class HedyClient {
       "/sessions",
       params,
     );
-    return extractList(resp);
+    return extractList(resp).map(normalizeSession);
   }
 
   async getSession(sessionId: string): Promise<HedySession> {
     const resp = await this.request<HedyApiObjectResponse<HedySession> | HedySession>(
       `/sessions/${encodeURIComponent(sessionId)}`,
     );
-    return extractObject(resp);
+    return normalizeSession(extractObject(resp));
   }
 
   async getSessionHighlights(sessionId: string): Promise<HedyHighlight[]> {
@@ -165,4 +165,45 @@ function extractObject<T>(resp: HedyApiObjectResponse<T> | T): T {
     if (obj.data) return obj.data;
   }
   return resp as T;
+}
+
+/**
+ * Mappt Hedy-Felder auf unser internes Schema:
+ * - sessionId -> id
+ * - startTime -> startedAt
+ * - duration (Minuten) -> endedAt (berechnet) + duration in Sekunden
+ * - topic.name -> zusaetzlicher Teilnehmer-Kandidat fuer Matching
+ */
+function normalizeSession(raw: HedySession): HedySession {
+  if (!raw) return raw;
+  const r = raw as HedySession & {
+    sessionId?: string;
+    startTime?: string;
+    topic?: { name?: string };
+  };
+
+  const id = r.id || r.sessionId;
+  const startedAt = r.startedAt || r.startTime;
+  const durationMinutes = typeof r.duration === "number" ? r.duration : null;
+  const durationSec = durationMinutes !== null ? durationMinutes * 60 : undefined;
+
+  let endedAt = r.endedAt;
+  if (!endedAt && startedAt && durationMinutes !== null) {
+    endedAt = new Date(new Date(startedAt).getTime() + durationMinutes * 60_000).toISOString();
+  }
+
+  // Topic-Name als synthetischer Teilnehmer — oft = Kundenname bei Hedy
+  const participants = Array.isArray(r.participants) ? [...r.participants] : [];
+  if (r.topic?.name && !participants.some((p) => p.name === r.topic!.name)) {
+    participants.push({ name: r.topic.name });
+  }
+
+  return {
+    ...r,
+    id: id || "",
+    startedAt,
+    endedAt,
+    duration: durationSec, // intern: Sekunden (summarize.ts rechnet /60)
+    participants: participants.length > 0 ? participants : undefined,
+  };
 }
