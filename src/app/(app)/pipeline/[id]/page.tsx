@@ -395,6 +395,7 @@ export default function LeadDetailPage() {
 
   // Aktivität-Dialog State
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [editingActivityId, setEditingActivityId] = useState<number | null>(null);
   const [activityForm, setActivityForm] = useState({
     datum: new Date().toISOString().slice(0, 16),
     kontaktart: "Telefon",
@@ -583,19 +584,44 @@ export default function LeadDetailPage() {
 
   // Aktivitäten
   async function handleSaveActivity() {
-    await fetch("/api/activities", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId,
-        datum: activityForm.datum,
-        kontaktart: activityForm.kontaktart,
-        notiz: activityForm.notiz || null,
-      }),
-    });
+    if (editingActivityId !== null) {
+      await fetch("/api/activities", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingActivityId,
+          datum: activityForm.datum,
+          kontaktart: activityForm.kontaktart,
+          notiz: activityForm.notiz || null,
+        }),
+      });
+    } else {
+      await fetch("/api/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId,
+          datum: activityForm.datum,
+          kontaktart: activityForm.kontaktart,
+          notiz: activityForm.notiz || null,
+        }),
+      });
+    }
     setActivityDialogOpen(false);
+    setEditingActivityId(null);
     setActivityForm({ datum: new Date().toISOString().slice(0, 16), kontaktart: "Telefon", notiz: "" });
     loadData();
+  }
+
+  function openActivityEdit(a: Activity) {
+    setEditingActivityId(a.id);
+    setActivityForm({
+      // Datum-Input erwartet "YYYY-MM-DDTHH:MM" — server liefert ggf. mit Sekunden, auf 16 Zeichen kuerzen
+      datum: (a.datum || new Date().toISOString()).slice(0, 16),
+      kontaktart: a.kontaktart || "Telefon",
+      notiz: a.notiz || "",
+    });
+    setActivityDialogOpen(true);
   }
 
   async function handleDeleteActivity(id: number) {
@@ -948,6 +974,7 @@ export default function LeadDetailPage() {
                 </Button>
                 <Button
                   onClick={() => {
+                    setEditingActivityId(null);
                     setActivityForm({ datum: new Date().toISOString().slice(0, 16), kontaktart: "Telefon", notiz: "" });
                     setActivityDialogOpen(true);
                   }}
@@ -983,15 +1010,26 @@ export default function LeadDetailPage() {
                       </div>
                       {a.notiz && <ExpandableText text={a.notiz} className="text-sm mt-1" />}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive flex-shrink-0"
-                      onClick={() => setDeleteConfirm({ type: "activity", id: a.id, label: `Aktivität vom ${new Date(a.datum).toLocaleDateString("de-DE")}` })}
-                      aria-label="Löschen"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => openActivityEdit(a)}
+                        aria-label="Bearbeiten"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteConfirm({ type: "activity", id: a.id, label: `Aktivität vom ${new Date(a.datum).toLocaleDateString("de-DE")}` })}
+                        aria-label="Löschen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1394,11 +1432,17 @@ export default function LeadDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for new Activity */}
-      <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>
+      {/* Dialog for new or edited Activity */}
+      <Dialog
+        open={activityDialogOpen}
+        onOpenChange={(open) => {
+          setActivityDialogOpen(open);
+          if (!open) setEditingActivityId(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Neue Aktivität</DialogTitle>
+            <DialogTitle>{editingActivityId !== null ? "Aktivität bearbeiten" : "Neue Aktivität"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
