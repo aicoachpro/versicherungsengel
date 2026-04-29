@@ -349,7 +349,7 @@ function PipelineContent() {
           Neuer Lead
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto md:overflow-hidden px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
         <KanbanBoard
           leads={filteredLeads}
           phases={PHASES as unknown as string[]}
