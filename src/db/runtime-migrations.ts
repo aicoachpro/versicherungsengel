@@ -33,4 +33,12 @@ export function applyRuntimeMigrations(sqlite: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_hedy_sessions_match_status ON hedy_sessions(match_status);
     CREATE INDEX IF NOT EXISTS idx_hedy_sessions_started_at ON hedy_sessions(started_at);
   `);
+
+  // VOE-174: Anbieter-Pause (paused_until)
+  try {
+    sqlite.prepare("SELECT paused_until FROM lead_providers LIMIT 1").get();
+  } catch {
+    sqlite.prepare("ALTER TABLE lead_providers ADD COLUMN paused_until TEXT").run();
+    console.log("Added 'paused_until' column to lead_providers table");
+  }
 }

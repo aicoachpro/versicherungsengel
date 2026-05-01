@@ -188,6 +188,7 @@ function getProviderBudgets() {
     startMonth: string;
     billingModel: string;
     active: boolean;
+    pausedUntil: string | null;
   }> = [];
 
   try {
@@ -211,6 +212,7 @@ function getProviderBudgets() {
     const carryOverEnabled = !!p.carryOver;
     const startMonth = p.startMonth || "";
     const costPerLead = p.costPerLead || 0;
+    const pausedUntil = p.pausedUntil || null;
 
     const result = db
       .select({
@@ -248,20 +250,35 @@ function getProviderBudgets() {
       }
     }
 
+    // VOE-174: Pausierte Monate werden mit min=0 und ohne carry-over behandelt,
+    // damit kein kuenstliches Defizit entsteht. Heuristik: Monat gilt als pausiert,
+    // wenn pausedUntil >= letzter Tag des Monats liegt (siehe lib/provider-pause).
+    const isMonthPaused = (key: string): boolean => {
+      if (!pausedUntil) return false;
+      const [yStr, mStr] = key.split("-");
+      const yr = Number(yStr);
+      const mo = Number(mStr);
+      if (!yr || !mo) return false;
+      const lastDay = new Date(Date.UTC(yr, mo, 0)).toISOString().slice(0, 10);
+      return pausedUntil >= lastDay;
+    };
+
     let accumulatedCarryOver = 0;
     const monthsWithCarryOver = allMonthKeys.map((key) => {
       const data = monthLookup.get(key);
       const delivered = data?.netto ?? 0;
       const total = data?.total ?? 0;
       const reklamiert = data?.reklamiert ?? 0;
-      const expected = minPerMonth + (carryOverEnabled ? accumulatedCarryOver : 0);
+      const paused = isMonthPaused(key);
+      const effectiveMin = paused ? 0 : minPerMonth;
+      const expected = effectiveMin + (carryOverEnabled ? accumulatedCarryOver : 0);
       const carryOverForThisMonth = carryOverEnabled ? accumulatedCarryOver : 0;
       const outstanding = Math.max(0, expected - delivered);
-      const shortfall = Math.max(0, minPerMonth - delivered);
+      const shortfall = Math.max(0, effectiveMin - delivered);
       if (carryOverEnabled) {
         accumulatedCarryOver = accumulatedCarryOver + shortfall;
-        if (delivered > minPerMonth) {
-          const excess = delivered - minPerMonth;
+        if (delivered > effectiveMin) {
+          const excess = delivered - effectiveMin;
           accumulatedCarryOver = Math.max(0, accumulatedCarryOver - excess);
         }
       }
@@ -273,6 +290,7 @@ function getProviderBudgets() {
         expected,
         carryOver: carryOverForThisMonth,
         outstanding,
+        paused,
       };
     });
 
@@ -283,6 +301,7 @@ function getProviderBudgets() {
         expected: minPerMonth,
         carryOver: 0,
         outstanding: Math.max(0, minPerMonth - m.netto),
+        paused: false,
       }));
 
     return {
@@ -290,6 +309,7 @@ function getProviderBudgets() {
       providerName: p.name,
       budget: minPerMonth,
       costPerLead,
+      pausedUntil,
       months: [...beforeStart, ...monthsWithCarryOver],
     };
   });

@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       carryOver: body.carryOver ?? true,
       startMonth: body.startMonth ?? "",
       active: body.active ?? true,
+      pausedUntil: body.pausedUntil || null,
     })
     .returning()
     .get();

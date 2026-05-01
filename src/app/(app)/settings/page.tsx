@@ -163,6 +163,7 @@ interface LeadProvider {
   carryOver: boolean;
   startMonth: string | null;
   active: boolean;
+  pausedUntil: string | null;
   products?: { id: number; name: string }[];
   productPrices?: Record<number, number | null>;
   createdAt: string;
@@ -177,6 +178,7 @@ type LeadProviderForm = {
   billingModel: string;
   carryOver: string;
   startMonth: string;
+  pausedUntil: string;
   productIds: number[];
   productPrices: Record<number, number | null>;
   superchatMappings: Record<number, string>;
@@ -190,10 +192,20 @@ const EMPTY_FORM: LeadProviderForm = {
   billingModel: "prepaid",
   carryOver: "true",
   startMonth: "",
+  pausedUntil: "",
   productIds: [],
   productPrices: {},
   superchatMappings: {},
 };
+
+function lastDayOfCurrentMonth(): string {
+  const now = new Date();
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const y = last.getFullYear();
+  const m = String(last.getMonth() + 1).padStart(2, "0");
+  const d = String(last.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 interface ProviderProduct {
   id: number;
@@ -414,6 +426,40 @@ function LeadProviderDialog({
               value={form.startMonth}
               onChange={(e) => setForm((p) => ({ ...p, startMonth: e.target.value }))}
             />
+          </div>
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            <Label className="text-sm font-medium">Pause</Label>
+            <p className="text-xs text-muted-foreground">
+              Pausierte Anbieter nehmen keine neuen Leads mehr an. Bestehende Leads bleiben unveraendert.
+              Pausierte Monate werden in der Soll-Berechnung uebersprungen.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={form.pausedUntil}
+                onChange={(e) => setForm((p) => ({ ...p, pausedUntil: e.target.value }))}
+                className="flex-1"
+                placeholder="Pausieren bis..."
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setForm((p) => ({ ...p, pausedUntil: lastDayOfCurrentMonth() }))}
+              >
+                Bis Monatsende
+              </Button>
+              {form.pausedUntil && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setForm((p) => ({ ...p, pausedUntil: "" }))}
+                >
+                  Pause aufheben
+                </Button>
+              )}
+            </div>
           </div>
           {allProducts.length > 0 && (
             <div className="space-y-2">
@@ -671,6 +717,7 @@ function LeadProviderSection() {
         billingModel: form.billingModel,
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
+        pausedUntil: form.pausedUntil || null,
         productIds: form.productIds,
         productPrices: form.productPrices,
         superchatMappings: form.superchatMappings,
@@ -697,6 +744,7 @@ function LeadProviderSection() {
         billingModel: form.billingModel,
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
+        pausedUntil: form.pausedUntil || null,
         productIds: form.productIds,
         productPrices: form.productPrices,
         superchatMappings: form.superchatMappings,
@@ -744,6 +792,7 @@ function LeadProviderSection() {
         billingModel: editProvider.billingModel,
         carryOver: editProvider.carryOver ? "true" : "false",
         startMonth: editProvider.startMonth || "",
+        pausedUntil: editProvider.pausedUntil || "",
         productIds: (editProvider as unknown as { productIds?: number[] }).productIds || editProvider.products?.map((p) => p.id) || [],
         productPrices: editProvider.productPrices || {},
         superchatMappings: (editProvider as unknown as { superchatMappings?: Record<number, string> }).superchatMappings || {},
@@ -806,6 +855,14 @@ function LeadProviderSection() {
                       <Badge variant={p.active ? "default" : "secondary"} className="text-xs">
                         {p.active ? "Aktiv" : "Inaktiv"}
                       </Badge>
+                      {p.pausedUntil && p.pausedUntil >= new Date().toISOString().slice(0, 10) && (
+                        <Badge className="text-xs bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-300">
+                          Pausiert bis {(() => {
+                            const [y, m, d] = p.pausedUntil.split("-");
+                            return `${d}.${m}.${y}`;
+                          })()}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {p.leadType && <span>{p.leadType}</span>}
