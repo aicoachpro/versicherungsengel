@@ -24,6 +24,7 @@ interface LeadBudgetMonth {
   expected: number;
   carryOver: number;
   outstanding: number;
+  paused?: boolean;
 }
 
 export interface ProviderBudget {
@@ -31,7 +32,14 @@ export interface ProviderBudget {
   providerName: string;
   budget: number;
   costPerLead: number;
+  pausedUntil?: string | null;
   months: LeadBudgetMonth[];
+}
+
+function formatPauseDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}.${m}.${y}`;
 }
 
 interface KpiCardsProps {
@@ -149,6 +157,7 @@ function ProviderBudgetCard({ data }: { data: ProviderBudget }) {
   const expected = monthData?.expected ?? data.budget;
   const carryOver = monthData?.carryOver ?? 0;
   const outstanding = monthData?.outstanding ?? 0;
+  const monthPaused = monthData?.paused === true;
 
   return (
     <>
@@ -197,7 +206,16 @@ function ProviderBudgetCard({ data }: { data: ProviderBudget }) {
                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
               </button>
             </div>
-            {(() => {
+            {monthPaused ? (
+              <>
+                <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 sm:text-xs">
+                  Pausiert{data.pausedUntil ? ` bis ${formatPauseDate(data.pausedUntil)}` : ""}
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+                  {netto > 0 ? `${netto} Leads in diesem Monat` : "Keine neuen Leads in diesem Monat"}
+                </p>
+              </>
+            ) : (() => {
               const ratio = expected > 0 ? netto / expected : 0;
               const pct = Math.min(ratio * 100, 100);
               const barColor =

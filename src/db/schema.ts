@@ -163,6 +163,7 @@ export const leadProviders = sqliteTable("lead_providers", {
   startMonth: text("start_month").notNull().default(""),
   superchatListId: text("superchat_list_id"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  pausedUntil: text("paused_until"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
 

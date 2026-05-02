@@ -15,7 +15,11 @@ export async function GET() {
 
   try {
     const active = db
-      .select({ id: leadProviders.id, name: leadProviders.name })
+      .select({
+        id: leadProviders.id,
+        name: leadProviders.name,
+        pausedUntil: leadProviders.pausedUntil,
+      })
       .from(leadProviders)
       .where(eq(leadProviders.active, true))
       .orderBy(sql`${leadProviders.name}`)

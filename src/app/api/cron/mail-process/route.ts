@@ -4,6 +4,7 @@ import { leads, inboundEmails, leadProducts, emailAccounts, leadAssignmentRules,
 import { eq, and, isNull } from "drizzle-orm";
 import { extractLeadFromEmail } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
+import { isProviderPaused } from "@/lib/provider-pause";
 
 export async function GET(req: NextRequest) {
   if (!verifyCronAuth(req)) {
@@ -223,6 +224,34 @@ export async function GET(req: NextRequest) {
         }
       } catch {
         // Tabellen existieren evtl. noch nicht
+      }
+
+      // VOE-174: Provider-Pause-Check — pausierte Anbieter nehmen keine neuen Leads an.
+      // Bestehende Leads bleiben unveraendert; nur die Auto-Erzeugung wird gestoppt.
+      if (providerId) {
+        let provPause: { pausedUntil: string | null; name: string } | undefined;
+        try {
+          provPause = db
+            .select({ pausedUntil: leadProviders.pausedUntil, name: leadProviders.name })
+            .from(leadProviders)
+            .where(eq(leadProviders.id, providerId))
+            .get();
+        } catch {
+          // Spalte existiert evtl. noch nicht (alte DB) → kein Skip
+        }
+        if (provPause && isProviderPaused(provPause.pausedUntil)) {
+          db.update(inboundEmails)
+            .set({
+              status: "skipped",
+              errorMessage: `Anbieter "${provPause.name}" pausiert bis ${provPause.pausedUntil}`,
+            })
+            .where(eq(inboundEmails.id, email.id))
+            .run();
+          console.log(
+            `[mail-process] Skipped (Provider "${provPause.name}" pausiert bis ${provPause.pausedUntil}): "${email.subject}"`,
+          );
+          continue;
+        }
       }
 
       if (assignedTo) {

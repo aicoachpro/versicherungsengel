@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Lead } from "@/app/(app)/pipeline/page";
+import { isProviderPaused } from "@/lib/provider-pause";
 
 interface LeadDialogProps {
   open: boolean;
@@ -31,6 +32,13 @@ interface LeadDialogProps {
 interface LeadProvider {
   id: number;
   name: string;
+  pausedUntil?: string | null;
+}
+
+function formatPauseDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}.${m}.${y}`;
 }
 
 interface LeadProduct {
@@ -220,9 +228,15 @@ export function LeadDialog({ open, onOpenChange, lead, onSave }: LeadDialogProps
               >
                 <SelectTrigger><SelectValue placeholder="Kein Anbieter" /></SelectTrigger>
                 <SelectContent>
-                  {providers.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                  ))}
+                  {providers.map((p) => {
+                    const paused = isProviderPaused(p.pausedUntil);
+                    return (
+                      <SelectItem key={p.id} value={String(p.id)} disabled={paused}>
+                        {p.name}
+                        {paused && p.pausedUntil ? ` (pausiert bis ${formatPauseDate(p.pausedUntil)})` : ""}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
