@@ -41,4 +41,12 @@ export function applyRuntimeMigrations(sqlite: Database.Database): void {
     sqlite.prepare("ALTER TABLE lead_providers ADD COLUMN paused_until TEXT").run();
     console.log("Added 'paused_until' column to lead_providers table");
   }
+
+  // VOE-175: Pause-Beginn (paused_from)
+  try {
+    sqlite.prepare("SELECT paused_from FROM lead_providers LIMIT 1").get();
+  } catch {
+    sqlite.prepare("ALTER TABLE lead_providers ADD COLUMN paused_from TEXT").run();
+    console.log("Added 'paused_from' column to lead_providers table");
+  }
 }

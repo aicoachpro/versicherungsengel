@@ -5,6 +5,7 @@ import { leads, insurances, leadProviders, provisions } from "@/db/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
 import { getSetting } from "@/lib/settings";
 import { auth } from "@/lib/auth";
+import { isMonthFullyPaused } from "@/lib/provider-pause";
 
 // Lead-Provider aus DB lesen (graceful fallback wenn Tabelle noch nicht existiert)
 function getActiveProviders() {
@@ -188,6 +189,7 @@ function getProviderBudgets() {
     startMonth: string;
     billingModel: string;
     active: boolean;
+    pausedFrom: string | null;
     pausedUntil: string | null;
   }> = [];
 
@@ -213,6 +215,7 @@ function getProviderBudgets() {
     const startMonth = p.startMonth || "";
     const costPerLead = p.costPerLead || 0;
     const pausedUntil = p.pausedUntil || null;
+    const pausedFrom = p.pausedFrom || null;
 
     const result = db
       .select({
@@ -250,18 +253,11 @@ function getProviderBudgets() {
       }
     }
 
-    // VOE-174: Pausierte Monate werden mit min=0 und ohne carry-over behandelt,
-    // damit kein kuenstliches Defizit entsteht. Heuristik: Monat gilt als pausiert,
-    // wenn pausedUntil >= letzter Tag des Monats liegt (siehe lib/provider-pause).
-    const isMonthPaused = (key: string): boolean => {
-      if (!pausedUntil) return false;
-      const [yStr, mStr] = key.split("-");
-      const yr = Number(yStr);
-      const mo = Number(mStr);
-      if (!yr || !mo) return false;
-      const lastDay = new Date(Date.UTC(yr, mo, 0)).toISOString().slice(0, 10);
-      return pausedUntil >= lastDay;
-    };
+    // VOE-175: Pausierte Monate werden mit min=0 behandelt, damit kein
+    // kuenstliches Defizit entsteht. Heuristik: Monat gilt als pausiert,
+    // wenn der Pause-Zeitraum (pausedFrom..pausedUntil) den Monat ueberlappt.
+    const isMonthPaused = (key: string): boolean =>
+      isMonthFullyPaused(pausedUntil, key, pausedFrom);
 
     let accumulatedCarryOver = 0;
     const monthsWithCarryOver = allMonthKeys.map((key) => {

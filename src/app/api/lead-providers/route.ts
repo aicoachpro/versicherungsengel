@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, leadProviders, providerProducts } from "@/db/schema";
+import { users, leadProviders, providerProducts, leads } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
@@ -31,10 +31,23 @@ export async function GET() {
   // allProductIds = alle mit bekanntem Preis (fuer Preis-Anzeige)
   // productPrices = Preise pro Produkt
   const allLinks = db.select().from(providerProducts).all();
+  // VOE-175: letztes Lead-Eingangsdatum pro Provider als Smart-Default fuer "Pause von"
+  const lastLeads = db
+    .select({
+      providerId: leads.providerId,
+      lastLeadAt: sql<string>`max(${leads.eingangsdatum})`,
+    })
+    .from(leads)
+    .groupBy(leads.providerId)
+    .all();
+  const lastLeadByProvider = new Map(
+    lastLeads.filter((l) => l.providerId != null).map((l) => [l.providerId as number, l.lastLeadAt]),
+  );
   const result = all.map((p) => {
     const links = allLinks.filter((l) => l.providerId === p.id);
     return {
       ...p,
+      lastLeadAt: lastLeadByProvider.get(p.id) ?? null,
       productIds: links.filter((l) => l.purchased).map((l) => l.productId),
       allProductIds: links.map((l) => l.productId),
       productPrices: links.reduce((acc, l) => {
@@ -71,6 +84,7 @@ export async function POST(req: NextRequest) {
       carryOver: body.carryOver ?? true,
       startMonth: body.startMonth ?? "",
       active: body.active ?? true,
+      pausedFrom: body.pausedFrom || null,
       pausedUntil: body.pausedUntil || null,
     })
     .returning()

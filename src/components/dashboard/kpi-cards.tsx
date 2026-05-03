@@ -214,6 +214,16 @@ function ProviderBudgetCard({ data }: { data: ProviderBudget }) {
                 <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
                   {netto > 0 ? `${netto} Leads in diesem Monat` : "Keine neuen Leads in diesem Monat"}
                 </p>
+                {carryOver > 0 && (
+                  <p className="text-[10px] text-muted-foreground sm:text-xs">
+                    inkl. {carryOver} Guthaben aus Vormonaten
+                  </p>
+                )}
+                {outstanding > 0 && (
+                  <p className="text-[10px] text-amber-600 sm:text-xs font-medium">
+                    {outstanding} Leads ausstehend
+                  </p>
+                )}
               </>
             ) : (() => {
               const ratio = expected > 0 ? netto / expected : 0;

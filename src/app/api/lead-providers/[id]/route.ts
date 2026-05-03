@@ -49,6 +49,7 @@ export async function PATCH(
   if (body.carryOver !== undefined) updates.carryOver = body.carryOver;
   if (body.startMonth !== undefined) updates.startMonth = body.startMonth ?? "";
   if (body.active !== undefined) updates.active = body.active;
+  if (body.pausedFrom !== undefined) updates.pausedFrom = body.pausedFrom || null;
   if (body.pausedUntil !== undefined) updates.pausedUntil = body.pausedUntil || null;
 
   // Update provider-products junction if productIds provided
