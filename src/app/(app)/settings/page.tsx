@@ -163,7 +163,9 @@ interface LeadProvider {
   carryOver: boolean;
   startMonth: string | null;
   active: boolean;
+  pausedFrom: string | null;
   pausedUntil: string | null;
+  lastLeadAt?: string | null;
   products?: { id: number; name: string }[];
   productPrices?: Record<number, number | null>;
   createdAt: string;
@@ -178,7 +180,9 @@ type LeadProviderForm = {
   billingModel: string;
   carryOver: string;
   startMonth: string;
+  pausedFrom: string;
   pausedUntil: string;
+  lastLeadAt: string | null;
   productIds: number[];
   productPrices: Record<number, number | null>;
   superchatMappings: Record<number, string>;
@@ -192,11 +196,17 @@ const EMPTY_FORM: LeadProviderForm = {
   billingModel: "prepaid",
   carryOver: "true",
   startMonth: "",
+  pausedFrom: "",
   pausedUntil: "",
+  lastLeadAt: null,
   productIds: [],
   productPrices: {},
   superchatMappings: {},
 };
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function lastDayOfCurrentMonth(): string {
   const now = new Date();
@@ -205,6 +215,12 @@ function lastDayOfCurrentMonth(): string {
   const m = String(last.getMonth() + 1).padStart(2, "0");
   const d = String(last.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function formatGermanDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}.${m}.${y}`;
 }
 
 interface ProviderProduct {
@@ -427,20 +443,50 @@ function LeadProviderDialog({
               onChange={(e) => setForm((p) => ({ ...p, startMonth: e.target.value }))}
             />
           </div>
-          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+          <div className="space-y-3 rounded-md border bg-muted/30 p-3">
             <Label className="text-sm font-medium">Pause</Label>
             <p className="text-xs text-muted-foreground">
               Pausierte Anbieter nehmen keine neuen Leads mehr an. Bestehende Leads bleiben unveraendert.
               Pausierte Monate werden in der Soll-Berechnung uebersprungen.
             </p>
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={form.pausedUntil}
-                onChange={(e) => setForm((p) => ({ ...p, pausedUntil: e.target.value }))}
-                className="flex-1"
-                placeholder="Pausieren bis..."
-              />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Pause von</Label>
+                <Input
+                  type="date"
+                  value={form.pausedFrom}
+                  onChange={(e) => setForm((p) => ({ ...p, pausedFrom: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Pause bis</Label>
+                <Input
+                  type="date"
+                  value={form.pausedUntil}
+                  onChange={(e) => setForm((p) => ({ ...p, pausedUntil: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setForm((p) => ({ ...p, pausedFrom: todayISO() }))}
+              >
+                Ab heute
+              </Button>
+              {form.lastLeadAt && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setForm((p) => ({ ...p, pausedFrom: form.lastLeadAt || "" }))}
+                  title={`Letzter Lead: ${formatGermanDate(form.lastLeadAt)}`}
+                >
+                  Ab letztem Lead ({formatGermanDate(form.lastLeadAt)})
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -449,12 +495,12 @@ function LeadProviderDialog({
               >
                 Bis Monatsende
               </Button>
-              {form.pausedUntil && (
+              {(form.pausedFrom || form.pausedUntil) && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setForm((p) => ({ ...p, pausedUntil: "" }))}
+                  onClick={() => setForm((p) => ({ ...p, pausedFrom: "", pausedUntil: "" }))}
                 >
                   Pause aufheben
                 </Button>
@@ -717,6 +763,7 @@ function LeadProviderSection() {
         billingModel: form.billingModel,
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
+        pausedFrom: form.pausedFrom || null,
         pausedUntil: form.pausedUntil || null,
         productIds: form.productIds,
         productPrices: form.productPrices,
@@ -744,6 +791,7 @@ function LeadProviderSection() {
         billingModel: form.billingModel,
         carryOver: form.carryOver === "true",
         startMonth: form.startMonth || null,
+        pausedFrom: form.pausedFrom || null,
         pausedUntil: form.pausedUntil || null,
         productIds: form.productIds,
         productPrices: form.productPrices,
@@ -792,7 +840,9 @@ function LeadProviderSection() {
         billingModel: editProvider.billingModel,
         carryOver: editProvider.carryOver ? "true" : "false",
         startMonth: editProvider.startMonth || "",
+        pausedFrom: editProvider.pausedFrom || "",
         pausedUntil: editProvider.pausedUntil || "",
+        lastLeadAt: editProvider.lastLeadAt ?? null,
         productIds: (editProvider as unknown as { productIds?: number[] }).productIds || editProvider.products?.map((p) => p.id) || [],
         productPrices: editProvider.productPrices || {},
         superchatMappings: (editProvider as unknown as { superchatMappings?: Record<number, string> }).superchatMappings || {},
@@ -857,10 +907,9 @@ function LeadProviderSection() {
                       </Badge>
                       {p.pausedUntil && p.pausedUntil >= new Date().toISOString().slice(0, 10) && (
                         <Badge className="text-xs bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-300">
-                          Pausiert bis {(() => {
-                            const [y, m, d] = p.pausedUntil.split("-");
-                            return `${d}.${m}.${y}`;
-                          })()}
+                          {p.pausedFrom
+                            ? `Pausiert ${formatGermanDate(p.pausedFrom)}–${formatGermanDate(p.pausedUntil)}`
+                            : `Pausiert bis ${formatGermanDate(p.pausedUntil)}`}
                         </Badge>
                       )}
                     </div>
