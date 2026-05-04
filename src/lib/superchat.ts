@@ -52,6 +52,7 @@ export async function createContact(data: {
   last_name?: string;
   phone?: string;
   email?: string;
+  gender?: "male" | "female";
   custom_attributes?: Array<{ id: string; value: string | string[] }>;
   contact_list_ids?: string[];
 }) {
@@ -62,6 +63,7 @@ export async function createContact(data: {
   const body: Record<string, unknown> = { handles };
   if (data.first_name) body.first_name = data.first_name;
   if (data.last_name) body.last_name = data.last_name;
+  if (data.gender) body.gender = data.gender;
   if (data.custom_attributes?.length) body.custom_attributes = data.custom_attributes;
   if (data.contact_list_ids?.length) body.contact_list_ids = data.contact_list_ids;
 
@@ -162,6 +164,7 @@ export async function updateContact(
     last_name?: string;
     phone?: string;
     email?: string;
+    gender?: "male" | "female";
     custom_attributes?: Array<{ id: string; value: string | string[] }>;
     contact_list_ids?: string[];
   }
@@ -169,6 +172,7 @@ export async function updateContact(
   const body: Record<string, unknown> = {};
   if (data.first_name !== undefined) body.first_name = data.first_name;
   if (data.last_name !== undefined) body.last_name = data.last_name;
+  if (data.gender) body.gender = data.gender;
   if (data.custom_attributes?.length) body.custom_attributes = data.custom_attributes;
   if (data.contact_list_ids?.length) body.contact_list_ids = data.contact_list_ids;
 
