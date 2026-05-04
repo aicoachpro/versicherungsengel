@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { createContact, updateContact, findContactByHandle } from "@/lib/superchat";
+import { inferGender } from "@/lib/gender-inference";
 
 // Fallback IDs (werden durch DB-Sync ueberschrieben)
 const FALLBACK_IDS: Record<string, string> = {
@@ -277,6 +278,11 @@ export async function POST(req: NextRequest) {
   const missingProduct = !lead.productId;
   const contact_list_ids = (superchatListId && !missingProduct) ? [superchatListId] : undefined;
 
+  // VOE-178: Geschlecht aus Vorname per KI ableiten — fuer geschlechtsspezifische
+  // WhatsApp-Anrede in Superchat. Bei Fehler oder mehrdeutigem Namen bleibt das
+  // Feld leer, der Sync laeuft dann ohne gender weiter.
+  const gender = (await inferGender(first_name)) ?? undefined;
+
   try {
     let contactId = lead.superchatContactId;
     let action: "create" | "update" = "create";
@@ -288,6 +294,7 @@ export async function POST(req: NextRequest) {
         await updateContact(contactId, {
           first_name,
           last_name,
+          gender,
           custom_attributes,
           contact_list_ids,
         });
@@ -333,6 +340,7 @@ export async function POST(req: NextRequest) {
             last_name,
             phone: handles.phone,
             email: handles.email,
+            gender,
             custom_attributes,
             contact_list_ids,
           });
@@ -353,7 +361,7 @@ export async function POST(req: NextRequest) {
           || (email ? await findContactByHandle(email) : null);
         if (existing?.id) {
           contactId = existing.id;
-          await updateContact(contactId!, { first_name, last_name, custom_attributes, contact_list_ids });
+          await updateContact(contactId!, { first_name, last_name, gender, custom_attributes, contact_list_ids });
           action = "update";
         } else {
           // Handles existieren als Geister-Kontakte (blockiert aber unsichtbar)
@@ -364,6 +372,7 @@ export async function POST(req: NextRequest) {
               first_name,
               last_name,
               email: fallbackEmail,
+              gender,
               custom_attributes,
               contact_list_ids,
             });
@@ -377,7 +386,7 @@ export async function POST(req: NextRequest) {
               const fallbackExisting = await findContactByHandle(fallbackEmail);
               if (fallbackExisting?.id) {
                 contactId = fallbackExisting.id;
-                await updateContact(contactId!, { first_name, last_name, custom_attributes, contact_list_ids });
+                await updateContact(contactId!, { first_name, last_name, gender, custom_attributes, contact_list_ids });
                 action = "update";
                 warnings.push(`Bestehender Fallback-Kontakt aktualisiert: ${fallbackEmail}`);
               } else {
