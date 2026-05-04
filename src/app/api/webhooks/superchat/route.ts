@@ -123,6 +123,7 @@ function findLeadByContact(
 }
 
 const SUPPORTED_MESSAGE_EVENTS = new Set([
+  "message_inbound",
   "message.received",
   "message_received",
   "message.created",
