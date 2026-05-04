@@ -80,14 +80,14 @@ export async function createContact(data: {
  * - Entfernt Laenderpraefix '49' (DE)
  * So werden '+49 172 7755335', '01727755335' und '491727755335' alle zu '1727755335'.
  */
-function normalizePhoneForCompare(value: string): string {
+export function normalizePhoneForCompare(value: string): string {
   return value
     .replace(/\D/g, "")
     .replace(/^0+/, "")
     .replace(/^49/, "");
 }
 
-function normalizeEmailForCompare(value: string): string {
+export function normalizeEmailForCompare(value: string): string {
   return value.trim().toLowerCase();
 }
 
