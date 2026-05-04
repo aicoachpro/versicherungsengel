@@ -1,0 +1,15 @@
+# Taegliches DB-Backup um 03:30 Uhr Berlin-Zeit (Cron laeuft in TZ des Containers,
+# aber dieser Cron liegt auf dem Host — Host-TZ pruefen mit `date`).
+#
+# Installation:
+#   cp /root/versicherungsengel/config/cron-backup /etc/cron.d/versicherungsengel-backup
+#   chmod 644 /etc/cron.d/versicherungsengel-backup
+#
+# Voraussetzungen:
+#   apt install -y sqlite3
+#   TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID in /root/versicherungsengel/.env
+#
+# Logs landen in /var/log/versicherungsengel-backup.log
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 3 * * * root /root/versicherungsengel/scripts/backup-db.sh >> /var/log/versicherungsengel-backup.log 2>&1
