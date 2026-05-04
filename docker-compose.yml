@@ -2,11 +2,8 @@ services:
   app:
     build: .
     restart: always
-    environment:
-      - AUTH_SECRET=voelker-finance-sales-hub-secret-key-2024
-      - AUTH_TRUST_HOST=true
-      - AUTH_URL=https://leads.voelkergroup.cloud
-      - TZ=Europe/Berlin
+    env_file:
+      - .env
     volumes:
       - app_data:/app/data
     labels:
