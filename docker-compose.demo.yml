@@ -7,6 +7,7 @@ services:
       - AUTH_TRUST_HOST=true
       - AUTH_URL=https://demo.voelkergroup.cloud
       - DEMO_MODE=true
+      - TZ=Europe/Berlin
     volumes:
       - demo_data:/app/data
     labels:

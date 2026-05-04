@@ -21,6 +21,13 @@ FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV TZ=Europe/Berlin
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tzdata \
+ && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+ && echo $TZ > /etc/timezone \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
