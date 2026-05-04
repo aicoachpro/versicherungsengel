@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/db";
-import { leads, activities } from "@/db/schema";
-import { eq, or } from "drizzle-orm";
-import { validateWebhookRequest } from "@/lib/api-auth";
-import { getConversationMessages } from "@/lib/superchat";
+import { leads, activities, apiKeys } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  getConversationMessages,
+  normalizePhoneForCompare,
+  normalizeEmailForCompare,
+} from "@/lib/superchat";
 
 // Superchat Kanal → Kontaktart-Mapping
 const CHANNEL_MAP: Record<string, string> = {
@@ -22,66 +27,154 @@ function mapKontaktart(channel: string): Kontaktart {
   return (CHANNEL_MAP[channel.toLowerCase()] || "Sonstiges") as Kontaktart;
 }
 
+// HMAC-SHA256-Verifikation gegen X-Superchat-Signature.
+// Akzeptiert sowohl "sha256=<hex>" als auch reines hex.
+function verifySuperchatSignature(rawBody: string, header: string, secret: string): boolean {
+  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  const provided = header.startsWith("sha256=") ? header.slice(7) : header;
+  if (provided.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(provided, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+type AuthResult = { ok: true; via: "hmac" | "api-key" } | { ok: false; reason: string };
+
+function authenticate(req: NextRequest, rawBody: string): AuthResult {
+  // 1. HMAC-Pfad (Superchat nativ)
+  const secret = process.env.SUPERCHAT_WEBHOOK_SECRET;
+  const sigHeader =
+    req.headers.get("x-superchat-signature") ||
+    req.headers.get("x-signature");
+  if (secret && sigHeader) {
+    return verifySuperchatSignature(rawBody, sigHeader, secret)
+      ? { ok: true, via: "hmac" }
+      : { ok: false, reason: "Ungueltige HMAC-Signatur" };
+  }
+
+  // 2. Fallback: x-api-key (n8n-Relay etc.)
+  const apiKey = req.headers.get("x-api-key");
+  if (apiKey) {
+    const validKey = db.select().from(apiKeys).where(eq(apiKeys.key, apiKey)).get();
+    if (!validKey) return { ok: false, reason: "Ungueltiger API-Key" };
+    const limit = checkRateLimit(apiKey, 60, 60_000);
+    if (!limit.allowed) return { ok: false, reason: "Rate-Limit ueberschritten" };
+    return { ok: true, via: "api-key" };
+  }
+
+  return {
+    ok: false,
+    reason: secret
+      ? "Weder X-Superchat-Signature noch x-api-key vorhanden"
+      : "x-api-key fehlt (SUPERCHAT_WEBHOOK_SECRET nicht gesetzt — HMAC-Pfad inaktiv)",
+  };
+}
+
+// Lead-Suche per superchat_contact_id, dann normalisiert per Telefon/Email.
 function findLeadByContact(
   contactId: string | undefined,
   contactPhone: string | undefined,
   contactEmail: string | undefined,
 ) {
-  let lead = null;
-
   if (contactId) {
-    lead = db
+    const byScid = db
       .select()
       .from(leads)
       .where(eq(leads.superchatContactId, contactId))
       .get();
+    if (byScid) return byScid;
   }
 
-  if (!lead && (contactPhone || contactEmail)) {
-    const conditions = [];
-    if (contactPhone) conditions.push(eq(leads.telefon, contactPhone));
-    if (contactEmail) conditions.push(eq(leads.email, contactEmail));
+  if (!contactPhone && !contactEmail) return null;
 
-    lead = db
-      .select()
-      .from(leads)
-      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
-      .get();
+  const phoneNorm = contactPhone ? normalizePhoneForCompare(contactPhone) : null;
+  const emailNorm = contactEmail ? normalizeEmailForCompare(contactEmail) : null;
 
-    if (lead && contactId && !lead.superchatContactId) {
-      db.update(leads)
-        .set({ superchatContactId: contactId, updatedAt: new Date().toISOString() })
-        .where(eq(leads.id, lead.id))
-        .run();
-    }
+  // SQLite hat keine eingebaute Normalisierung — alle Leads laden und in JS vergleichen.
+  // Bei wenigen Tausend Leads vertretbar; Indexsuche per superchat_contact_id deckt
+  // den Hot Path nach erstem Match ohnehin ab.
+  const all = db
+    .select({
+      id: leads.id,
+      telefon: leads.telefon,
+      email: leads.email,
+      superchatContactId: leads.superchatContactId,
+      name: leads.name,
+    })
+    .from(leads)
+    .all();
+
+  const match = all.find((l) => {
+    if (phoneNorm && l.telefon && normalizePhoneForCompare(l.telefon) === phoneNorm) return true;
+    if (emailNorm && l.email && normalizeEmailForCompare(l.email) === emailNorm) return true;
+    return false;
+  });
+
+  if (match && contactId && !match.superchatContactId) {
+    db.update(leads)
+      .set({ superchatContactId: contactId, updatedAt: new Date().toISOString() })
+      .where(eq(leads.id, match.id))
+      .run();
   }
 
-  return lead;
+  return match || null;
 }
 
+const SUPPORTED_MESSAGE_EVENTS = new Set([
+  "message.received",
+  "message_received",
+  "message.created",
+  "message_created",
+  "conversation.message.created",
+]);
+
+const SUPPORTED_CONVERSATION_EVENTS = new Set([
+  "conversation.closed",
+  "conversation.archived",
+]);
+
 /**
- * Webhook für eingehende Superchat-Nachrichten und Konversations-Events.
+ * Webhook fuer eingehende Superchat-Nachrichten und Konversations-Events.
  *
- * Unterstützte Events:
- * - message.received: legt je Nachricht eine Aktivität am Lead an
- * - conversation.closed / conversation.archived: holt den kompletten Chat-Verlauf
- *   und legt eine einzige Aktivität mit der gesamten Historie an
+ * Auth:
+ * - Bevorzugt: HMAC-SHA256 ueber raw body, Header X-Superchat-Signature,
+ *   Secret in env SUPERCHAT_WEBHOOK_SECRET
+ * - Fallback: x-api-key Header (api_keys-Tabelle)
  */
 export async function POST(req: NextRequest) {
-  const auth = validateWebhookRequest(req);
-  if (!auth.authorized) return auth.response!;
+  const rawBody = await req.text();
+  const auth = authenticate(req, rawBody);
 
-  const body = await req.json();
-  const event = body.event || body.type;
+  if (!auth.ok) {
+    // Diagnose-Logging: Header-Namen (Werte gekuerzt) + erste 200 Zeichen Body.
+    const headerKeys = Array.from(req.headers.keys());
+    console.warn(
+      `[superchat-webhook] 401 — ${auth.reason}. Headers=[${headerKeys.join(", ")}] BodyPreview=${rawBody.slice(0, 200)}`,
+    );
+    return NextResponse.json({ error: auth.reason }, { status: 401 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    return NextResponse.json({ error: "Body ist kein gueltiges JSON" }, { status: 400 });
+  }
+
+  const event = String(body.event || body.type || "");
 
   // ===== Event: Konversation geschlossen / archiviert =====
-  if (event === "conversation.closed" || event === "conversation.archived") {
-    const payload = body.data || body.conversation || body;
-    const conversationId = payload.conversation_id || payload.id;
-    const contactId = payload.contact_id || payload.contact?.id;
-    const contactPhone = payload.contact?.phone || payload.phone;
-    const contactEmail = payload.contact?.email || payload.email;
-    const channel = payload.channel || "whatsapp";
+  if (SUPPORTED_CONVERSATION_EVENTS.has(event)) {
+    const payload = (body.data || body.conversation || body) as Record<string, unknown>;
+    const conversationId =
+      (payload.conversation_id as string | undefined) || (payload.id as string | undefined);
+    const contact = (payload.contact as Record<string, unknown> | undefined) || {};
+    const contactId = (payload.contact_id as string | undefined) || (contact.id as string | undefined);
+    const contactPhone = (contact.phone as string | undefined) || (payload.phone as string | undefined);
+    const contactEmail = (contact.email as string | undefined) || (payload.email as string | undefined);
+    const channel = (payload.channel as string | undefined) || "whatsapp";
 
     if (!conversationId) {
       return NextResponse.json({ skipped: true, reason: "Keine conversation_id" });
@@ -99,7 +192,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Kompletten Chat-Verlauf holen
     let messages: Array<Record<string, unknown>> = [];
     try {
       messages = await getConversationMessages(conversationId);
@@ -111,14 +203,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Nachrichten sortieren (alt → neu)
     messages.sort((a, b) => {
       const ta = new Date((a.created_at as string) || (a.timestamp as string) || 0).getTime();
       const tb = new Date((b.created_at as string) || (b.timestamp as string) || 0).getTime();
       return ta - tb;
     });
 
-    // Chat-Verlauf als Text aufbereiten
     const lines: string[] = [
       `[Superchat ${channel}] Chat-Verlauf (${messages.length} Nachrichten)`,
       "",
@@ -169,23 +259,42 @@ export async function POST(req: NextRequest) {
         leadName: lead.name,
         activityId: activity.id,
         messageCount: messages.length,
+        via: auth.via,
       },
       { status: 201 },
     );
   }
 
   // ===== Event: Einzelne Nachricht empfangen =====
-  if (event !== "message.received" && event !== "message_received") {
+  if (!SUPPORTED_MESSAGE_EVENTS.has(event)) {
     return NextResponse.json({ skipped: true, reason: `Event nicht unterstuetzt: ${event}` });
   }
 
-  const message = body.data || body.message || body;
-  const contactId = message.contact_id || message.contactId;
-  const contactPhone = message.contact?.phone || message.phone;
-  const contactEmail = message.contact?.email || message.email;
-  const contactName = message.contact?.name || message.name;
-  const channel = message.channel || "whatsapp";
-  const text = message.body?.text || message.text || message.content || "";
+  const message = (body.data || body.message || body) as Record<string, unknown>;
+  const contact = (message.contact as Record<string, unknown> | undefined) || {};
+  const contactId =
+    (message.contact_id as string | undefined) ||
+    (message.contactId as string | undefined) ||
+    (contact.id as string | undefined);
+  const contactPhone = (contact.phone as string | undefined) || (message.phone as string | undefined);
+  const contactEmail = (contact.email as string | undefined) || (message.email as string | undefined);
+  const contactName = (contact.name as string | undefined) || (message.name as string | undefined);
+  const channel = (message.channel as string | undefined) || "whatsapp";
+
+  // Inbound-only: outbound-Nachrichten von uns nicht doppelt protokollieren
+  const direction = (message.direction as string | undefined) || (message.type as string | undefined);
+  if (direction && direction !== "inbound" && direction !== "incoming") {
+    return NextResponse.json({ skipped: true, reason: `Outbound-Nachricht ignoriert (${direction})` });
+  }
+
+  const body_ = message.body as { text?: string } | undefined;
+  const content = message.content as { text?: string } | undefined;
+  const text =
+    body_?.text ||
+    content?.text ||
+    (message.text as string | undefined) ||
+    (message.content as string | undefined) ||
+    "";
 
   if (!text) {
     return NextResponse.json({ skipped: true, reason: "Leere Nachricht" });
@@ -216,7 +325,7 @@ export async function POST(req: NextRequest) {
     .get();
 
   return NextResponse.json(
-    { matched: true, leadId: lead.id, leadName: lead.name, activityId: activity.id },
+    { matched: true, leadId: lead.id, leadName: lead.name, activityId: activity.id, via: auth.via },
     { status: 201 },
   );
 }
