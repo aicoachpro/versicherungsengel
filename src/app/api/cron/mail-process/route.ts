@@ -5,6 +5,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { extractLeadFromEmail } from "@/lib/ai-client";
 import { verifyCronAuth } from "@/lib/cron-auth";
 import { isProviderPaused } from "@/lib/provider-pause";
+import { logAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   if (!verifyCronAuth(req)) {
@@ -424,6 +425,23 @@ export async function GET(req: NextRequest) {
                     { position: 1, value: anrede },
                     { position: 2, value: produktName },
                   ],
+                });
+                // VOE-177: Activity + Audit-Log analog zum manuellen WhatsApp-Endpoint,
+                // damit der Erstanfrage-Button ausgegraut wird und Bearbeiter den
+                // Versand am Lead-Detail nachvollziehen koennen.
+                db.insert(activities).values({
+                  leadId: newLead.id,
+                  datum: new Date().toISOString(),
+                  kontaktart: "WhatsApp",
+                  notiz: `Erstnachricht versendet per WhatsApp: ${anrede} Produkt: ${produktName}`,
+                }).run();
+                logAudit({
+                  userId: null,
+                  userName: "System (Mail-Cron)",
+                  action: "whatsapp_send",
+                  entity: "lead",
+                  entityId: newLead.id,
+                  entityName: newLead.name,
                 });
                 console.log(`[mail-process] Auto-WhatsApp gesendet an ${superchatContactPhone} fuer Lead #${newLead.id}`);
               }
