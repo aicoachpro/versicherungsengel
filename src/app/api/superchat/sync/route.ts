@@ -5,7 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logAudit, getAuditUser } from "@/lib/audit";
 import { createContact, updateContact, findContactByHandle } from "@/lib/superchat";
-import { inferGender } from "@/lib/gender-inference";
+import { extractNameParts, inferGenderFromFullName } from "@/lib/gender-inference";
 
 // Fallback IDs (werden durch DB-Sync ueberschrieben)
 const FALLBACK_IDS: Record<string, string> = {
@@ -100,10 +100,11 @@ export async function POST(req: NextRequest) {
   const lead = db.select().from(leads).where(eq(leads.id, leadId)).get();
   if (!lead) return NextResponse.json({ error: "Lead nicht gefunden" }, { status: 404 });
 
-  // Name aufteilen
-  const parts = (lead.ansprechpartner || lead.name || "").split(" ");
-  const first_name = parts[0] || "";
-  const last_name = parts.slice(1).join(" ") || "";
+  // Name aufteilen — Anrede ("Frau"/"Herr") und Titel ("Dr."/"Prof.") strippen,
+  // damit der Vorname tatsaechlich der Vorname ist und nicht "Frau" oder "Dr."
+  // landet als first_name in Superchat (VOE-190).
+  const fullName = lead.ansprechpartner || lead.name || "";
+  const { firstName: first_name, lastName: last_name } = extractNameParts(fullName);
   // Telefon in E.164 konvertieren: 0179... → +49179...
   let phone = lead.telefon?.replace(/[^0-9+]/g, "") || undefined;
   if (phone && phone.startsWith("0")) {
@@ -278,10 +279,11 @@ export async function POST(req: NextRequest) {
   const missingProduct = !lead.productId;
   const contact_list_ids = (superchatListId && !missingProduct) ? [superchatListId] : undefined;
 
-  // VOE-178: Geschlecht aus Vorname per KI ableiten — fuer geschlechtsspezifische
-  // WhatsApp-Anrede in Superchat. Bei Fehler oder mehrdeutigem Namen bleibt das
-  // Feld leer, der Sync laeuft dann ohne gender weiter.
-  const gender = (await inferGender(first_name)) ?? undefined;
+  // VOE-178/VOE-190: Geschlecht aus Vorname/Anrede ableiten — direkt aus
+  // "Frau"/"Herr" wenn vorhanden, sonst KI-Inferenz auf den bereinigten Vornamen.
+  // Bei Fehler oder mehrdeutigem Namen bleibt das Feld leer, der Sync laeuft
+  // dann ohne gender weiter.
+  const gender = (await inferGenderFromFullName(fullName)) ?? undefined;
 
   try {
     let contactId = lead.superchatContactId;
