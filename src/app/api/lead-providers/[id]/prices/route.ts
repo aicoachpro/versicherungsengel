@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, leadProviders, providerProducts, leadProducts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, leadProviders, providerProducts, leadProducts, leads } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { chat } from "@/lib/ai-client";
 
@@ -152,18 +152,25 @@ export async function POST(
 
   let matched = 0;
   let skipped = 0;
+  let leadsPriceUpdated = 0;
   const results: { sparte: string; preis: number; matched: boolean }[] = [];
   const unmatchedItems: { sparte: string; preis: number }[] = [];
 
-  // Bestehende purchased-Flags merken bevor wir die Preise neu setzen
-  const existingPurchased = db
+  // Bestehende purchased-Flags und Preise merken bevor wir die Eintraege neu setzen.
+  // Die Preise brauchen wir, damit wir nur tatsaechlich geaenderte Werte auf
+  // bestehende Leads propagieren (VOE-191).
+  const existingLinks = db
     .select()
     .from(providerProducts)
     .where(eq(providerProducts.providerId, providerId))
     .all();
   const purchasedSet = new Set(
-    existingPurchased.filter((pp) => pp.purchased).map((pp) => pp.productId)
+    existingLinks.filter((pp) => pp.purchased).map((pp) => pp.productId)
   );
+  const previousPrices = new Map<number, number | null>();
+  for (const l of existingLinks) {
+    previousPrices.set(l.productId, l.costPerLead ?? null);
+  }
 
   // Bestehende Links loeschen und neu aufbauen
   db.delete(providerProducts).where(eq(providerProducts.providerId, providerId)).run();
@@ -248,6 +255,16 @@ export async function POST(
           purchased: purchasedSet.has(productId),
         })
         .run();
+      // VOE-191: Preis-Update auf bestehende Leads propagieren
+      const oldPrice = previousPrices.get(productId) ?? null;
+      if (preis !== oldPrice) {
+        const upd = db
+          .update(leads)
+          .set({ terminKosten: preis })
+          .where(and(eq(leads.providerId, providerId), eq(leads.productId, productId)))
+          .run();
+        leadsPriceUpdated += upd.changes;
+      }
       matched++;
       results.push({ sparte: label, preis, matched: true });
     } else {
@@ -299,6 +316,16 @@ Regeln:
               purchased: purchasedSet.has(mapping.productId),
             })
             .run();
+          // VOE-191: Preis-Update auf bestehende Leads propagieren (KI-Match-Pfad)
+          const oldPrice = previousPrices.get(mapping.productId) ?? null;
+          if (item.preis !== oldPrice) {
+            const upd = db
+              .update(leads)
+              .set({ terminKosten: item.preis })
+              .where(and(eq(leads.providerId, providerId), eq(leads.productId, mapping.productId)))
+              .run();
+            leadsPriceUpdated += upd.changes;
+          }
           matched++;
           results.push({ sparte: item.sparte, preis: item.preis, matched: true });
         } else {
@@ -321,6 +348,7 @@ Regeln:
     total: matched + skipped,
     priceType,
     vatApplied: applyVat,
+    leadsPriceUpdated,
     results,
   });
 }

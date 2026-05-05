@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { CHECK_DIREKT_SPARTEN, LEGACY_KUERZEL_MAP } from "./seeds/check-direkt-sparten";
 
 /**
  * Idempotente Schema-Migrationen, die beim Container-Start automatisch laufen.
@@ -48,5 +49,42 @@ export function applyRuntimeMigrations(sqlite: Database.Database): void {
   } catch {
     sqlite.prepare("ALTER TABLE lead_providers ADD COLUMN paused_from TEXT").run();
     console.log("Added 'paused_from' column to lead_providers table");
+  }
+
+  // VOE-191: Check-Direkt-Sparten + kuerzel-Spalte
+  // Vorher in migrate.ts (manuelles Skript), jetzt automatisch beim Start.
+  // Zuerst Spalte sicherstellen, dann Legacy-Kuerzel updaten, dann Sparten seeden.
+  // Reihenfolge ist wichtig: ohne den Legacy-Update wuerde der Seed Duplikate
+  // einfuegen, weil bestehende Sparten kein Kuerzel haben.
+  try {
+    sqlite.prepare("SELECT kuerzel FROM lead_products LIMIT 1").get();
+  } catch {
+    sqlite.prepare("ALTER TABLE lead_products ADD COLUMN kuerzel TEXT").run();
+    console.log("Added 'kuerzel' column to lead_products table");
+  }
+
+  // Bestehende Sparten mit Kuerzel versehen (nur wenn noch keins gesetzt ist)
+  const updateKuerzel = sqlite.prepare(
+    "UPDATE lead_products SET kuerzel = ? WHERE name = ? AND (kuerzel IS NULL OR kuerzel = '')"
+  );
+  for (const [name, kuerzel] of Object.entries(LEGACY_KUERZEL_MAP)) {
+    updateKuerzel.run(kuerzel, name);
+  }
+
+  // Check-Direkt-Sparten einfuegen, wenn das Kuerzel noch nicht existiert.
+  // Idempotent: erneuter Start fuegt nichts erneut ein.
+  const insertSparte = sqlite.prepare(
+    `INSERT INTO lead_products (name, kuerzel, sort_order)
+     SELECT ?, ?, ?
+     WHERE NOT EXISTS (SELECT 1 FROM lead_products WHERE kuerzel = ?)`
+  );
+  let inserted = 0;
+  let sortIdx = 100;
+  for (const [kuerzel, name] of CHECK_DIREKT_SPARTEN) {
+    const result = insertSparte.run(name, kuerzel, sortIdx++, kuerzel);
+    if (result.changes > 0) inserted++;
+  }
+  if (inserted > 0) {
+    console.log(`[VOE-191] Seeded ${inserted} Check-Direkt Sparten as lead_products`);
   }
 }

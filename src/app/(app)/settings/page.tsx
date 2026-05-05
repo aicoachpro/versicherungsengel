@@ -284,7 +284,7 @@ function LeadProviderDialog({
   }, [open, initialData]);
 
   const [csvUploading, setCsvUploading] = useState(false);
-  const [csvResult, setCsvResult] = useState<{ matched: number; skipped: number; vatApplied?: boolean; results?: { sparte: string; matched: boolean }[] } | null>(null);
+  const [csvResult, setCsvResult] = useState<{ matched: number; skipped: number; vatApplied?: boolean; leadsPriceUpdated?: number; results?: { sparte: string; matched: boolean }[] } | null>(null);
   const [pendingCsv, setPendingCsv] = useState<File | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [showOnlyActive, setShowOnlyActive] = useState(false);
@@ -537,15 +537,17 @@ function LeadProviderDialog({
                 <p className={`text-xs ${csvResult.matched > 0 ? "text-emerald-600" : "text-destructive"}`}>
                   {csvResult.matched} Sparten zugeordnet, {csvResult.skipped} uebersprungen
                   {csvResult.vatApplied && " (19% MwSt aufgeschlagen)"}
+                  {csvResult.leadsPriceUpdated ? ` · ${csvResult.leadsPriceUpdated} bestehende Leads aktualisiert` : ""}
                 </p>
               )}
               {/* Suchfeld + Filter-Toggle + Bulk-Aktionen */}
               <div className="flex gap-2 items-center flex-wrap">
                 <Input
-                  placeholder="Suche nach Name oder Kuerzel..."
+                  placeholder="Suche nach Name oder Kuerzel (z.B. 'hund' oder 'VSH')..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   className="h-8 text-xs flex-1 min-w-[180px]"
+                  autoFocus
                 />
                 <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer shrink-0 whitespace-nowrap">
                   <input
@@ -582,9 +584,22 @@ function LeadProviderDialog({
                     });
                   if (filtered.length === 0) {
                     return (
-                      <p className="text-xs text-muted-foreground text-center py-2">
-                        {q ? "Keine Treffer" : showOnlyActive ? "Keine aktiven Produkte" : "Keine Produkte"}
-                      </p>
+                      <div className="text-xs text-muted-foreground text-center py-3 space-y-1">
+                        {q ? (
+                          <>
+                            <p>Keine Sparte gefunden fuer &bdquo;{q}&ldquo;</p>
+                            {showOnlyActive && (
+                              <p className="text-[11px]">
+                                Filter &bdquo;Nur aktive&ldquo; abwaehlen, um alle Sparten zu sehen.
+                              </p>
+                            )}
+                          </>
+                        ) : showOnlyActive ? (
+                          <p>Keine aktiven Produkte</p>
+                        ) : (
+                          <p>Keine Produkte</p>
+                        )}
+                      </div>
                     );
                   }
                   return filtered.map((product) => {
@@ -802,9 +817,19 @@ function LeadProviderSection() {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || "Fehler beim Speichern");
     }
+    // VOE-191: Anzahl der durch Preis-Update angepassten Leads aus Antwort lesen
+    const data = await res.json().catch(() => ({} as { leadsPriceUpdated?: number }));
     setEditProvider(null);
     await fetchProviders();
-    showFeedback("success", "Anbieter aktualisiert");
+    const leadsUpdated = data.leadsPriceUpdated ?? 0;
+    if (leadsUpdated > 0) {
+      showFeedback(
+        "success",
+        `Anbieter aktualisiert · ${leadsUpdated} bestehende Lead${leadsUpdated === 1 ? "" : "s"} auf neuen Preis gesetzt`
+      );
+    } else {
+      showFeedback("success", "Anbieter aktualisiert");
+    }
   };
 
   const handleDelete = async () => {

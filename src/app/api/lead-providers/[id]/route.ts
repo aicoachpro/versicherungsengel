@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, leadProviders, providerProducts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, leadProviders, providerProducts, leads } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 async function requireAdmin() {
@@ -52,6 +52,10 @@ export async function PATCH(
   if (body.pausedFrom !== undefined) updates.pausedFrom = body.pausedFrom || null;
   if (body.pausedUntil !== undefined) updates.pausedUntil = body.pausedUntil || null;
 
+  // VOE-191: Anzahl der Leads, die durch Preis-Updates angepasst wurden.
+  // Wird in der Antwort zurueckgegeben, damit der Dialog den Operator informieren kann.
+  let leadsPriceUpdated = 0;
+
   // Update provider-products junction if productIds provided
   // productIds = Liste der GEKAUFTEN Sparten
   // productPrices = Preise (auch fuer nicht-gekaufte Sparten moeglich)
@@ -60,6 +64,18 @@ export async function PATCH(
     const purchasedSet = new Set<number>(body.productIds);
     const prices: Record<number, number | null> = body.productPrices || {};
     const scMappings: Record<number, string> = body.superchatMappings || {};
+
+    // VOE-191: Alte Preise merken, damit wir nur tatsaechlich geaenderte Preise
+    // auf bestehende Leads propagieren (vermeidet unnoetige Updates).
+    const previousLinks = db
+      .select()
+      .from(providerProducts)
+      .where(eq(providerProducts.providerId, providerId))
+      .all();
+    const previousPrices = new Map<number, number | null>();
+    for (const l of previousLinks) {
+      previousPrices.set(l.productId, l.costPerLead ?? null);
+    }
 
     // Alle bestehenden Links fuer diesen Provider loeschen
     db.delete(providerProducts).where(eq(providerProducts.providerId, providerId)).run();
@@ -70,15 +86,28 @@ export async function PATCH(
       ...Object.keys(prices).map((k) => parseInt(k)),
     ]);
     for (const pid of allProductIds) {
+      const newPrice = prices[pid] ?? null;
       db.insert(providerProducts)
         .values({
           providerId,
           productId: pid,
-          costPerLead: prices[pid] ?? null,
+          costPerLead: newPrice,
           purchased: purchasedSet.has(pid),
           superchatOption: scMappings[pid] || null,
         })
         .run();
+
+      // VOE-191: Preis-Update auf bestehende Leads propagieren, wenn sich der
+      // Preis tatsaechlich geaendert hat und ein neuer Preis gesetzt wurde.
+      const oldPrice = previousPrices.get(pid) ?? null;
+      if (newPrice !== null && newPrice !== oldPrice) {
+        const result = db
+          .update(leads)
+          .set({ terminKosten: newPrice })
+          .where(and(eq(leads.providerId, providerId), eq(leads.productId, pid)))
+          .run();
+        leadsPriceUpdated += result.changes;
+      }
     }
   }
 
@@ -115,6 +144,7 @@ export async function PATCH(
       if (l.superchatOption) acc[l.productId] = l.superchatOption;
       return acc;
     }, {} as Record<number, string>),
+    leadsPriceUpdated,
   });
 }
 
