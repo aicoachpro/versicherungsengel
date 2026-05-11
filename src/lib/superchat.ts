@@ -157,6 +157,45 @@ export async function sendTemplateMessage(params: {
   });
 }
 
+/**
+ * Listet alle bei Superchat registrierten Webhooks. Antwort-Schema laut
+ * Developer-Doku (ReadMe): `{ results: [...] }` mit pro Webhook mindestens
+ * `id` und `target_url`, optional `events` und `signing_secret`.
+ */
+export async function listWebhooks(): Promise<Array<Record<string, unknown>>> {
+  const result = await superchatFetch(`/webhooks?limit=100`);
+  return result?.results || result?.data || [];
+}
+
+/**
+ * Registriert einen neuen Webhook bei Superchat.
+ * `events` als Array von Event-Typ-Strings (z.B. ["message_inbound"]).
+ *
+ * Superchat akzeptiert laut Doku zwei Schemata fuer `events`:
+ *  - Array of objects: [{ type: "message_inbound" }]
+ *  - Array of strings: ["message_inbound"]
+ * Wir senden die Object-Form, weil das Developer-Reference das so zeigt.
+ *
+ * Response enthaelt den erzeugten Webhook inkl. optionalem `signing_secret`,
+ * das (falls vorhanden) als `SUPERCHAT_WEBHOOK_SECRET` in die .env muss.
+ */
+export async function createWebhook(params: {
+  targetUrl: string;
+  events: string[];
+}): Promise<Record<string, unknown>> {
+  return superchatFetch(`/webhooks`, {
+    method: "POST",
+    body: JSON.stringify({
+      target_url: params.targetUrl,
+      events: params.events.map((type) => ({ type })),
+    }),
+  });
+}
+
+export async function deleteWebhook(webhookId: string): Promise<void> {
+  await superchatFetch(`/webhooks/${webhookId}`, { method: "DELETE" });
+}
+
 export async function updateContact(
   contactId: string,
   data: {
