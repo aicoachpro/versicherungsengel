@@ -3170,6 +3170,178 @@ function AssignmentRuleDialog({
   );
 }
 
+interface SuperchatDiagnose {
+  envApiKey: boolean;
+  envWebhookSecret: boolean;
+  leadsTotal: number;
+  leadsLinked: number;
+  lastInbound: { at: string; leadName: string | null; leadId: number } | null;
+  webhookUrl: string;
+}
+
+function StatusRow({ ok, label, hint }: { ok: boolean; label: string; hint?: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      {ok ? (
+        <CircleCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+      ) : (
+        <CircleX className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+      )}
+      <div className="flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      </div>
+    </div>
+  );
+}
+
+function SuperchatDiagnoseSection() {
+  const [data, setData] = useState<SuperchatDiagnose | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const fetchDiagnose = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/superchat/diagnose");
+      if (res.ok) setData(await res.json());
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDiagnose();
+  }, []);
+
+  const handleCopy = async () => {
+    if (!data?.webhookUrl) return;
+    try {
+      await navigator.clipboard.writeText(data.webhookUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // silent
+    }
+  };
+
+  const linkedPercent = data && data.leadsTotal > 0
+    ? Math.round((data.leadsLinked / data.leadsTotal) * 100)
+    : 0;
+
+  const allGood = data?.envApiKey && data?.envWebhookSecret && !!data?.lastInbound;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5" />
+            Superchat-Verbindung
+          </h3>
+          <Badge variant={allGood ? "default" : "secondary"}>
+            {loading ? "Pruefe..." : allGood ? "Aktiv" : "Setup unvollstaendig"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Prueft, ob Superchat-Konversationen automatisch beim Lead dokumentiert werden.
+          Drei Punkte muessen passen — siehe unten.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading || !data ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Lade Diagnose...
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              <StatusRow
+                ok={data.envApiKey}
+                label="Superchat API-Key gesetzt"
+                hint={data.envApiKey
+                  ? "SUPERCHAT_API_KEY ist in der .env vorhanden."
+                  : "Fehlt — Operator muss SUPERCHAT_API_KEY in die .env auf dem Server eintragen."}
+              />
+              <StatusRow
+                ok={data.envWebhookSecret}
+                label="Webhook-Signatur-Schluessel gesetzt"
+                hint={data.envWebhookSecret
+                  ? "SUPERCHAT_WEBHOOK_SECRET ist in der .env vorhanden."
+                  : "Fehlt — ohne diesen Wert lehnt der Webhook eingehende Nachrichten mit 401 ab."}
+              />
+              <StatusRow
+                ok={!!data.lastInbound}
+                label={data.lastInbound
+                  ? `Letzte automatische Dokumentation: ${new Date(data.lastInbound.at).toLocaleString("de-DE")}`
+                  : "Noch keine automatisch dokumentierte Konversation"}
+                hint={data.lastInbound
+                  ? `Beim Lead "${data.lastInbound.leadName ?? "—"}" gespeichert.`
+                  : "Sobald Superchat eine Nachricht an den Webhook schickt, erscheint sie hier."}
+              />
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+              <p className="text-sm font-medium">Lead-Verknuepfung</p>
+              <p className="text-xs text-muted-foreground">
+                {data.leadsLinked} von {data.leadsTotal} Leads sind mit einer Superchat-Kontakt-ID verknuepft ({linkedPercent}%).
+                Nur verknuepfte Leads bekommen die Konversation automatisch zugeordnet.
+                Unverknuepfte Leads werden ueber Telefon/E-Mail-Vergleich gesucht.
+              </p>
+            </div>
+
+            <div className="rounded-lg border p-3 space-y-2">
+              <p className="text-sm font-medium">Webhook-URL (im Superchat-Dashboard eintragen)</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-md bg-muted px-2 py-1 text-xs break-all">
+                  {data.webhookUrl}
+                </code>
+                <Button size="sm" variant="outline" onClick={handleCopy} className="gap-1.5 shrink-0">
+                  {copied ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+                  {copied ? "Kopiert" : "Kopieren"}
+                </Button>
+              </div>
+            </div>
+
+            <details className="rounded-lg border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                Anleitung: Webhook in Superchat einrichten (einmalig)
+              </summary>
+              <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                <li>Im Superchat-Dashboard einloggen.</li>
+                <li>
+                  In den <span className="font-medium text-foreground">Entwickler-Einstellungen</span> auf{" "}
+                  <span className="font-medium text-foreground">Webhooks</span> klicken.
+                </li>
+                <li>
+                  Neuen Webhook anlegen, die obige URL einfuegen und die Events{" "}
+                  <code className="rounded bg-muted px-1">message_inbound</code> sowie{" "}
+                  <code className="rounded bg-muted px-1">conversation.closed</code> aktivieren.
+                </li>
+                <li>
+                  Den von Superchat angezeigten <span className="font-medium text-foreground">Signing Secret</span>{" "}
+                  kopieren — der wird auf dem Server als <code className="rounded bg-muted px-1">SUPERCHAT_WEBHOOK_SECRET</code> hinterlegt.
+                </li>
+                <li>Webhook speichern. Ab jetzt erscheinen alle eingehenden Nachrichten automatisch am passenden Lead.</li>
+              </ol>
+            </details>
+
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" onClick={fetchDiagnose} disabled={loading} className="gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Neu pruefen
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 interface SuperchatAttribute {
   id: string;
   name: string;
@@ -3856,6 +4028,7 @@ export default function SettingsPage() {
               settings={settings}
               onSave={saveSection}
             />
+            <SuperchatDiagnoseSection />
             <SuperchatAttributesSection />
             <HedySection settings={settings} onSave={saveSection} />
           </>
