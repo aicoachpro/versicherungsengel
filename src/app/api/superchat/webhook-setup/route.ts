@@ -96,9 +96,14 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/superchat/webhook-setup
- * Registriert unseren Webhook bei Superchat. Wenn schon einer mit unserer URL
- * existiert, wird kein neuer angelegt (Idempotenz).
+ * POST /api/superchat/webhook-setup[?force=true]
+ *
+ * Ohne force: idempotent — wenn schon ein Webhook mit unserer URL existiert,
+ * wird kein neuer erstellt.
+ *
+ * Mit force=true: loescht zuerst ALLE Webhooks mit unserer target_url und
+ * erstellt dann frisch — Use Case: Signing Secret ist verloren gegangen oder
+ * passt nicht mehr, ein neuer Webhook muss her, der ein frisches Secret liefert.
  */
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin();
@@ -111,19 +116,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const force = new URL(req.url).searchParams.get("force") === "true";
   const ourUrl = buildWebhookUrl(req);
 
   try {
     const existing = await listWebhooks();
-    const already = existing
+    const matching = existing
       .map((w) => normalize(w, ourUrl))
-      .find((w) => w?.matchesOurEndpoint);
+      .filter((w): w is NormalizedWebhook => !!w && w.matchesOurEndpoint);
 
-    if (already) {
+    if (force && matching.length > 0) {
+      for (const w of matching) {
+        try {
+          await deleteWebhook(w.id);
+        } catch {
+          // wenn delete fehlschlaegt, weitermachen — Superchat darf evtl. mehrere
+        }
+      }
+    } else if (matching.length > 0) {
       return NextResponse.json({
         created: false,
         alreadyRegistered: true,
-        webhook: already,
+        webhook: matching[0],
         webhookUrl: ourUrl,
       });
     }
@@ -143,6 +157,7 @@ export async function POST(req: NextRequest) {
       {
         created: true,
         alreadyRegistered: false,
+        replaced: force && matching.length > 0,
         webhook: normalize(created, ourUrl),
         signingSecret,
         webhookUrl: ourUrl,

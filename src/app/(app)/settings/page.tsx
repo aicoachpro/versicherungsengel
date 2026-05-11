@@ -3249,12 +3249,15 @@ function SuperchatDiagnoseSection() {
     }
   };
 
-  const registerWebhook = async () => {
+  const registerWebhook = async (force = false) => {
     setSetupAction("creating");
     setSetupError(null);
     setRevealedSecret(null);
     try {
-      const res = await fetch("/api/superchat/webhook-setup", { method: "POST" });
+      const url = force
+        ? "/api/superchat/webhook-setup?force=true"
+        : "/api/superchat/webhook-setup";
+      const res = await fetch(url, { method: "POST" });
       const json = await res.json();
       if (res.ok) {
         if (json.signingSecret) setRevealedSecret(json.signingSecret);
@@ -3385,7 +3388,7 @@ function SuperchatDiagnoseSection() {
                   {setupError}
                 </div>
               ) : setupStatus?.registered && setupStatus.ours ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <p className="text-xs text-muted-foreground">
                     Webhook ist bei Superchat registriert. Eingehende Nachrichten werden automatisch an diese App geschickt.
                   </p>
@@ -3393,6 +3396,30 @@ function SuperchatDiagnoseSection() {
                     <span className="font-medium text-foreground">Events:</span>{" "}
                     {setupStatus.ours.events.length > 0 ? setupStatus.ours.events.join(", ") : "—"}
                   </div>
+                  {data && !data.lastInbound && (
+                    <div className="rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-2">
+                      <p className="text-xs text-amber-900 dark:text-amber-200">
+                        Webhook ist verbunden, aber bisher kam noch nichts an. Moegliche Ursache:
+                        das Signing-Secret in der <code className="rounded bg-amber-100 dark:bg-amber-900 px-1">.env</code> passt
+                        nicht zu dem, mit dem Superchat signiert. Klick auf den Knopf, um den
+                        Webhook neu zu registrieren — Superchat gibt dabei ein frisches Secret aus.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => registerWebhook(true)}
+                        disabled={setupAction === "creating"}
+                        className="gap-1.5"
+                      >
+                        {setupAction === "creating" ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                        Webhook neu verbinden (neues Secret holen)
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -3402,7 +3429,7 @@ function SuperchatDiagnoseSection() {
                   </p>
                   <Button
                     size="sm"
-                    onClick={registerWebhook}
+                    onClick={() => registerWebhook(false)}
                     disabled={setupAction === "creating" || !data?.envApiKey}
                     className="gap-1.5"
                   >

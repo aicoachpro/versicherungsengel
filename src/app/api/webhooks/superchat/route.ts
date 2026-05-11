@@ -164,7 +164,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Body ist kein gueltiges JSON" }, { status: 400 });
   }
 
-  const event = String(body.event || body.type || "");
+  // Superchat schickt das Event-Topic im Header `x-superchat-topic`, NICHT im Body.
+  // Body-Form ist `{id: "pe_...", message: {...}}`. Wir fallen defensiv auf
+  // alte `body.event`/`body.type`-Felder zurueck (fuer Tests, n8n-Relays etc.).
+  const topicHeader = req.headers.get("x-superchat-topic") || "";
+  const event = String(topicHeader || body.event || body.type || "");
 
   // ===== Event: Konversation geschlossen / archiviert =====
   if (SUPPORTED_CONVERSATION_EVENTS.has(event)) {
@@ -267,38 +271,69 @@ export async function POST(req: NextRequest) {
   }
 
   // ===== Event: Einzelne Nachricht empfangen =====
-  if (!SUPPORTED_MESSAGE_EVENTS.has(event)) {
+  // Superchats echtes Format hat das Event NICHT im Body, sondern im
+  // x-superchat-topic Header. Falls weder Header noch body.event vorhanden,
+  // aber body.message existiert → als message_inbound interpretieren.
+  const hasMessagePayload = !!body.message && typeof body.message === "object";
+  if (!SUPPORTED_MESSAGE_EVENTS.has(event) && !(event === "" && hasMessagePayload)) {
     return NextResponse.json({ skipped: true, reason: `Event nicht unterstuetzt: ${event}` });
   }
 
-  const message = (body.data || body.message || body) as Record<string, unknown>;
+  // Im echten Superchat-Schema ist `body.message` das Message-Objekt.
+  // Fuer alte Formate (n8n-Relay, manuelle Tests) fallen wir auf body.data / body zurueck.
+  const message = (body.message || body.data || body) as Record<string, unknown>;
   const contact = (message.contact as Record<string, unknown> | undefined) || {};
   const contactId =
     (message.contact_id as string | undefined) ||
     (message.contactId as string | undefined) ||
-    (contact.id as string | undefined);
-  const contactPhone = (contact.phone as string | undefined) || (message.phone as string | undefined);
+    (contact.id as string | undefined) ||
+    (body.contact_id as string | undefined);
+  const contactPhone =
+    (contact.phone as string | undefined) ||
+    (message.phone as string | undefined) ||
+    (message.from as string | undefined);
   const contactEmail = (contact.email as string | undefined) || (message.email as string | undefined);
   const contactName = (contact.name as string | undefined) || (message.name as string | undefined);
-  const channel = (message.channel as string | undefined) || "whatsapp";
+  const channel =
+    (message.channel as string | undefined) ||
+    (body.channel as string | undefined) ||
+    "whatsapp";
 
-  // Inbound-only: outbound-Nachrichten von uns nicht doppelt protokollieren
+  // Inbound-only: outbound-Nachrichten von uns nicht doppelt protokollieren.
+  // Superchat markiert Inbound mit message.status === "received" und
+  // Outbound mit status "sent"/"delivered"/"read".
+  const status = (message.status as string | undefined) || "";
   const direction = (message.direction as string | undefined) || (message.type as string | undefined);
-  if (direction && direction !== "inbound" && direction !== "incoming") {
-    return NextResponse.json({ skipped: true, reason: `Outbound-Nachricht ignoriert (${direction})` });
+  const isInbound =
+    status === "received" ||
+    direction === "inbound" ||
+    direction === "incoming" ||
+    (!status && !direction); // Falls beides fehlt: nicht skippen, weiterverarbeiten
+  if (!isInbound) {
+    return NextResponse.json({
+      skipped: true,
+      reason: `Outbound-Nachricht ignoriert (status=${status}, direction=${direction})`,
+    });
   }
 
+  // Text aus den verschiedenen moeglichen Stellen extrahieren.
+  // Superchat: message.content.body fuer Text-Nachrichten.
   const body_ = message.body as { text?: string } | undefined;
-  const content = message.content as { text?: string } | undefined;
+  const content = message.content as { text?: string; body?: string; file_id?: string } | undefined;
   const text =
-    body_?.text ||
+    content?.body ||
     content?.text ||
+    body_?.text ||
     (message.text as string | undefined) ||
-    (message.content as string | undefined) ||
     "";
 
   if (!text) {
-    return NextResponse.json({ skipped: true, reason: "Leere Nachricht" });
+    // Datei-Nachrichten ohne Text: trotzdem Activity erstellen, damit die
+    // Konversation am Lead nachvollziehbar bleibt.
+    const isFileMessage = !!content?.file_id;
+    if (!isFileMessage) {
+      return NextResponse.json({ skipped: true, reason: "Leere Nachricht" });
+    }
   }
 
   const lead = findLeadByContact(contactId, contactPhone, contactEmail);
@@ -314,13 +349,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const content2 = message.content as { file_id?: string } | undefined;
+  const notizText = text || (content2?.file_id ? "(Datei-Anhang)" : "(leer)");
+
   const activity = db
     .insert(activities)
     .values({
       leadId: lead.id,
       datum: new Date().toISOString(),
       kontaktart: mapKontaktart(channel),
-      notiz: `[Superchat ${channel}] ${text}`,
+      notiz: `[Superchat ${channel}] ${notizText}`,
     })
     .returning()
     .get();
