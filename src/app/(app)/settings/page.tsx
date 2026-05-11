@@ -3179,6 +3179,20 @@ interface SuperchatDiagnose {
   webhookUrl: string;
 }
 
+interface SuperchatWebhook {
+  id: string;
+  targetUrl: string;
+  events: string[];
+  matchesOurEndpoint: boolean;
+}
+
+interface WebhookSetupStatus {
+  webhookUrl: string;
+  registered: boolean;
+  ours: SuperchatWebhook | null;
+  all: SuperchatWebhook[];
+}
+
 function StatusRow({ ok, label, hint }: { ok: boolean; label: string; hint?: string }) {
   return (
     <div className="flex items-start gap-3">
@@ -3199,6 +3213,11 @@ function SuperchatDiagnoseSection() {
   const [data, setData] = useState<SuperchatDiagnose | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [setupStatus, setSetupStatus] = useState<WebhookSetupStatus | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [setupAction, setSetupAction] = useState<"idle" | "creating">("idle");
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
 
   const fetchDiagnose = async () => {
     setLoading(true);
@@ -3212,8 +3231,48 @@ function SuperchatDiagnoseSection() {
     }
   };
 
+  const fetchSetupStatus = async () => {
+    setSetupLoading(true);
+    setSetupError(null);
+    try {
+      const res = await fetch("/api/superchat/webhook-setup");
+      const json = await res.json();
+      if (res.ok) {
+        setSetupStatus(json);
+      } else {
+        setSetupError(json.error || "Unbekannter Fehler");
+      }
+    } catch {
+      setSetupError("Verbindungsfehler");
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
+  const registerWebhook = async () => {
+    setSetupAction("creating");
+    setSetupError(null);
+    setRevealedSecret(null);
+    try {
+      const res = await fetch("/api/superchat/webhook-setup", { method: "POST" });
+      const json = await res.json();
+      if (res.ok) {
+        if (json.signingSecret) setRevealedSecret(json.signingSecret);
+        await fetchSetupStatus();
+        await fetchDiagnose();
+      } else {
+        setSetupError(json.error || "Registrierung fehlgeschlagen");
+      }
+    } catch {
+      setSetupError("Verbindungsfehler");
+    } finally {
+      setSetupAction("idle");
+    }
+  };
+
   useEffect(() => {
     fetchDiagnose();
+    fetchSetupStatus();
   }, []);
 
   const handleCopy = async () => {
@@ -3306,31 +3365,87 @@ function SuperchatDiagnoseSection() {
               </div>
             </div>
 
-            <details className="rounded-lg border p-3">
-              <summary className="cursor-pointer text-sm font-medium">
-                Anleitung: Webhook in Superchat einrichten (einmalig)
-              </summary>
-              <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-                <li>Im Superchat-Dashboard einloggen.</li>
-                <li>
-                  In den <span className="font-medium text-foreground">Entwickler-Einstellungen</span> auf{" "}
-                  <span className="font-medium text-foreground">Webhooks</span> klicken.
-                </li>
-                <li>
-                  Neuen Webhook anlegen, die obige URL einfuegen und die Events{" "}
-                  <code className="rounded bg-muted px-1">message_inbound</code> sowie{" "}
-                  <code className="rounded bg-muted px-1">conversation.closed</code> aktivieren.
-                </li>
-                <li>
-                  Den von Superchat angezeigten <span className="font-medium text-foreground">Signing Secret</span>{" "}
-                  kopieren — der wird auf dem Server als <code className="rounded bg-muted px-1">SUPERCHAT_WEBHOOK_SECRET</code> hinterlegt.
-                </li>
-                <li>Webhook speichern. Ab jetzt erscheinen alle eingehenden Nachrichten automatisch am passenden Lead.</li>
-              </ol>
-            </details>
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Webhook-Registrierung in Superchat</p>
+                {setupStatus && (
+                  <Badge variant={setupStatus.registered ? "default" : "secondary"}>
+                    {setupStatus.registered ? "Verbunden" : "Nicht verbunden"}
+                  </Badge>
+                )}
+              </div>
 
-            <div className="flex justify-end">
-              <Button size="sm" variant="outline" onClick={fetchDiagnose} disabled={loading} className="gap-1.5">
+              {setupLoading && !setupStatus ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Pruefe Superchat...
+                </div>
+              ) : setupError ? (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive">
+                  {setupError}
+                </div>
+              ) : setupStatus?.registered && setupStatus.ours ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Webhook ist bei Superchat registriert. Eingehende Nachrichten werden automatisch an diese App geschickt.
+                  </p>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Events:</span>{" "}
+                    {setupStatus.ours.events.length > 0 ? setupStatus.ours.events.join(", ") : "—"}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Bei Superchat ist noch kein Webhook fuer diese App registriert. Klick auf den Knopf,
+                    um die Verbindung automatisch herzustellen — kein manueller Eintrag in Superchat noetig.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={registerWebhook}
+                    disabled={setupAction === "creating" || !data?.envApiKey}
+                    className="gap-1.5"
+                  >
+                    {setupAction === "creating" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                    )}
+                    Webhook jetzt automatisch verbinden
+                  </Button>
+                  {!data?.envApiKey && (
+                    <p className="text-xs text-destructive">
+                      Erst den Superchat API-Key in die .env eintragen — sonst kann die App Superchat nicht ansprechen.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {revealedSecret && (
+                <div className="rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                    Signing Secret von Superchat erhalten
+                  </p>
+                  <p className="text-xs text-amber-900 dark:text-amber-200">
+                    Dieser Wert muss in der <code className="rounded bg-amber-100 dark:bg-amber-900 px-1">.env</code> auf dem Server
+                    als <code className="rounded bg-amber-100 dark:bg-amber-900 px-1">SUPERCHAT_WEBHOOK_SECRET</code> eingetragen
+                    und der Container neu gestartet werden. Operator hierzu informieren.
+                  </p>
+                  <code className="block rounded bg-amber-100 dark:bg-amber-900 px-2 py-1 text-xs break-all">
+                    {revealedSecret}
+                  </code>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { fetchDiagnose(); fetchSetupStatus(); }}
+                disabled={loading || setupLoading}
+                className="gap-1.5"
+              >
                 <RefreshCw className="h-3.5 w-3.5" />
                 Neu pruefen
               </Button>
