@@ -17,6 +17,7 @@ Lead-Management & Versicherungs-CRM fuer Versicherungsvermittler. Fullstack-Weba
 - **API-Ingest** — Externe Lead-Erfassung (n8n, Webhooks) mit Rate-Limiting
 - **MCP-Server** — Claude AI Integration via Model Context Protocol
 - **Hedy-Integration** — Gespraechsnotizen aus Hedy-Sitzungen landen automatisch als Aktivitaeten am passenden Lead (Matching ueber Termin-Zeitfenster + Teilnehmer, manuelle Zuordnung fallback, VOE-156)
+- **Superchat-Integration** — Bidirektionaler Sync (WhatsApp, SMS, E-Mail). Eingehende Nachrichten landen automatisch als Aktivitaet am passenden Lead. Settings-Karte mit Diagnose + 1-Klick-Webhook-Setup (VOE-199/200/201)
 
 ## Tech Stack
 
@@ -162,6 +163,9 @@ versicherungsengel/
 | `/api/activities/ingest` | POST | Externe Aktivitaeten-Erfassung |
 | `/api/leads/search` | POST | Lead-Suche (Name/ID) |
 | `/api/webhooks/leads` | GET, POST | Webhook fuer externe Integrationen |
+| `/api/webhooks/superchat` | POST | Eingehende Superchat-Nachrichten (HMAC-signiert) → Activity |
+| `/api/superchat/diagnose` | GET | Admin: Status der Superchat-Verbindung (Env, Lead-Verknuepfung, letzte Inbound) |
+| `/api/superchat/webhook-setup` | GET, POST | Admin: Webhook bei Superchat registrieren (POST `?force=true` = neu verbinden) |
 
 ```bash
 # Beispiel: Lead erstellen
