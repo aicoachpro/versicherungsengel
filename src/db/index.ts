@@ -28,7 +28,8 @@ function resolveMigrationsFolder(): string | null {
     "/app/drizzle",
   ];
   for (const candidate of candidates) {
-    if (fs.existsSync(path.join(candidate, "_journal.json"))) return candidate;
+    // _journal.json liegt in meta/, nicht direkt im drizzle/-Ordner
+    if (fs.existsSync(path.join(candidate, "meta", "_journal.json"))) return candidate;
   }
   return null;
 }
