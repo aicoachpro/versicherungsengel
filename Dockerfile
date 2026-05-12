@@ -39,6 +39,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Dynamic imports not traced by Next.js standalone — copy manually
 COPY --from=deps /app/node_modules/unpdf ./node_modules/unpdf
 
+# Drizzle-Migrationen fuer Auto-Migration beim Container-Start (VOE-133)
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
+
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
