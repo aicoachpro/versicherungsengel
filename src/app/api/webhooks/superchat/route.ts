@@ -27,17 +27,97 @@ function mapKontaktart(channel: string): Kontaktart {
   return (CHANNEL_MAP[channel.toLowerCase()] || "Sonstiges") as Kontaktart;
 }
 
-// HMAC-SHA256-Verifikation gegen X-Superchat-Signature.
-// Akzeptiert sowohl "sha256=<hex>" als auch reines hex.
-function verifySuperchatSignature(rawBody: string, header: string, secret: string): boolean {
-  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
-  const provided = header.startsWith("sha256=") ? header.slice(7) : header;
-  if (provided.length !== expected.length) return false;
+// HMAC-Verifikation gegen X-Superchat-Signature.
+//
+// Superchat dokumentiert das Signatur-Format nicht klar, deshalb probieren wir
+// mehrere gaengige Varianten gleichzeitig:
+//   1. HMAC-SHA256(rawBody) mit Secret als String → hex
+//   2. HMAC-SHA256(rawBody) mit Secret base64-decoded → hex
+//   3. HMAC-SHA256(rawBody) mit Secret base64-decoded → base64
+//   4. HMAC-SHA256(timestamp.rawBody) mit Secret base64-decoded → hex (Stripe-Style)
+//   5. HMAC-SHA256(topic.timestamp.rawBody) mit Secret base64-decoded → hex
+//
+// Sobald eine Variante matcht, geben wir die Methode im Log aus — danach kann
+// der Code vereinfacht werden auf die richtige Variante. Falls keine matcht,
+// loggen wir alle berechneten Hashes + den erhaltenen Wert zur Diagnose.
+function safeEqualBytes(a: Buffer, b: Buffer): boolean {
+  if (a.length !== b.length) return false;
   try {
-    return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(provided, "hex"));
+    return timingSafeEqual(a, b);
   } catch {
     return false;
   }
+}
+
+function verifySuperchatSignature(
+  rawBody: string,
+  header: string,
+  secret: string,
+  timestampHeader: string | null,
+  topicHeader: string | null,
+): { ok: boolean; matched?: string; debug: Record<string, string> } {
+  const provided = header.startsWith("sha256=") ? header.slice(7) : header;
+  const secretAsString = secret;
+  let secretAsBytes: Buffer | null = null;
+  try {
+    secretAsBytes = Buffer.from(secret, "base64");
+  } catch {
+    secretAsBytes = null;
+  }
+
+  const variants: Array<{ name: string; expected: Buffer; mode: "hex" | "base64" }> = [];
+  variants.push({
+    name: "v1: sha256(body) / secret=string / hex",
+    expected: createHmac("sha256", secretAsString).update(rawBody, "utf8").digest(),
+    mode: "hex",
+  });
+  if (secretAsBytes) {
+    variants.push({
+      name: "v2: sha256(body) / secret=base64-bytes / hex",
+      expected: createHmac("sha256", secretAsBytes).update(rawBody, "utf8").digest(),
+      mode: "hex",
+    });
+    variants.push({
+      name: "v3: sha256(body) / secret=base64-bytes / base64",
+      expected: createHmac("sha256", secretAsBytes).update(rawBody, "utf8").digest(),
+      mode: "base64",
+    });
+    if (timestampHeader) {
+      variants.push({
+        name: "v4: sha256(timestamp.body) / secret=base64-bytes / hex",
+        expected: createHmac("sha256", secretAsBytes)
+          .update(`${timestampHeader}.${rawBody}`, "utf8")
+          .digest(),
+        mode: "hex",
+      });
+      if (topicHeader) {
+        variants.push({
+          name: "v5: sha256(topic.timestamp.body) / secret=base64-bytes / hex",
+          expected: createHmac("sha256", secretAsBytes)
+            .update(`${topicHeader}.${timestampHeader}.${rawBody}`, "utf8")
+            .digest(),
+          mode: "hex",
+        });
+      }
+    }
+  }
+
+  const debug: Record<string, string> = { provided };
+  for (const v of variants) {
+    const expectedStr = v.mode === "hex" ? v.expected.toString("hex") : v.expected.toString("base64");
+    debug[v.name] = expectedStr.slice(0, 16) + "...";
+    let providedBuf: Buffer;
+    try {
+      providedBuf =
+        v.mode === "hex" ? Buffer.from(provided, "hex") : Buffer.from(provided, "base64");
+    } catch {
+      continue;
+    }
+    if (safeEqualBytes(v.expected, providedBuf)) {
+      return { ok: true, matched: v.name, debug };
+    }
+  }
+  return { ok: false, debug };
 }
 
 type AuthResult = { ok: true; via: "hmac" | "api-key" } | { ok: false; reason: string };
@@ -48,10 +128,29 @@ function authenticate(req: NextRequest, rawBody: string): AuthResult {
   const sigHeader =
     req.headers.get("x-superchat-signature") ||
     req.headers.get("x-signature");
+  const timestampHeader = req.headers.get("x-superchat-timestamp");
+  const topicHeader = req.headers.get("x-superchat-topic");
   if (secret && sigHeader) {
-    return verifySuperchatSignature(rawBody, sigHeader, secret)
-      ? { ok: true, via: "hmac" }
-      : { ok: false, reason: "Ungueltige HMAC-Signatur" };
+    const result = verifySuperchatSignature(
+      rawBody,
+      sigHeader,
+      secret,
+      timestampHeader,
+      topicHeader,
+    );
+    if (result.ok) {
+      console.log(`[superchat-webhook] HMAC ok via ${result.matched}`);
+      return { ok: true, via: "hmac" };
+    }
+    // Diagnose-Log: alle berechneten Varianten + der gelieferte Wert
+    console.warn(
+      `[superchat-webhook] HMAC FAIL — provided=${result.debug.provided?.slice(0, 20)}... variants=${JSON.stringify(
+        Object.fromEntries(
+          Object.entries(result.debug).filter(([k]) => k !== "provided"),
+        ),
+      )}`,
+    );
+    return { ok: false, reason: "Ungueltige HMAC-Signatur" };
   }
 
   // 2. Fallback: x-api-key (n8n-Relay etc.)
