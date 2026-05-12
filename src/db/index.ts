@@ -82,40 +82,49 @@ function bootstrapDrizzleMigrationsIfNeeded(sqlite: Database.Database, migration
   }
 }
 
-const migrationsFolder = resolveMigrationsFolder();
-if (migrationsFolder) {
+// Beim Next.js-Build wird db/index.ts vom Prerender geladen. Eine frische
+// Build-DB wuerde dann scheitern, weil das Drizzle-Journal nicht vollstaendig
+// ist (nur 0000-Migration drin) und applyRuntimeMigrations auf Tabellen
+// zugreift, die im Build noch nicht existieren. Migration darf nur zur
+// Runtime laufen, nicht beim Build.
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
+if (!isBuildPhase) {
+  const migrationsFolder = resolveMigrationsFolder();
+  if (migrationsFolder) {
+    try {
+      bootstrapDrizzleMigrationsIfNeeded(sqlite, migrationsFolder);
+      migrate(db, { migrationsFolder });
+      console.log(`[db] Drizzle-Migrationen aus ${migrationsFolder} angewendet`);
+    } catch (err) {
+      console.error("[db] Drizzle-Migrationen fehlgeschlagen:", err);
+      // Best-effort Telegram-Alert ueber dynamic import, damit hier kein Zirkel-Import entsteht
+      import("../lib/telegram")
+        .then((mod) =>
+          mod.sendTelegramMessage(
+            `<b>DB-Migration fehlgeschlagen</b>\n${err instanceof Error ? err.message : String(err)}`,
+          ),
+        )
+        .catch(() => {});
+      throw err;
+    }
+  } else {
+    console.warn("[db] Kein drizzle/-Ordner gefunden — Drizzle-Migrationen werden uebersprungen");
+  }
+
+  // Custom idempotente Schema-Ensures (VOE-156, 174, 175, 191).
+  // Laeuft NACH den Drizzle-Migrationen, damit Tabellen existieren.
   try {
-    bootstrapDrizzleMigrationsIfNeeded(sqlite, migrationsFolder);
-    migrate(db, { migrationsFolder });
-    console.log(`[db] Drizzle-Migrationen aus ${migrationsFolder} angewendet`);
+    applyRuntimeMigrations(sqlite);
   } catch (err) {
-    console.error("[db] Drizzle-Migrationen fehlgeschlagen:", err);
-    // Best-effort Telegram-Alert ueber dynamic import, damit hier kein Zirkel-Import entsteht
+    console.error("[db] Runtime-Migrationen fehlgeschlagen:", err);
     import("../lib/telegram")
       .then((mod) =>
         mod.sendTelegramMessage(
-          `<b>DB-Migration fehlgeschlagen</b>\n${err instanceof Error ? err.message : String(err)}`,
+          `<b>Runtime-Migration fehlgeschlagen</b>\n${err instanceof Error ? err.message : String(err)}`,
         ),
       )
       .catch(() => {});
     throw err;
   }
-} else {
-  console.warn("[db] Kein drizzle/-Ordner gefunden — Drizzle-Migrationen werden uebersprungen");
-}
-
-// Custom idempotente Schema-Ensures (VOE-156, 174, 175, 191).
-// Laeuft NACH den Drizzle-Migrationen, damit Tabellen existieren.
-try {
-  applyRuntimeMigrations(sqlite);
-} catch (err) {
-  console.error("[db] Runtime-Migrationen fehlgeschlagen:", err);
-  import("../lib/telegram")
-    .then((mod) =>
-      mod.sendTelegramMessage(
-        `<b>Runtime-Migration fehlgeschlagen</b>\n${err instanceof Error ? err.message : String(err)}`,
-      ),
-    )
-    .catch(() => {});
-  throw err;
 }
